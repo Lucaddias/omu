@@ -225,8 +225,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "O Papagaio usa eventos do calendário para reconhecer participantes e o contexto da reunião.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "O Papagaio usa contatos para reconhecer melhor nomes próprios em transcrições.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "O Papagaio grava o seu microfone para transcrever o que você fala na reunião.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -255,8 +253,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "O Papagaio usa eventos do calendário para reconhecer participantes e o contexto da reunião.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "O Papagaio usa contatos para reconhecer melhor nomes próprios em transcrições.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "O Papagaio grava o seu microfone para transcrever o que você fala na reunião.";
 				LD_RUNPATH_SEARCH_PATHS = (

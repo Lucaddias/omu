@@ -93,3 +93,35 @@ struct PainelDeGravacao: View {
     }
 
 }
+
+struct AvisosDaGravacao: View {
+    let avisos: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
+            ForEach(avisos, id: \.self) { aviso in
+                Label(aviso, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(PapagaioTema.aviso)
+            }
+        }
+        .padding(PapagaioTema.Espaco.largo)
+        .background(PapagaioTema.aviso.opacity(0.09), in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous).stroke(PapagaioTema.aviso.opacity(0.36), lineWidth: 1) }
+    }
+}
+
+struct FalhaDaGravacao: View {
+    let mensagem: String
+
+    var body: some View {
+        Label(mensagem, systemImage: "xmark.octagon.fill")
+            .font(.callout)
+            .foregroundStyle(PapagaioTema.perigo)
+            .padding(PapagaioTema.Espaco.largo)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(PapagaioTema.perigo.opacity(0.09), in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous).stroke(PapagaioTema.perigo.opacity(0.32), lineWidth: 1) }
+            .accessibilityElement(children: .combine)
+    }
+}

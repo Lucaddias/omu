@@ -264,3 +264,35 @@ struct EditorDeInformacoesDoCard: View {
     }
 }
 
+struct PessoasDaFichaDaEntrevista: View {
+    let titulo: String
+    @Binding var nome: String
+    @Binding var email: String
+    let placeholderNome: String
+    let placeholderEmail: String
+
+    private var quantidade: Int { max(nome.components(separatedBy: .newlines).count, email.components(separatedBy: .newlines).count, 1) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
+            Text(titulo).font(.caption.weight(.bold)).foregroundStyle(PapagaioTema.destaqueEscuro).textCase(.uppercase)
+            ForEach(0..<quantidade, id: \.self) { indice in
+                HStack(alignment: .top, spacing: PapagaioTema.Espaco.medio) {
+                    campo("Nome") { TextField(placeholderNome, text: bindingLinha($nome, indice)).textFieldStyle(.plain).campoPapagaio() }
+                    campo("E-mail") { TextField(placeholderEmail, text: bindingLinha($email, indice)).textFieldStyle(.plain).campoPapagaio() }
+                    if quantidade > 1 { Button { removerPessoa(indice) } label: { Image(systemName: "trash") }.buttonStyle(.plain) }
+                }
+            }
+            Button { nome += nome.isEmpty ? "\n" : "\n"; email += email.isEmpty ? "\n" : "\n" } label: { Label("Adicionar pessoa", systemImage: "plus.circle") }.buttonStyle(.plain)
+        }
+    }
+
+    private func campo<Content: View>(_ titulo: String, @ViewBuilder _ content: () -> Content) -> some View { VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) { Text(titulo).font(.caption.weight(.bold)).foregroundStyle(PapagaioTema.textoSecundario); content() }.frame(maxWidth: .infinity, alignment: .leading) }
+    private func bindingLinha(_ texto: Binding<String>, _ indice: Int) -> Binding<String> { Binding(get: { texto.wrappedValue.components(separatedBy: .newlines).dropFirst(indice).first ?? "" }, set: { novo in var linhas = texto.wrappedValue.components(separatedBy: .newlines); while linhas.count <= indice { linhas.append("") }; linhas[indice] = novo; texto.wrappedValue = linhas.joined(separator: "\n") }) }
+    private func removerPessoa(_ indice: Int) { for binding in [$nome, $email] { var linhas = binding.wrappedValue.components(separatedBy: .newlines); if linhas.indices.contains(indice) { linhas.remove(at: indice); binding.wrappedValue = linhas.joined(separator: "\n") } } }
+}
+
+struct BotaoDeFormatoDaEntrevista: View {
+    let titulo: String; let simbolo: String; let selecionado: Bool; let acao: () -> Void
+    var body: some View { Button(action: acao) { Label(titulo, systemImage: simbolo).font(.callout.weight(.semibold)).foregroundStyle(selecionado ? PapagaioTema.textoSobrePrimario : PapagaioTema.textoSecundario).frame(maxWidth: .infinity).frame(height: PapagaioTema.Altura.padrao).background(selecionado ? PapagaioTema.preenchimentoPrimario : PapagaioTema.superficie, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous)).overlay { RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous).stroke(selecionado ? Color.clear : PapagaioTema.borda, lineWidth: 1) } }.buttonStyle(.plain) }
+}
