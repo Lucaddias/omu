@@ -1,3 +1,32 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:518c9cbaa95bfa21f2acad01fe1d29bd8a6bdfd797021a2b39de3c5145b48ac0
-size 963
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>llama</string>
+    <key>CFBundleIdentifier</key>
+    <string>org.ggml.llama</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>llama</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>MinimumOSVersion</key>
+    <string>13.3</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
+    <key>DTPlatformName</key>
+    <string>macosx</string>
+    <key>DTSDKName</key>
+    <string>macosx13.3</string>
+</dict>
+</plist>

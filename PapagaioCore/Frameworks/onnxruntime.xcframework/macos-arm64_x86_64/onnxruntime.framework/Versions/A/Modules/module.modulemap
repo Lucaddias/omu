@@ -1,3 +1,6 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:91d74b46edff33756dc81b2894147d3dc7375811974a2dd29152a173102d3f6d
-size 109
+framework module onnxruntime {
+  umbrella header "onnxruntime_c_api.h"
+
+  export *
+  module * { export * }
+}

@@ -1,3 +1,21 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:c1d3a522672341d8796d462a03ae55d24325c4de23e81e0920a133fa3d0d9996
-size 670
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>onnxruntime</string>
+	<key>CFBundleName</key>
+	<string>onnxruntime</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.microsoft.onnxruntime</string>
+	<key>CFBundleVersion</key>
+	<string>1.24.2</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.24.2</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundlePackageType</key>
+	<string>FMWK</string>
+    <key>MinimumOSVersion</key>
+    <string>14.0</string></dict>
+</plist>

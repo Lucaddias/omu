@@ -17,6 +17,7 @@ struct TarefasView: View {
     @State private var prioridadeDoEditor: PrioridadeDaTarefa = .media
     @State private var statusDoEditor: StatusDaTarefa = .emAndamento
     @State private var prazoDoEditor = Date()
+    @State private var larguraDoQuadro: CGFloat?
 
     private var conversas: [Arquivo] {
         biblioteca?.arquivos.sorted { $0.criadoEm > $1.criadoEm } ?? []
@@ -198,6 +199,7 @@ struct TarefasView: View {
                 }
                 .padding(.vertical, PapagaioTema.Espaco.minimo)
             }
+            .desvanecerNasBordasHorizontais()
         }
     }
 
@@ -249,21 +251,40 @@ struct TarefasView: View {
                 .frame(maxWidth: .infinity, minHeight: 240)
                 .cartaoPapagaio()
             } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: PapagaioTema.Espaco.largo) {
-                        coluna(titulo: "Prioridade alta", cor: PapagaioTema.perigo, tarefas: tarefasDePrioridadeAlta)
-                        coluna(titulo: "Em andamento", cor: PapagaioTema.destaque, tarefas: tarefasEmAndamento)
-                        coluna(titulo: "Concluídas", cor: PapagaioTema.textoSecundario, tarefas: tarefasConcluidas)
-                    }
+                // `AnyLayout` decidido pela largura medida, e não `ViewThatFits`:
+                // o quadro tem de empilhar quando a *janela* aperta, nunca por
+                // causa do texto que está dentro dele. Ver `cabeEmColunas`.
+                let arranjo = cabeEmColunas
+                    ? AnyLayout(HStackLayout(alignment: .top, spacing: PapagaioTema.Espaco.largo))
+                    : AnyLayout(VStackLayout(alignment: .leading, spacing: PapagaioTema.Espaco.largo))
 
-                    VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
-                        coluna(titulo: "Prioridade alta", cor: PapagaioTema.perigo, tarefas: tarefasDePrioridadeAlta)
-                        coluna(titulo: "Em andamento", cor: PapagaioTema.destaque, tarefas: tarefasEmAndamento)
-                        coluna(titulo: "Concluídas", cor: PapagaioTema.textoSecundario, tarefas: tarefasConcluidas)
-                    }
+                arranjo {
+                    coluna(titulo: "Prioridade alta", cor: PapagaioTema.perigo, tarefas: tarefasDePrioridadeAlta)
+                    coluna(titulo: "Em andamento", cor: PapagaioTema.destaque, tarefas: tarefasEmAndamento)
+                    coluna(titulo: "Concluídas", cor: PapagaioTema.textoSecundario, tarefas: tarefasConcluidas)
                 }
             }
         }
+        // Medido no bloco inteiro, que ocupa a mesma largura nos dois arranjos.
+        // Medir o próprio quadro faria a escolha depender do que ela produziu.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { larguraDoQuadro = $0 }
+    }
+
+    /// Largura mínima em que um cartão de tarefa ainda se lê: abaixo disso o
+    /// título quebra em quatro linhas e a data desgruda do responsável.
+    private static let larguraMinimaDaColuna: CGFloat = 280
+
+    /// As três colunas lado a lado só quando a janela realmente as comporta.
+    ///
+    /// Isto era um `ViewThatFits`, que escolhe pelo tamanho *ideal* do conteúdo
+    /// — e o ideal de um texto é a linha inteira sem quebrar. Bastava uma tarefa
+    /// de título longo mudar de coluna para o total estourar e o quadro inteiro
+    /// desabar numa coluna só, sem a janela ter mudado de tamanho. Era esse o
+    /// "bug ao concluir": concluir movia um cartão comprido para as Concluídas.
+    private var cabeEmColunas: Bool {
+        // Antes da primeira medida, assume que cabe: a janela padrão comporta.
+        guard let larguraDoQuadro else { return true }
+        return larguraDoQuadro >= Self.larguraMinimaDaColuna * 3 + PapagaioTema.Espaco.largo * 2
     }
 
     private var tituloDoKanban: String {

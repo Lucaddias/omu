@@ -107,10 +107,17 @@ struct AvisosDaGravacao: View {
         }
         .padding(PapagaioTema.Espaco.largo)
         .background(PapagaioTema.aviso.opacity(0.09), in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous).stroke(PapagaioTema.aviso.opacity(0.36), lineWidth: 1) }
+        .overlay {
+            RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous)
+                .stroke(PapagaioTema.aviso.opacity(0.36), lineWidth: 1)
+        }
     }
 }
 
+
+/// A falha de captura/importação fazia parte do texto de estado da tela
+/// anterior. Mantê-la visível evita transformar um erro operacional em um
+/// cartão silencioso depois do redesign.
 struct FalhaDaGravacao: View {
     let mensagem: String
 
@@ -120,8 +127,14 @@ struct FalhaDaGravacao: View {
             .foregroundStyle(PapagaioTema.perigo)
             .padding(PapagaioTema.Espaco.largo)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(PapagaioTema.perigo.opacity(0.09), in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
-            .overlay { RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous).stroke(PapagaioTema.perigo.opacity(0.32), lineWidth: 1) }
+            .background(
+                PapagaioTema.perigo.opacity(0.09),
+                in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous)
+                    .stroke(PapagaioTema.perigo.opacity(0.32), lineWidth: 1)
+            }
             .accessibilityElement(children: .combine)
     }
 }

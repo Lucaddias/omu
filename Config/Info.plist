@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>O Papagaio usa o reconhecimento de fala para mostrar a nota ditada enquanto você fala. O texto final é refinado no seu Mac, sem sair dele.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>O Papagaio grava o áudio da reunião para transcrever a fala do seu interlocutor.</string>
 </dict>

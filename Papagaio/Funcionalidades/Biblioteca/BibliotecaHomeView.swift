@@ -35,6 +35,46 @@ struct BibliotecaHomeView: View {
     @State private var criandoPasta = false
     @State private var novaPasta = ""
 
+    /// Durante a captura, filtros e pastas somem: a página é a tela da
+    /// gravação, e não um acervo para navegar.
+    @ViewBuilder
+    private var filtrosEPastas: some View {
+        if secaoSelecionada == .todos, !emCaptura {
+            FiltroDeConversas(
+                selecionado: $filtroSelecionado,
+                pastaSelecionada: $pastaSelecionada,
+                atalhoSelecionado: $atalhoSelecionado,
+                aoLimparAtalhoVisual: limparAtalhoVisual
+            )
+
+            if filtroSelecionado == .pastas, pastaSelecionada == nil {
+                GradeDePastas(
+                    pastas: informacoesDasPastas,
+                    selecionada: $pastaSelecionada,
+                    aoCriarPasta: abrirCriacaoDePasta
+                )
+                .simultaneousGesture(TapGesture().onEnded { limparAtalhoVisual() })
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var capturaEmAndamento: some View {
+        if emCaptura {
+            PainelDeGravacao(
+                waveform: gravador.waveform,
+                tempoDeGravacao: gravador.tempoDeGravacao,
+                pausado: gravador.pausado,
+                aoPausar: aoPausarGravacao,
+                aoContinuar: aoContinuarGravacao,
+                aoFinalizar: aoAlternarGravacao,
+                aoCancelar: aoCancelarGravacao
+            )
+
+            PainelDeNotasDuranteGravacao(gravador: gravador)
+        }
+    }
+
     /// Tela de captura: gravando **e** com o foco nela.
     private var emCaptura: Bool {
         gravador.gravando && focoNaGravacao
@@ -232,23 +272,7 @@ struct BibliotecaHomeView: View {
                     }
                 }
 
-                if secaoSelecionada == .todos {
-                    FiltroDeConversas(
-                        selecionado: $filtroSelecionado,
-                        pastaSelecionada: $pastaSelecionada,
-                        atalhoSelecionado: $atalhoSelecionado,
-                        aoLimparAtalhoVisual: limparAtalhoVisual
-                    )
-                }
-
-                if secaoSelecionada == .todos, filtroSelecionado == .pastas, pastaSelecionada == nil {
-                    GradeDePastas(
-                        pastas: informacoesDasPastas,
-                        selecionada: $pastaSelecionada,
-                        aoCriarPasta: abrirCriacaoDePasta
-                    )
-                    .simultaneousGesture(TapGesture().onEnded { limparAtalhoVisual() })
-                }
+                filtrosEPastas
 
                 if let modelos, !modelos.pronto {
                     CartaoDeModelos(
@@ -258,19 +282,7 @@ struct BibliotecaHomeView: View {
                     )
                 }
 
-                if emCaptura {
-                    PainelDeGravacao(
-                        waveform: gravador.waveform,
-                        tempoDeGravacao: gravador.tempoDeGravacao,
-                        pausado: gravador.pausado,
-                        aoPausar: aoPausarGravacao,
-                        aoContinuar: aoContinuarGravacao,
-                        aoFinalizar: aoAlternarGravacao,
-                        aoCancelar: aoCancelarGravacao
-                    )
-
-                    PainelDeNotasDuranteGravacao(gravador: gravador)
-                }
+                capturaEmAndamento
 
                 if !gravador.avisos.isEmpty {
                     AvisosDaGravacao(avisos: gravador.avisos)

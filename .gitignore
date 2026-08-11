@@ -1,14 +1,14 @@
-# Os XCFrameworks de whisper.cpp, llama.cpp e ONNX Runtime (~1 GB) **estão**
-# versionados, via Git LFS — ver .gitattributes. Já estiveram fora do git e
-# baixados pelo Scripts/bootstrap-runtimes.sh; a regra que os ignorava ficou
-# para trás e contradizia os 295 arquivos rastreados (arquivo já rastreado
-# vence o .gitignore, então a linha não fazia nada além de enganar quem lia).
-#
-# Quem clona precisa de `git lfs pull` para receber os binários no lugar dos
-# ponteiros — sem isso o Info.plist de cada .xcframework chega como texto e o
-# Xcode falha com "Failed to decode XCFramework Info.plist".
+# Os XCFrameworks de whisper.cpp, llama.cpp e ONNX Runtime ficam FORA do git.
+# São baixados por Scripts/bootstrap-runtimes.sh a partir das releases
+# oficiais (com verificação de SHA-256) — reproduzíveis a qualquer momento,
+# então não há motivo para versionar o binário em si, nem via LFS: são ~200MB
+# só de macOS (a única plataforma que o Package.swift builda), e LFS troca um
+# problema (não caber no git) por outro (o bootstrap e o LFS disputando dono
+# dos mesmos arquivos — foi isso que quebrava o `git pull` depois de rodar o
+# bootstrap). Quem clona só precisa rodar Scripts/bootstrap-runtimes.sh uma vez.
+PapagaioCore/Frameworks/
 
-# Modelo do Silero VAD (M.1) — 2,3 MB, este sim fora do git. É baixado pelo
+# Modelo do Silero VAD (M.1) — 2,3 MB, mesmo motivo acima: baixado pelo
 # Scripts/bootstrap-runtimes.sh para Sources/PapagaioCore/Resources/, de onde
 # vira resource do PapagaioCore. Sem ele a resolução do pacote falha com
 # "The file 'Resources' couldn't be opened".
@@ -17,6 +17,5 @@ PapagaioCore/Sources/PapagaioCore/Resources/silero_vad.onnx
 .build/
 *.xcuserdatad/
 
-# Lixo do Finder. Catorze deles chegaram a ser commitados (inclusive dentro dos
-# .xcframework, onde o filtro do LFS ainda os empacotava como binário).
+# Lixo do Finder.
 .DS_Store

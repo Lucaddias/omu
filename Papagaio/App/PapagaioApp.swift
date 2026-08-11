@@ -14,6 +14,10 @@ struct PapagaioApp: App {
             DiagnosticoTap.executar()
             exit(0)
         }
+
+        // Antes de qualquer view ler UserDefaults: instalações antigas têm as
+        // equipes e as pessoas de exemplo gravadas no disco.
+        LimpezaDeDadosFabricados.executarUmaVez()
     }
 
     var body: some Scene {

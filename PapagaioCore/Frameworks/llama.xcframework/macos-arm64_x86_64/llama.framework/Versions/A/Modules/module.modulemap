@@ -1,3 +1,10 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:b5651903a342dc59fb4fe16ff9cc82ba4d08fdb142458aeacf516e7c31c15f15
-size 171
+framework module llama {
+    umbrella "Headers"
+
+    link "c++"
+    link framework "Accelerate"
+    link framework "Metal"
+    link framework "Foundation"
+
+    export *
+}

@@ -219,7 +219,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8CTC75M93B;
+				DEVELOPMENT_TEAM = YJZ4H74CX4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -227,12 +227,13 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "O Papagaio grava o seu microfone para transcrever o que você fala na reunião.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "O Papagaio usa o reconhecimento de fala para mostrar a nota ditada enquanto você fala. O texto final é refinado no seu Mac, sem sair dele.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaio;
+				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaioo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -247,7 +248,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8CTC75M93B;
+				DEVELOPMENT_TEAM = YJZ4H74CX4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -255,12 +256,13 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "O Papagaio grava o seu microfone para transcrever o que você fala na reunião.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "O Papagaio usa o reconhecimento de fala para mostrar a nota ditada enquanto você fala. O texto final é refinado no seu Mac, sem sair dele.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaio;
+				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaioo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;

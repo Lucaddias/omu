@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test-papagaio-core:
+    name: Testes do PapagaioCore (SPM)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Bootstrap runtimes (Silero VAD)
+        run: ./Scripts/bootstrap-runtimes.sh
+
+      - name: swift test
+        working-directory: PapagaioCore
+        run: swift test
+
+  build-app:
+    name: Build do app (Papagaio.xcodeproj)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Bootstrap runtimes (Silero VAD)
+        run: ./Scripts/bootstrap-runtimes.sh
+
+      - name: xcodebuild build
+        run: |
+          xcodebuild build \
+            -project Papagaio.xcodeproj \
+            -scheme Papagaio \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO
