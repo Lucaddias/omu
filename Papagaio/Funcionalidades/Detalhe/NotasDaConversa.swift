@@ -51,7 +51,6 @@ struct PainelDeNotasDaConversa: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.secao) {
-            cabecalho
             acoes
 
             if ditado.ocupado || !ditado.textoParcial.isEmpty {
@@ -89,29 +88,15 @@ struct PainelDeNotasDaConversa: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var cabecalho: some View {
-        VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Notas da Conversa")
-                    .font(PapagaioTema.Tipo.tituloDePagina)
-                    .foregroundStyle(PapagaioTema.texto)
-
-                Spacer()
-
-                Label(
-                    estadoDeSalvamento,
-                    systemImage: estadoDeSalvamento == "Salvo" ? "checkmark.circle" : "clock"
-                )
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(PapagaioTema.textoSecundario)
-            }
-
-            Text("Cada nota fica presa a um instante. Clique no tempo para ouvir o trecho, e use #etiquetas para agrupar depois.")
-                .font(.body)
-                .foregroundStyle(PapagaioTema.textoSecundario)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 720, alignment: .leading)
-        }
+    /// Sem título nem parágrafo de abertura: a aba já se chama "Notas" e o
+    /// texto de instruções custava duas linhas e meia de altura antes da
+    /// primeira nota. Ele continua atrás do "?", para quem chega agora.
+    private var botaoDeAjuda: some View {
+        BotaoDeAjudaPapagaio(
+            texto: "Cada nota fica presa a um instante. Clique no tempo para ouvir o trecho, e use #etiquetas para agrupar depois.",
+            ajuda: "Como funcionam as notas",
+            largura: 300
+        )
     }
 
     private var acoes: some View {
@@ -148,10 +133,26 @@ struct PainelDeNotasDaConversa: View {
                     .foregroundStyle(PapagaioTema.perigo)
                     .lineLimit(2)
             } else {
-                Text("⌘N nota · ⌘K marcador")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(PapagaioTema.textoSecundario)
+                HStack(spacing: PapagaioTema.Espaco.curto) {
+                    Text("⌘N nota · ⌘K marcador")
+                    botaoDeAjuda
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(PapagaioTema.textoSecundario)
+                .padding(.leading, PapagaioTema.Espaco.medio)
+                .padding(.trailing, PapagaioTema.Espaco.minimo)
+                .frame(height: PapagaioTema.Altura.compacta)
+                .background(PapagaioTema.superficieSuave, in: Capsule())
             }
+
+            // O aviso de salvamento vem para cá junto com o resto: era a
+            // única coisa que o cabeçalho ainda carregava.
+            Label(
+                estadoDeSalvamento,
+                systemImage: estadoDeSalvamento == "Salvo" ? "checkmark.circle" : "clock"
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(PapagaioTema.textoSecundario)
         }
     }
 

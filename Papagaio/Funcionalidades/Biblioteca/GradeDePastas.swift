@@ -16,15 +16,14 @@ struct GradeDePastas: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
+            // Sem o título "Pastas": o filtro logo acima já está marcado como
+            // Pastas, e repetir a palavra a 40pt de distância não informa nada.
+            // O botão herda a posição dele, à esquerda, onde a leitura começa.
             HStack {
-                Text("Pastas")
-                    .font(.headline)
-                    .foregroundStyle(PapagaioTema.texto)
-
-                Spacer()
-
                 Button("Nova pasta", systemImage: "folder.badge.plus", action: aoCriarPasta)
                     .buttonStyle(BotaoDeContornoPapagaio())
+
+                Spacer()
             }
 
             if pastas.isEmpty {

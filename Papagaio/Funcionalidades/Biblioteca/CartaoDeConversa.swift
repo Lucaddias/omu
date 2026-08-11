@@ -5,6 +5,10 @@ import SwiftUI
 struct CartaoDeConversa: View {
     let arquivo: Arquivo
     let estado: EstadoDoArquivo
+    /// `nil` quando não há processamento em andamento.
+    let progresso: (inicio: Date, estimativa: TimeInterval)?
+    /// Veio de um arquivo escolhido pela pessoa, e não do microfone.
+    let importado: Bool
     let processando: Bool
     let naFila: Bool
     let emOperacaoDeLixeira: Bool
@@ -43,6 +47,8 @@ struct CartaoDeConversa: View {
     init(
         arquivo: Arquivo,
         estado: EstadoDoArquivo,
+        progresso: (inicio: Date, estimativa: TimeInterval)?,
+        importado: Bool,
         processando: Bool,
         naFila: Bool,
         emOperacaoDeLixeira: Bool,
@@ -59,6 +65,8 @@ struct CartaoDeConversa: View {
     ) {
         self.arquivo = arquivo
         self.estado = estado
+        self.progresso = progresso
+        self.importado = importado
         self.processando = processando
         self.naFila = naFila
         self.emOperacaoDeLixeira = emOperacaoDeLixeira
@@ -85,22 +93,32 @@ struct CartaoDeConversa: View {
     /// Antes o cartão imprimia "Não informado" três vezes e dedicava a maior
     /// área da sua superfície a dados ausentes. Campo vazio agora simplesmente
     /// não ocupa espaço — quem preencheu vê a informação em destaque.
+    /// Só quem foi preenchido.
+    ///
+    /// "Não informado" em negrito, duas vezes por cartão, era o maior ruído da
+    /// grade: repetia a ausência com o mesmo peso visual de um nome de verdade
+    /// e competia com o título. Quando nada foi preenchido, uma única linha
+    /// discreta convida a preencher — ver `avisoDePessoas`.
     private var pessoasDoCard: [(simbolo: String, rotulo: String, valor: String)] {
         let entrevistado = listaDePessoas(metadados.entrevistado)
         let entrevistadores = listaDePessoas(metadados.entrevistadores)
 
-        return [
-            (
-                "person",
-                quantidadeDePessoas(entrevistado) > 1 ? "Entrevistados" : "Entrevistado",
-                entrevistado.isEmpty ? "Não informado" : entrevistado
-            ),
-            (
+        var linhas: [(simbolo: String, rotulo: String, valor: String)] = []
+        if !entrevistadores.isEmpty {
+            linhas.append((
                 "person.crop.circle.badge.checkmark",
                 quantidadeDePessoas(entrevistadores) > 1 ? "Entrevistadores" : "Entrevistador",
-                entrevistadores.isEmpty ? "Não informado" : entrevistadores
-            ),
-        ]
+                entrevistadores
+            ))
+        }
+        if !entrevistado.isEmpty {
+            linhas.append((
+                "person",
+                quantidadeDePessoas(entrevistado) > 1 ? "Entrevistados" : "Entrevistado",
+                entrevistado
+            ))
+        }
+        return linhas
     }
 
     private func quantidadeDePessoas(_ lista: String) -> Int {
@@ -151,7 +169,16 @@ struct CartaoDeConversa: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.trailing, PapagaioTema.Espaco.secao)
 
-                    if !metadados.descricao.isEmpty {
+                    // A linha existe mesmo vazia, e não por simetria: sem ela
+                    // um cartão com descrição e outro sem ficavam com o corpo
+                    // deslocado na mesma fileira. Em itálico e sem negrito, o
+                    // aviso se lê como lacuna, não como conteúdo.
+                    if metadados.descricao.isEmpty {
+                        Text("Sem descrição")
+                            .font(PapagaioTema.Tipo.apoio.italic())
+                            .foregroundStyle(PapagaioTema.textoSecundario.opacity(0.7))
+                            .lineLimit(1)
+                    } else {
                         Text(metadados.descricao)
                             .font(PapagaioTema.Tipo.apoio)
                             .foregroundStyle(PapagaioTema.textoSecundario)
@@ -161,19 +188,40 @@ struct CartaoDeConversa: View {
                     // O selo "Áudio local" saiu: era verdadeiro em 100% dos
                     // cartões, então não distinguia nada — só competia por
                     // espaço com o estado, que é a informação que muda.
-                    LayoutDeFluxo(espacoHorizontal: PapagaioTema.Espaco.curto, espacoVertical: PapagaioTema.Espaco.curto) {
-                        SeloDeStatus(
-                            texto: estado.descricao,
-                            simbolo: estado.simbolo,
-                            estilo: estado.estilo
-                        )
+                    // O selo só aparece quando há algo a dizer. "Transcrito e
+                    // resumido" é o estado de repouso de toda conversa madura:
+                    // estaria em quase todos os cartões, o tempo todo, gastando
+                    // uma linha para informar o esperado. Fila, processamento e
+                    // falha são exceções, e mudam o que dá para fazer ali.
+                    if estado != .transcritoEResumido || pasta != nil {
+                        LayoutDeFluxo(espacoHorizontal: PapagaioTema.Espaco.curto, espacoVertical: PapagaioTema.Espaco.curto) {
+                            if estado != .transcritoEResumido {
+                                SeloDeStatus(
+                                    texto: estado.descricao,
+                                    simbolo: estado.simbolo,
+                                    estilo: estado.estilo
+                                )
+                            }
 
-                        if let pasta {
-                            SeloDeStatus(texto: pasta, simbolo: "folder", estilo: .neutro)
+                            if let pasta {
+                                SeloDeStatus(texto: pasta, simbolo: "folder", estilo: .neutro)
+                            }
                         }
                     }
 
-                    if !pessoasDoCard.isEmpty {
+                    if let progresso {
+                        BarraDeProgressoDoProcessamento(
+                            inicio: progresso.inicio,
+                            estimativa: progresso.estimativa
+                        )
+                    }
+
+                    if pessoasDoCard.isEmpty {
+                        Label("Participantes não informados", systemImage: "person.badge.plus")
+                            .font(PapagaioTema.Tipo.legenda)
+                            .foregroundStyle(PapagaioTema.textoSecundario)
+                            .lineLimit(1)
+                    } else {
                         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
                             ForEach(pessoasDoCard, id: \.rotulo) { pessoa in
                                 MetadadoDoCard(
@@ -194,17 +242,29 @@ struct CartaoDeConversa: View {
                             systemImage: "calendar"
                         )
                         Label(arquivo.duracao.comoDuracaoPorExtenso, systemImage: "clock")
-                        // Conversa de uma pessoa é o caso comum; dizer "1" em
-                        // todo cartão só empurrava o rodapé para uma segunda
-                        // linha e desalinhava a fileira.
+
+                        // Gravado e importado são conversas diferentes: uma tem
+                        // dois canais e separa quem falou, a outra é um áudio
+                        // só. Saber disso muda o que esperar da transcrição.
                         Label(
-                            participantes == 1 ? "1 participante" : "\(participantes) participantes",
-                            systemImage: participantes == 1 ? "person" : "person.2"
+                            importado ? "Importado" : "Gravado",
+                            systemImage: importado ? "square.and.arrow.down" : "mic"
                         )
-                        Label(
-                            metadados.formato.isEmpty ? "Modalidade não informada" : metadados.formato,
-                            systemImage: simboloDaModalidade(metadados.formato)
-                        )
+
+                        // Participantes e modalidade só quando dizem algo: "1
+                        // participante" e "modalidade não informada" apareciam
+                        // em quase todo cartão, empurrando o rodapé para uma
+                        // segunda linha e desalinhando a fileira.
+                        if participantes > 1 {
+                            Label("\(participantes) participantes", systemImage: "person.2")
+                        }
+
+                        if !metadados.formato.isEmpty {
+                            Label(
+                                metadados.formato,
+                                systemImage: simboloDaModalidade(metadados.formato)
+                            )
+                        }
                     }
                     .font(PapagaioTema.Tipo.legenda)
                     .foregroundStyle(PapagaioTema.textoSecundario)
@@ -566,5 +626,68 @@ struct CapaDeConversa: View {
         .frame(height: 88)
         .clipShape(RoundedRectangle(cornerRadius: PapagaioTema.raioDeCard, style: .continuous))
         .accessibilityHidden(true)
+    }
+}
+
+/// Barra fina com o quanto falta, em linguagem de gente.
+///
+/// Existe porque importar e esperar sem nenhum sinal é a pior parte do fluxo:
+/// a pessoa não sabe se o app travou, se falta um minuto ou dez. Uma
+/// estimativa aproximada, dita como aproximada, informa mais que o silêncio.
+struct BarraDeProgressoDoProcessamento: View {
+    let inicio: Date
+    let estimativa: TimeInterval
+
+    var body: some View {
+        // `TimelineView` porque o progresso é função do relógio, não de estado:
+        // sem uma batida de fora, a barra ficaria congelada até a fase mudar —
+        // e a fase muda duas vezes em vários minutos.
+        TimelineView(.periodic(from: inicio, by: 1)) { contexto in
+            corpo(agora: contexto.date)
+        }
+    }
+
+    private func corpo(agora: Date) -> some View {
+        let decorrido = agora.timeIntervalSince(inicio)
+        // Satura em 95% enquanto o trabalho não termina: barra parada em 100%
+        // com o app ainda pensando é pior que barra lenta.
+        let fracao = min(0.95, max(0, decorrido / estimativa))
+        let restante = max(0, estimativa - decorrido)
+
+        return VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
+            GeometryReader { geometria in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(PapagaioTema.superficieSuave)
+
+                    Capsule()
+                        .fill(PapagaioTema.destaque)
+                        .frame(width: max(4, geometria.size.width * fracao))
+                }
+            }
+            .frame(height: 4)
+
+            HStack {
+                Text("\(Int((fracao * 100).rounded()))%")
+                    .monospacedDigit()
+
+                Spacer()
+
+                Text(textoDoRestante(restante))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(PapagaioTema.textoSecundario)
+        }
+        .animation(.easeOut(duration: 0.3), value: fracao)
+    }
+
+    /// "Cerca de" na frente porque é estimativa, e abaixo de um minuto o número
+    /// exato em segundos daria uma precisão que o cálculo não tem.
+    private func textoDoRestante(_ restante: TimeInterval) -> String {
+        let segundos = Int(restante.rounded())
+        if segundos <= 0 { return "finalizando…" }
+        if segundos < 60 { return "menos de 1 min" }
+        let minutos = Int((restante / 60).rounded())
+        return "cerca de \(minutos) min"
     }
 }

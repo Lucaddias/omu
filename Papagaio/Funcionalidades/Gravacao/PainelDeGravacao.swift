@@ -9,6 +9,7 @@ struct PainelDeGravacao: View {
     let aoFinalizar: () async -> Void
     let aoCancelar: () async -> Void
 
+
     /// Numa janela estreita os três botões espremiam a waveform até ela sumir e
     /// os rótulos hifenizarem. `ViewThatFits` tenta a linha única e, quando não
     /// cabe, empilha: medidor em cima, controles embaixo em largura cheia.
@@ -50,8 +51,24 @@ struct PainelDeGravacao: View {
                 .foregroundStyle(PapagaioTema.texto)
                 .monospacedDigit()
                 .frame(width: 72, alignment: .leading)
+
+            botaoDeAjuda
         }
         .fixedSize(horizontal: true, vertical: false)
+    }
+
+    /// O que era título e subtítulo da página cabe aqui.
+    ///
+    /// Durante a captura, "Gravações — grave, transcreva e revise suas
+    /// conversas" descrevia a tela para quem já está com o microfone ligado, e
+    /// empurrava o painel para baixo. Atrás do "i", a frase continua para quem
+    /// nunca gravou.
+    private var botaoDeAjuda: some View {
+        BotaoDeAjudaPapagaio(
+            texto: "Grave, transcreva e revise suas conversas. O áudio fica no seu Mac, e a transcrição começa assim que você finalizar.",
+            ajuda: "Sobre a gravação",
+            largura: 300
+        )
     }
 
     private var controles: some View {

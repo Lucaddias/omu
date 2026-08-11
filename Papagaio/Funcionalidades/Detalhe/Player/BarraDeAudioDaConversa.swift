@@ -11,6 +11,10 @@ struct BarraDeAudioDaConversa: View {
     @Binding var tempoEmEdicao: TimeInterval?
     let aoConcluirEdicao: () -> Void
 
+    @State private var pairandoNoVolume = false
+    /// Nível de antes do mudo, para o clique seguinte devolvê-lo.
+    @State private var volumeAntesDoMudo: Float = 1
+
     var body: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: PapagaioTema.Espaco.secao) {
@@ -128,29 +132,40 @@ struct BarraDeAudioDaConversa: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// Volume ao estilo do YouTube: o alto-falante silencia no clique e a
+    /// barra só cresce quando o mouse chega perto.
+    ///
+    /// Parada, ela ocupava mais largura que a própria barra de progresso —
+    /// um controle secundário maior que o principal. Agora o repouso é só o
+    /// ícone, e a régua aparece quando alguém demonstra interesse nela.
     private var volumeEVelocidade: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: PapagaioTema.Espaco.medio) {
-                controlesDeVolumeEVelocidade
+        HStack(spacing: PapagaioTema.Espaco.curto) {
+            Button {
+                alternarMudo()
+            } label: {
+                Image(systemName: simboloDoVolume)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(
+                        pairandoNoVolume ? PapagaioTema.destaqueEscuro : PapagaioTema.textoSecundario
+                    )
+                    .frame(width: 26, height: 26)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help(reprodutor.volume == 0 ? "Reativar som" : "Silenciar")
 
-            VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                controlesDeVolumeEVelocidade
+            if pairandoNoVolume {
+                Slider(value: volume, in: 0...1)
+                    .tint(PapagaioTema.destaqueEscuro)
+                    .frame(width: 90)
+                    .accessibilityLabel("Volume")
+
+                Text("\(Int((reprodutor.volume * 100).rounded()))%")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(PapagaioTema.textoSecundario)
+                    .frame(width: 36, alignment: .leading)
             }
-        }
-        .frame(minWidth: 140, idealWidth: 190, alignment: .leading)
-    }
-
-    private var controlesDeVolumeEVelocidade: some View {
-        Group {
-            Image(systemName: reprodutor.volume == 0 ? "speaker.slash" : "speaker.wave.2")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(PapagaioTema.textoSecundario)
-
-            Slider(value: volume, in: 0...1)
-                .tint(PapagaioTema.destaqueEscuro)
-                .frame(minWidth: 92, idealWidth: 120)
-                .accessibilityLabel("Volume")
 
             Menu {
                 ForEach([0.75, 1, 1.25, 1.5, 2], id: \.self) { velocidade in
@@ -169,6 +184,33 @@ struct BarraDeAudioDaConversa: View {
             .menuStyle(.button)
             .buttonStyle(.plain)
             .help("Velocidade")
+        }
+        // A área de hover é a linha inteira, e não só o ícone: entrando pela
+        // direita, o ponteiro cruzaria a velocidade antes do alto-falante e a
+        // régua abriria e fecharia no caminho.
+        .contentShape(Rectangle())
+        .onHover { ativo in
+            withAnimation(.snappy(duration: 0.16)) { pairandoNoVolume = ativo }
+        }
+        .fixedSize()
+    }
+
+    private var simboloDoVolume: String {
+        switch reprodutor.volume {
+        case 0: "speaker.slash"
+        case ..<0.5: "speaker.wave.1"
+        default: "speaker.wave.2"
+        }
+    }
+
+    /// Guarda o nível anterior para o clique seguinte devolvê-lo. Sem isso,
+    /// reativar o som traria o volume no máximo, e não onde a pessoa deixou.
+    private func alternarMudo() {
+        if reprodutor.volume > 0 {
+            volumeAntesDoMudo = reprodutor.volume
+            reprodutor.volume = 0
+        } else {
+            reprodutor.volume = volumeAntesDoMudo
         }
     }
 

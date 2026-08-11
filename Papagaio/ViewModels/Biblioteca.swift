@@ -19,6 +19,8 @@ final class Biblioteca {
     /// Fase corrente por arquivo. Chaveado pelo `UUID` cru porque é o que a view
     /// tem em mãos na navegação.
     private(set) var fases: [UUID: PipelineDeArquivo.Fase] = [:]
+    /// Quando cada processamento começou, para estimar o quanto falta.
+    private(set) var iniciadoEm: [UUID: Date] = [:]
     private(set) var erros: [UUID: String] = [:]
 
     /// O Whisper e o Qwen juntos podem ocupar 13,7 GB. A fila mantém os
@@ -80,6 +82,7 @@ final class Biblioteca {
 
     func preparar() async {
         await ciclo.iniciarMonitoramento()
+        await ciclo.encerrarNaSaidaDoApp()
         await carregar()
     }
 
@@ -144,6 +147,7 @@ final class Biblioteca {
         let faseAnterior = fases[chave]
         let erroAnterior = erros[chave]
         fases[chave] = nil
+        iniciadoEm[chave] = nil
         erros[chave] = nil
         erroDaLixeira = nil
         operacoesDeLixeiraEmAndamento.insert(arquivo.id)
@@ -500,6 +504,7 @@ final class Biblioteca {
 
         erros[chave] = nil
         fases[chave] = .transcrevendo
+        iniciadoEm[chave] = Date()
         let promptDeEntidades = await PromptDeEntidades.construir(para: arquivo)
 
         // Criado por execução, e descarregado no fim: os dois modelos somam
@@ -566,6 +571,7 @@ final class Biblioteca {
         guard identificadorDaExecucao == execucao else { return }
 
         fases[chave] = nil
+        iniciadoEm[chave] = nil
         arquivoEmProcessamento = nil
         identificadorDaExecucao = nil
         tarefaDeProcessamento = nil
@@ -597,6 +603,17 @@ final class Biblioteca {
         let microfone = pasta.appendingPathComponent(Armazenamento.Nome.microfone)
         if Self.existe(microfone) { return microfone }
         return Self.arquivoDeCanalUnico(em: pasta)
+    }
+
+    /// Veio de arquivo escolhido pela pessoa, e não do microfone.
+    ///
+    /// Deduzido do disco, e não guardado no modelo: gravação sempre escreve
+    /// `microfone.wav`, importação sempre escreve `gravacao.<extensão>`. Um
+    /// campo novo em `Arquivo` obrigaria a migrar o que já está salvo para
+    /// responder algo que os próprios arquivos já dizem.
+    func importado(_ arquivo: Arquivo) -> Bool {
+        let pasta = armazenamento.resolver(relativo: arquivo.pastaRelativa)
+        return !Self.existe(pasta.appendingPathComponent(Armazenamento.Nome.microfone))
     }
 
     /// Canal do sistema tocado em paralelo ao microfone — `sistema.m4a`.
@@ -639,6 +656,22 @@ final class Biblioteca {
     /// própria: o cartão por lista de literais, o detalhe por `contains("erro")`.
     /// O mesmo arquivo aparecia vermelho numa tela e neutro na outra, e trocar
     /// uma palavra em `Fase.descricao` quebrava a cor sem quebrar o build.
+    /// Quanto do processamento já passou e quanto falta, em segundos.
+    ///
+    /// É uma **estimativa por tempo decorrido**, não medição real: nem o
+    /// whisper nem o Qwen reportam percentual daqui. A referência é a duração
+    /// do áudio — na prática o large-v3 leva algo perto de metade dela para
+    /// transcrever, e o resumo some num punhado de segundos por minuto de
+    /// conversa. Erra, e por isso a interface fala em "cerca de".
+    ///
+    /// A fração satura em 95% enquanto o trabalho não termina: barra parada em
+    /// 100% com o app ainda pensando é pior que barra lenta.
+    func progresso(de arquivo: Arquivo) -> (inicio: Date, estimativa: TimeInterval)? {
+        let chave = arquivo.id.rawValue
+        guard fases[chave] != nil, let inicio = iniciadoEm[chave] else { return nil }
+        return (inicio, max(20, arquivo.duracao * 0.75))
+    }
+
     func estado(de arquivo: Arquivo) -> EstadoDoArquivo {
         let chave = arquivo.id.rawValue
         if let fase = fases[chave] { return .processando(fase) }

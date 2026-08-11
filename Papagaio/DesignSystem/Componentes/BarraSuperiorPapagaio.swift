@@ -5,6 +5,7 @@ struct BarraSuperiorPapagaioView: View {
     @Binding var legendaAtiva: LegendaDaBarra?
     @State private var exibindoMenuDePerfil = false
     @State private var exibindoNotificacoes = false
+    @State private var larguraDaBarra: CGFloat = 0
     let exibindoBotaoVoltar: Bool
     let bibliotecaSelecionada: Bool
     let tarefasSelecionada: Bool
@@ -40,20 +41,34 @@ struct BarraSuperiorPapagaioView: View {
     /// Agora ela se resolve sozinha em três estágios: completa; sem o rótulo da
     /// conta; e, no mais apertado, com os dois grupos de ícones fundidos num
     /// menu "⋯". Nenhuma ação fica inalcançável em nenhuma largura.
+    /// Fora da gravação e fora do painel de tarefas — nas duas a busca não tem
+    /// o que fazer.
+    private var exibindoBusca: Bool { !gravando && !tarefasSelecionada }
+
+    /// Só centraliza quando sobra largura para os três blocos conviverem: a
+    /// busca no meio, o voltar à esquerda e conta mais ações à direita.
+    private var exibindoBuscaCentralizada: Bool {
+        exibindoBusca && larguraDaBarra >= 1_040
+    }
+
     var body: some View {
+        // A busca fica no centro da **janela**, não no meio do que sobra entre
+        // os dois grupos. Num `HStack` com espaçadores ela pousaria à esquerda
+        // do centro, porque o grupo da conta é bem mais largo que o do voltar.
+        // Daí a sobreposição centralizada por cima da linha.
         HStack(spacing: PapagaioTema.Espaco.medio) {
             if exibindoBotaoVoltar || gravando {
-                BotaoCircularPapagaio(simbolo: "chevron.backward", ajuda: "Voltar", acao: aoVoltar)
+                BotaoCircularPapagaio(
+                    simbolo: "chevron.backward",
+                    ajuda: "Voltar para a biblioteca",
+                    legendaAtiva: $legendaAtiva,
+                    acao: aoVoltar
+                )
             }
 
-            // Gravando, a barra some inteira e sobra só o botão de voltar:
-            // buscar conversas, trocar de seção ou mexer na conta no meio de
-            // uma captura só tira a pessoa da tela em que ela está trabalhando.
-            //
-            // Fora da gravação, busca e atalhos de seção andam juntos à
-            // esquerda — são o "onde estou / o que procuro". Conta e ações do
-            // app ficam na quina oposta, longe do fluxo de leitura.
-            if !gravando {
+            // Sem espaço para centralizar, busca e atalhos voltam para a linha,
+            // logo depois do voltar, e encolhem junto com ela.
+            if exibindoBusca, !exibindoBuscaCentralizada {
                 campoDeBusca
                 atalhos
             }
@@ -84,21 +99,39 @@ struct BarraSuperiorPapagaioView: View {
                 }
             }
         }
-        // Padding menor que o das páginas: a barra é cromo, e cada ponto aqui
-        // é ponto que falta para o botão de conta caber na janela mínima.
-        .padding(.horizontal, PapagaioTema.Espaco.medio)
-        .padding(.vertical, PapagaioTema.Espaco.curto)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PapagaioTema.fundo)
-        // Gravando não existe barra: sem a linha divisória, o que sobra é o
-        // botão de voltar solto sobre o fundo da página.
-        .overlay(alignment: .bottom) {
-            if !gravando {
-                Rectangle()
-                    .fill(PapagaioTema.borda.opacity(0.75))
-                    .frame(height: 1)
+        // Gravando, a barra some inteira e sobra só o botão de voltar: buscar
+        // conversas ou trocar de seção no meio de uma captura só tira a pessoa
+        // da tela em que ela está trabalhando. No painel de tarefas some
+        // também — não há conversa nenhuma para buscar ali.
+        // A busca centralizada é uma sobreposição, e sobreposição não empurra
+        // ninguém: em janela estreita ela passava por cima dos botões da
+        // direita. Por isso a largura decide o layout — centralizada quando há
+        // espaço, dentro da linha quando não há.
+        .overlay {
+            if exibindoBuscaCentralizada {
+                HStack(spacing: PapagaioTema.Espaco.medio) {
+                    campoDeBusca
+                    atalhos
+                }
+                .fixedSize()
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { larguraDaBarra = $0 }
+        // A barra segue a mesma coluna das páginas: margem igual **e** o mesmo
+        // teto de largura. Só igualar o padding não bastava — as páginas usam
+        // `larguraDeConteudoPapagaio`, que centraliza o conteúdo numa coluna
+        // limitada, então em tela larga o título começava bem depois da busca.
+        // A ordem importa: primeiro a coluna, depois a margem — igual às
+        // páginas, que fazem `larguraDeConteudoPapagaio()` e só então o
+        // `padding`. Invertido, a margem entra **dentro** da coluna e soma
+        // 24pt, jogando a busca para a direita do título em tela larga.
+        .padding(.vertical, PapagaioTema.Espaco.curto)
+        .larguraDeConteudoPapagaio()
+        .padding(.horizontal, PapagaioTema.espacamentoDePagina)
+        // Sem linha divisória: a régua horizontal separava a barra da página
+        // como se fossem duas superfícies, e são a mesma. Os próprios botões
+        // já têm contorno, então a hierarquia não depende dela.
+        .background(PapagaioTema.fundo)
     }
 
     private var grupoDeAcoes: some View {
@@ -148,12 +181,10 @@ struct BarraSuperiorPapagaioView: View {
             .buttonStyle(.plain)
             .help("Lixeira")
         }
-        .padding(.horizontal, PapagaioTema.Espaco.minimo)
+        // Sem cápsula em volta: eram dois contornos concêntricos para a mesma
+        // coisa. Cada ícone já se anuncia como botão pelo próprio círculo, e
+        // agrupá-los de novo só engrossava a moldura.
         .frame(height: PapagaioTema.Altura.padrao)
-        .background(PapagaioTema.superficie, in: Capsule())
-        .overlay {
-            Capsule().stroke(PapagaioTema.borda.opacity(0.82), lineWidth: 1)
-        }
         .fixedSize()
     }
 

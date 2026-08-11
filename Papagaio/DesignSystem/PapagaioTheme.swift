@@ -248,22 +248,57 @@ struct BotaoCircularPapagaio: View {
     let simbolo: String
     let ajuda: String
     var destaque: Bool = false
+    /// Opcional: quem passar um binding ganha a mesma legenda flutuante da
+    /// barra superior. Sem ele o botão continua contando só com o `help`,
+    /// que é o tooltip lento do sistema.
+    var legendaAtiva: Binding<LegendaDaBarra?>? = nil
     let acao: () -> Void
 
+    /// Sem resposta ao mouse, o botão parecia um ícone decorativo: nada
+    /// mudava até o clique. Ícone e borda acendem no coral da identidade,
+    /// como já acontece nos botões da barra.
+    @State private var pairando = false
+
     var body: some View {
-        Button(action: acao) {
-            Image(systemName: simbolo)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(destaque ? PapagaioTema.destaqueEscuro : PapagaioTema.textoSecundario)
-                .frame(width: PapagaioTema.Altura.padrao, height: PapagaioTema.Altura.padrao)
-                .background(PapagaioTema.superficie, in: Circle())
-                .overlay {
-                    Circle().stroke(PapagaioTema.borda, lineWidth: 1)
+        GeometryReader { geometria in
+            Button(action: acao) {
+                Image(systemName: simbolo)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(
+                        destaque || pairando
+                            ? PapagaioTema.destaqueEscuro
+                            : PapagaioTema.textoSecundario
+                    )
+                    .frame(width: PapagaioTema.Altura.padrao, height: PapagaioTema.Altura.padrao)
+                    .background(PapagaioTema.superficie, in: Circle())
+                    .overlay {
+                        Circle().stroke(
+                            pairando ? PapagaioTema.destaque.opacity(0.58) : PapagaioTema.borda,
+                            lineWidth: 1
+                        )
+                    }
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help(ajuda)
+            .accessibilityLabel(ajuda)
+            .onHover { ativo in
+                pairando = ativo
+                guard let legendaAtiva else { return }
+                if ativo {
+                    let area = geometria.frame(in: .global)
+                    legendaAtiva.wrappedValue = LegendaDaBarra(
+                        texto: ajuda,
+                        x: area.midX,
+                        baseDoIcone: area.maxY
+                    )
+                } else if legendaAtiva.wrappedValue?.texto == ajuda {
+                    legendaAtiva.wrappedValue = nil
                 }
+            }
+            .animation(.easeOut(duration: 0.14), value: pairando)
         }
-        .buttonStyle(.plain)
-        .help(ajuda)
-        .accessibilityLabel(ajuda)
+        .frame(width: PapagaioTema.Altura.padrao, height: PapagaioTema.Altura.padrao)
     }
 }
 

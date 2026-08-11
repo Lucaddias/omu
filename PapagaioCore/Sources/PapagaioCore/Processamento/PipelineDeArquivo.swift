@@ -114,7 +114,14 @@ public struct PipelineDeArquivo: Sendable {
 
         if temMicrofone {
             let doMicrofone = try await transcrever(microfone, Speaker.eu)
-            let doSistema = temSistema ? try await transcrever(sistema, Speaker.interlocutor) : []
+            // O canal do sistema é acessório: se ele estiver corrompido — tap
+            // que morreu no meio, arquivo só com cabeçalho — a conversa ainda
+            // tem o microfone, que é o principal. Deixar o erro subir aqui
+            // jogava fora uma gravação inteira por causa do canal secundário.
+            var doSistema: [Trecho] = []
+            if temSistema {
+                doSistema = (try? await transcrever(sistema, Speaker.interlocutor)) ?? []
+            }
             return Segmentacao.mesclarCanais(microfone: doMicrofone, sistema: doSistema)
         }
 

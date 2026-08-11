@@ -30,15 +30,10 @@ struct PreviaDoAnexoDeMidia: View {
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
             }
 
-            VStack {
-                HStack {
-                    SeloDeTipoDoArquivo(texto: anexo.tipoVisual)
-                    Spacer()
-                    SeloDeTipoDoArquivo(texto: anexo.extensaoVisual)
-                }
-                Spacer()
-            }
-            .padding(PapagaioTema.Espaco.curto)
+            // Os selos de tipo e extensão saíram daqui: a mesma informação
+            // já aparece logo abaixo, na linha de etiquetas do cartão. Sobre a
+            // prévia, eles cobriam justamente o que a prévia existe para
+            // mostrar.
         }
         .frame(maxWidth: .infinity)
         .frame(height: 150)

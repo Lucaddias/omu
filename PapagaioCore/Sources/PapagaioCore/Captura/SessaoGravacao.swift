@@ -122,17 +122,30 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
 
     #if os(macOS)
     private func iniciarSistemaSePossivel() {
+        // Declarado fora do `do` para o `catch` conseguir apagá-lo: o arquivo
+        // nasce antes do tap começar, e é justamente quando o tap falha que
+        // ele fica para trás.
+        var urlCriada: URL?
         do {
             let url = try armazenamento.criarArquivoDeAudio(
                 id: id,
                 nome: Armazenamento.Nome.sistema
             )
+            urlCriada = url
             let tap = SystemAudioTap()
             try tap.start(destinationURL: url)
             systemTap = tap
             sistemaURL = url
             capturouSistema = true
         } catch {
+            // O `sistema.m4a` órfão é pior que arquivo nenhum. Ele tem alguns
+            // bytes de cabeçalho, então passa no teste de "existe e não está
+            // vazio", vira o insumo escolhido pelo pipeline e a transcrição
+            // morre inteira com "arquivo de áudio inválido" — mesmo havendo um
+            // microfone perfeitamente gravado ao lado.
+            if let urlCriada {
+                try? FileManager.default.removeItem(at: urlCriada)
+            }
             systemTap = nil
             sistemaURL = nil
             capturouSistema = false
@@ -168,6 +181,7 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
 
     public func parar() async -> Resultado {
         let duracao = recorder?.currentTime ?? tempoDecorrido
+        let urlDoSistema = sistemaURL
         encerrarCaptura()
         pausada = false
         tempoDecorrido = duracao
@@ -175,6 +189,11 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
         var sistemaOk = false
         #if os(macOS)
         sistemaOk = capturouSistema
+        if descartarSistemaSeVazio(urlDoSistema) {
+            sistemaOk = false
+            capturouSistema = false
+            avisos.append("Áudio do sistema não capturou nada — a conversa tem só o microfone.")
+        }
         #endif
 
         let bytes = pasta
@@ -205,6 +224,29 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
             avisos: avisos
         )
     }
+
+    #if os(macOS)
+    /// Apaga o `sistema.m4a` que ficou sem som e diz se apagou.
+    ///
+    /// O tap pode **começar sem erro e não gravar nada** — foi o que aconteceu
+    /// aqui: um contêiner M4A de 1 KB, só cabeçalho. Ele não é inofensivo:
+    /// aparece na aba Mídia como um segundo arquivo de áudio que não toca, e o
+    /// pipeline pode elegê-lo como insumo, já que "existe e não está vazio".
+    ///
+    /// O corte é por tamanho, e não por inspeção de trilha: `AVAsset` custa
+    /// caro e este caminho roda no fim de toda gravação. 16 KB é folgado para
+    /// cabeçalho de M4A e apertado para qualquer áudio de verdade — mesmo um
+    /// segundo de AAC passa disso.
+    private func descartarSistemaSeVazio(_ url: URL?) -> Bool {
+        guard let url,
+              let tamanho = try? FileManager.default
+                  .attributesOfItem(atPath: url.path)[.size] as? Int,
+              tamanho < 16_384
+        else { return false }
+        try? FileManager.default.removeItem(at: url)
+        return true
+    }
+    #endif
 
     private func encerrarCaptura() {
         timer?.invalidate()

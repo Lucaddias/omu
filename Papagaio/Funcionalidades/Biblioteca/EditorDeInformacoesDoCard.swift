@@ -35,7 +35,10 @@ struct EditorDeInformacoesDoCard: View {
 
         var botao: String {
             switch self {
-            case .nova: "Continuar"
+            // Mesmo rótulo nos dois modos: o formulário não leva a lugar
+            // nenhum, ele grava a ficha e fecha. "Continuar" prometia uma
+            // próxima etapa que não existe.
+            case .nova: "Salvar informações"
             case .edicao: "Salvar informações"
             }
         }
@@ -99,19 +102,19 @@ struct EditorDeInformacoesDoCard: View {
                 }
 
                 PessoasDaFichaDaEntrevista(
-                    titulo: "Entrevistado(s)",
-                    nome: $entrevistado,
-                    email: $emailDoEntrevistado,
-                    placeholderNome: "Ex.: Ana Silva",
-                    placeholderEmail: "ana.silva@email.com"
-                )
-
-                PessoasDaFichaDaEntrevista(
                     titulo: "Entrevistador(es)",
                     nome: $entrevistadores,
                     email: $emailDosEntrevistadores,
                     placeholderNome: "Ex.: João Santos",
                     placeholderEmail: "joao.santos@empresa.com"
+                )
+
+                PessoasDaFichaDaEntrevista(
+                    titulo: "Entrevistado(s)",
+                    nome: $entrevistado,
+                    email: $emailDoEntrevistado,
+                    placeholderNome: "Ex.: Ana Silva",
+                    placeholderEmail: "ana.silva@email.com"
                 )
 
                 ViewThatFits(in: .horizontal) {
@@ -150,7 +153,9 @@ struct EditorDeInformacoesDoCard: View {
             HStack(spacing: PapagaioTema.Espaco.medio) {
                 Spacer()
 
-                Button(modo.botao, systemImage: "arrow.right", action: aoSalvar)
+                // Sem ícone: a seta sugeria "avançar para a próxima etapa", e
+                // aqui não há próxima etapa — o botão salva e fecha.
+                Button(modo.botao, action: aoSalvar)
                     .buttonStyle(BotaoPrincipalPapagaio())
                     .disabled(!podeSalvar)
 

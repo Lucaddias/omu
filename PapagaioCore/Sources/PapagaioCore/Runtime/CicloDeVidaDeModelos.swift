@@ -21,6 +21,7 @@ public actor CicloDeVidaDeModelos {
     private var residentes: [String: any Residente] = [:]
     private var monitor: DispatchSourceMemoryPressure?
     private var ultimoDescarte: Date?
+    private var observadorDeSaida: (any NSObjectProtocol)?
 
     public init() {}
 
@@ -68,6 +69,37 @@ public actor CicloDeVidaDeModelos {
         }
         residentes.removeAll()
         ultimoDescarte = Date()
+    }
+
+    /// Descarrega os modelos **antes** de o processo sair.
+    ///
+    /// Sem isto o app aborta ao ser fechado. O ggml guarda os dispositivos
+    /// Metal numa lista estática; ao sair, o destrutor dessa lista roda com o
+    /// contexto do llama ainda vivo, encontra buffers pendurados no conjunto
+    /// de residência e dispara `GGML_ASSERT([rsets->data count] == 0)` —
+    /// `ggml_abort`, SIGABRT, com o stack apontando para `exit`. Liberar
+    /// contexto e modelo enquanto o app ainda está de pé esvazia esse
+    /// conjunto, e o destrutor estático encontra tudo zerado.
+    ///
+    /// `atexit` não serve: roda tarde demais, junto dos destrutores estáticos.
+    /// O aviso do AppKit chega antes de qualquer um deles.
+    public func encerrarNaSaidaDoApp() {
+        guard observadorDeSaida == nil else { return }
+        observadorDeSaida = NotificationCenter.default.addObserver(
+            forName: Notification.Name("NSApplicationWillTerminateNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            // Síncrono de propósito: depois deste retorno o processo sai, e uma
+            // Task assíncrona não teria tempo de rodar.
+            let espera = DispatchSemaphore(value: 0)
+            Task {
+                await self.descarregarTudo()
+                espera.signal()
+            }
+            espera.wait()
+        }
     }
 
     /// Memória física em uso pelo processo, para diagnóstico e testes.

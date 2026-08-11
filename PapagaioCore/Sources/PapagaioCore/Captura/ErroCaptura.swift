@@ -3,7 +3,7 @@ import Foundation
 
 /// Erros de captura. Todos recuperáveis do ponto de vista do app: o Passo 2
 /// exige que a falha do tap do sistema **não derrube** a gravação do microfone.
-public enum ErroCaptura: Error, CustomStringConvertible {
+public enum ErroCaptura: Error, CustomStringConvertible, LocalizedError {
     case coreAudio(String, OSStatus)
     case tapIndisponivel(String)
     case formatoIndisponivel
@@ -27,6 +27,12 @@ public enum ErroCaptura: Error, CustomStringConvertible {
             "arquivo de áudio inválido: \(motivo)"
         }
     }
+
+    /// Sem isto, `localizedDescription` cai no texto padrão do Foundation e a
+    /// notificação mostra "PapagaioCore.ErroCaptura erro 2" — o número da
+    /// posição do caso no enum, que não diz nada a quem está usando o app.
+    /// `LocalizedError` faz o `description` acima chegar até a tela.
+    public var errorDescription: String? { description }
 
     /// OSStatus do Core Audio quase sempre é um four-char code legível.
     private static func fourCC(_ status: OSStatus) -> String {

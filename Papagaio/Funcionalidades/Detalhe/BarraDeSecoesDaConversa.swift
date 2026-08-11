@@ -55,12 +55,20 @@ struct BarraDeSecoesDaConversa<Acessorio: View>: View {
     // de transbordar para fora da tela, o conjunto desce e rola na horizontal.
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .bottom, spacing: PapagaioTema.Espaco.medio) {
+            // Mesmo espaçamento das abas entre si, e sem recuo inferior: o
+            // acessório agora traz o próprio filete de 3pt, então empurrá-lo
+            // para cima o descolava da linha de base das outras.
+            HStack(alignment: .bottom, spacing: PapagaioTema.Espaco.secao) {
                 abas
-                Spacer(minLength: PapagaioTema.Espaco.medio)
+
+                // Encostado nas abas, e não na quina oposta: lá na ponta
+                // direita, a 1.500pt de distância em tela cheia, ele parecia
+                // pertencer à janela e não à conversa. Aqui, colado em
+                // "Tarefas", lê-se como o próximo item do mesmo grupo.
                 acessorio
-                    .padding(.bottom, PapagaioTema.Espaco.curto)
                     .fixedSize(horizontal: true, vertical: false)
+
+                Spacer(minLength: PapagaioTema.Espaco.medio)
             }
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {

@@ -25,6 +25,11 @@ struct PapagaioApp: App {
             ContentView(gravador: gravador)
         }
         .defaultSize(width: 1_000, height: 700)
+        // Barra de título transparente pela janela inteira, e não só pela
+        // toolbar. `toolbarBackground(.hidden:)` vale para a toolbar da
+        // janela; em tela cheia o macOS troca a barra de título por outra,
+        // que aquele modificador não alcança — e a tira cinza voltava.
+        .windowStyle(.hiddenTitleBar)
         // Sem isto o `minWidth` da `ContentView` é só uma sugestão: a janela
         // continua arrastável abaixo dele e o conteúdo transborda em vez de
         // parar de encolher.

@@ -19,6 +19,7 @@ struct BibliotecaHomeView: View {
     let aoCancelarGravacao: () async -> Void
     let aoEscolherPastaDeModelos: (URL) -> Void
     let aoUsarPastaDoApp: () -> Void
+    let aoSoltarArquivos: ([URL]) -> Void
     /// Enquanto a gravação roda a pessoa pode sair da tela de captura e voltar
     /// à biblioteca; a gravação continua. Este é o foco visual, não o estado
     /// da gravação.
@@ -40,12 +41,34 @@ struct BibliotecaHomeView: View {
     @ViewBuilder
     private var filtrosEPastas: some View {
         if secaoSelecionada == .todos, !emCaptura {
-            FiltroDeConversas(
-                selecionado: $filtroSelecionado,
-                pastaSelecionada: $pastaSelecionada,
-                atalhoSelecionado: $atalhoSelecionado,
-                aoLimparAtalhoVisual: limparAtalhoVisual
-            )
+            // Filtros e atalhos na mesma linha: são a mesma decisão — qual
+            // recorte da biblioteca estou vendo. Separados, "Recentes" e
+            // "Favoritos" pareciam ações do título, e não filtros.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: PapagaioTema.Espaco.largo) {
+                    FiltroDeConversas(
+                        selecionado: $filtroSelecionado,
+                        pastaSelecionada: $pastaSelecionada,
+                        atalhoSelecionado: $atalhoSelecionado,
+                        aoLimparAtalhoVisual: limparAtalhoVisual
+                    )
+
+                    Spacer(minLength: PapagaioTema.Espaco.medio)
+
+                    atalhosDaBiblioteca
+                }
+
+                VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
+                    FiltroDeConversas(
+                        selecionado: $filtroSelecionado,
+                        pastaSelecionada: $pastaSelecionada,
+                        atalhoSelecionado: $atalhoSelecionado,
+                        aoLimparAtalhoVisual: limparAtalhoVisual
+                    )
+
+                    atalhosDaBiblioteca
+                }
+            }
 
             if filtroSelecionado == .pastas, pastaSelecionada == nil {
                 GradeDePastas(
@@ -56,6 +79,28 @@ struct BibliotecaHomeView: View {
                 .simultaneousGesture(TapGesture().onEnded { limparAtalhoVisual() })
             }
         }
+    }
+
+    private var atalhosDaBiblioteca: some View {
+        AtalhosDaBiblioteca(
+            selecionado: $atalhoVisualSelecionado,
+            aoSelecionarRecentes: {
+                withAnimation(.snappy(duration: 0.18)) {
+                    filtroSelecionado = .todas
+                    pastaSelecionada = nil
+                    atalhoSelecionado = .recentes
+                    atalhoVisualSelecionado = .recentes
+                }
+            },
+            aoSelecionarFavoritos: {
+                withAnimation(.snappy(duration: 0.18)) {
+                    filtroSelecionado = .todas
+                    pastaSelecionada = nil
+                    atalhoSelecionado = .favoritos
+                    atalhoVisualSelecionado = .favoritos
+                }
+            }
+        )
     }
 
     @ViewBuilder
@@ -222,32 +267,17 @@ struct BibliotecaHomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.secao) {
-                CabecalhoDePagina(
-                    titulo: tituloDaPagina,
-                    subtitulo: subtitulo
-                ) {
+                // Gravando, o cabeçalho inteiro sai: "Gravações / Grave,
+                // transcreva e revise" empurrava o painel de captura — que é a
+                // única coisa que importa nesse momento — para baixo. A frase
+                // vira o "i" que fica ao lado do cronômetro.
+                if !emCaptura {
+                    CabecalhoDePagina(
+                        titulo: tituloDaPagina,
+                        subtitulo: subtitulo
+                    ) {
                     HStack(spacing: PapagaioTema.Espaco.largo) {
-                        if secaoSelecionada == .todos {
-                            AtalhosDaBiblioteca(
-                                selecionado: $atalhoVisualSelecionado,
-                                aoSelecionarRecentes: {
-                                    withAnimation(.snappy(duration: 0.18)) {
-                                        filtroSelecionado = .todas
-                                        pastaSelecionada = nil
-                                        atalhoSelecionado = .recentes
-                                        atalhoVisualSelecionado = .recentes
-                                    }
-                                },
-                                aoSelecionarFavoritos: {
-                                    withAnimation(.snappy(duration: 0.18)) {
-                                        filtroSelecionado = .todas
-                                        pastaSelecionada = nil
-                                        atalhoSelecionado = .favoritos
-                                        atalhoVisualSelecionado = .favoritos
-                                    }
-                                }
-                            )
-                        } else if let biblioteca {
+                        if secaoSelecionada != .todos, let biblioteca {
                             AcoesDaLixeira(
                                 temArquivos: !biblioteca.arquivosNaLixeira.isEmpty || !LixeiraDeTarefas.itens().isEmpty || !LixeiraDeMidia.itens().isEmpty,
                                 aoRestaurarTudo: {
@@ -268,6 +298,7 @@ struct BibliotecaHomeView: View {
                                 simbolo: "waveform",
                                 estilo: .destaque
                             )
+                        }
                         }
                     }
                 }
@@ -380,7 +411,9 @@ struct BibliotecaHomeView: View {
 
     @ViewBuilder
     private var gradeDeConversas: some View {
-        let colunas = [GridItem(.adaptive(minimum: 270, maximum: 380), spacing: PapagaioTema.Espaco.largo, alignment: .center)]
+        // `.top`, e não `.center`: centralizado, um cartão mais baixo flutuava
+        // no meio da linha e nem topo nem base batiam com o vizinho.
+        let colunas = [GridItem(.adaptive(minimum: 270, maximum: 380), spacing: PapagaioTema.Espaco.largo, alignment: .top)]
         let colunasDaLixeira = [GridItem(.adaptive(minimum: 270, maximum: 430), spacing: PapagaioTema.Espaco.secao, alignment: .top)]
 
         switch secaoSelecionada {
@@ -392,7 +425,8 @@ struct BibliotecaHomeView: View {
                         bloqueado: gravador.estado == .processando,
                         prontoParaEntrada: biblioteca != nil,
                         aoAlternarGravacao: aoAlternarGravacao,
-                        aoImportar: { mostrandoImportador = true }
+                        aoImportar: { mostrandoImportador = true },
+                        aoSoltarArquivos: aoSoltarArquivos
                     )
                 }
 
@@ -401,6 +435,8 @@ struct BibliotecaHomeView: View {
                         CartaoDeConversa(
                             arquivo: arquivo,
                             estado: biblioteca.estado(de: arquivo),
+                            progresso: biblioteca.progresso(de: arquivo),
+                            importado: biblioteca.importado(arquivo),
                             processando: biblioteca.estaProcessando(arquivo),
                             naFila: biblioteca.estaNaFila(arquivo),
                             emOperacaoDeLixeira: biblioteca.estaEmOperacaoDeLixeira(arquivo),
