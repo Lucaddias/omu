@@ -33,8 +33,13 @@ public enum ValidacaoDeCitacoes {
     /// Só o que é ruído puro de oralidade. Nada que carregue sentido — "tipo"
     /// entra na lista porque na fala espontânea brasileira ele é muleta, mas
     /// palavras como "olha" ou "veja" ficam, porque marcam o tom de quem fala.
+    /// Atenção: "é" solto NÃO entra aqui. É o verbo ser na terceira pessoa
+    /// ("...é jogar dinheiro fora"), e como a remoção é por token inteiro,
+    /// listá-lo apagava uma palavra real da fala — o texto limpo deixava de
+    /// existir literalmente na transcrição e a citação verdadeira era
+    /// descartada. A hesitação alongada continua coberta por "éé"/"ééé"/"eh".
     static let viciosDeFala: Set<String> = [
-        "é", "éé", "ééé", "eh", "ehh", "ahn", "ahm", "ah", "hum", "hmm", "hm",
+        "éé", "ééé", "eh", "ehh", "ahn", "ahm", "ah", "hum", "hmm", "hm",
         "putz", "tipo", "né", "ne", "tá", "ta", "então assim", "assim ó",
         "sabe", "entende", "entendeu", "cara", "pô", "po", "uhum", "aham",
     ]
