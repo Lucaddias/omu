@@ -1496,6 +1496,16 @@ explicitamente `<think></think>` antes da gramática GBNF para gerar JSON direto
 carregamento Metal, `phys_footprint`, velocidade e fidelidade das decisões,
 números e próximos passos num áudio já conhecido.
 
+**Atualização (2026-08-18):** o candidato **já está em uso no código** — este
+registro ficou para trás. `QwenEngine.identificador` é `qwen3.5-9b-q4_k_m`,
+`Pesos.qwen35_9B` (6.169.341.984 bytes) é o único peso de resumo em
+`Preflight.todos`, e `MotoresLocais` carrega esse arquivo. O piso de RAM segue
+em 18 GB (`Preflight.ramMinima`), como esta decisão pedia. O que continua **não
+feito** é a medição que a decisão exigia: `phys_footprint` real, velocidade e
+fidelidade num áudio conhecido, comparados contra o Qwen2.5-14B. Sem o harness
+do Passo 6 (R-15, bloqueado em R-5), a troca de modelo está validada só por
+inspeção.
+
 ---
 
 ## Riscos abertos
@@ -1519,3 +1529,65 @@ números e próximos passos num áudio já conhecido.
 | **R-10** | ~~Sem Apple Developer Team utilizável.~~ | **Resolvido em 2026-07-31.** Uma equipe com assinatura automática foi validada. Desde D-13.3 o projeto não fixa Team: cada publicador seleciona o seu no Xcode. |
 | **R-16** | ~~A interface não tem caminho para produzir transcrição nem resumo.~~ `ContentView` passou a ligar captura/importação à `Biblioteca`, ao download ou seleção dos pesos, ao `PipelineDeArquivo` e ao `SwiftDataRepository`; o resultado volta para a lista e para a tela de detalhe. | **Resolvido no código em 2026-07-31** por D-10.5. A validação manual completa com pesos reais e uma gravação continua necessária, mas não há mais lacuna arquitetural entre a interface e o pipeline. |
 | **R-17** | ~~O fluxo CloudKit de equipe não foi validado entre duas contas iCloud porque não há segundo dispositivo.~~ | **Fechado em 2026-08-01:** CloudKit e espaços de equipe foram removidos antes da distribuição (D-13.3). |
+
+---
+
+## D-13.5 — Identidade única, assinatura destravada e target de teste (2026-08-18)
+
+**Decidido:** o produto se chama **Papagaio** e o bundle identifier é
+`com.papagaio.Papagaio`.
+
+**Por quê:** o app tinha duas identidades ao mesmo tempo. Projeto, workspace,
+esquema, ícone e `CFBundleDisplayName` diziam `Loro`; as cinco
+`INFOPLIST_KEY_NS*UsageDescription` diziam `Papagaio`. O usuário via os dois
+nomes nas mesmas caixas de diálogo de permissão do macOS. O bundle identifier
+estava `com.papagaio.Papagaioooo`, com quatro letras "o" — as pendências de
+10/08 já apontaram o erro quando eram duas, e ele define o caminho do container
+do sandbox e a identidade permanente na App Store.
+
+**Consequência:** renomeados `Loro.xcodeproj`, `Loro.xcworkspace`,
+`Loro.xcscheme` e `LoroAppIcon.icns`. `CFBundleIconFile` passa a ser
+`PapagaioAppIcon`, o que torna verdadeira pela primeira vez a afirmação de
+D-13.4. O manifest do Xcode Cloud tinha duas entradas com o mesmo target id,
+resíduo de uma renomeação feita pela metade; ficou uma. Bundle identifier novo
+significa **container novo**: bibliotecas e pesos GGUF já baixados em máquinas
+de teste ficam órfãos no container antigo. Renomear o target costuma exigir
+reapontar o workflow do Xcode Cloud no App Store Connect.
+
+**Assinatura:** `DEVELOPMENT_TEAM` sai do `project.pbxproj`, cumprindo o que
+D-13.3 já havia decidido. Fixá-lo era o que obrigava um integrante a manter
+`project.pbxproj` e os entitlements alterados só no disco dele — arquivos que,
+por isso, "não podiam entrar em commit". `com.apple.developer.aps-environment`
+sai dos entitlements: D-13.4 já removera as capacidades de notificação remota, o
+app só agenda notificações locais, e a chave em `development` só produziria
+divergência de perfil no archive de distribuição.
+
+**Target de teste:** os 17 testes em `PapagaioTests/` eram código morto. O
+`.xcodeproj` tinha um único `PBXNativeTarget`, `<Testables>` estava vazio, e o
+módulo se chamava `Loro` enquanto os testes faziam `@testable import Papagaio`.
+Agora existe o target `PapagaioTests`, com grupo sincronizado por filesystem,
+dependência no alvo hospedeiro e `TEST_HOST`/`BUNDLE_LOADER`. Sem fase de
+Frameworks de propósito: religar o `PapagaioCore` arrastaria whisper e llama uma
+segunda vez para dentro do processo de teste.
+
+**Dois defeitos que os testes acharam ao compilar pela primeira vez:**
+
+1. `Biblioteca.carregar()` gravava a falha de abrir a biblioteca em
+   `erros[UUID()]` — dicionário chaveado por arquivo, sob um UUID que não
+   pertence a arquivo nenhum. Nenhuma view procura essa chave, então o erro era
+   invisível, e cada tentativa acumulava uma entrada. Virou `erroDeCarregamento`,
+   com alerta na `BibliotecaHomeView`.
+2. `apagarDefinitivamente` removia o registro no SwiftData e a pasta do disco,
+   mas deixava as quatro chaves visuais do arquivo em `UserDefaults` órfãs para
+   sempre. Fechado por `PreferenciasVisuaisDoArquivo.esquecer(_:)`.
+
+**CI:** `xcodebuild build` virou `xcodebuild test`, com destino concreto
+(`platform=macOS,arch=arm64`). Entrou um job de formatação com `.swift-format`,
+**bloqueante**, porque a base já passa limpa em `swift format lint --strict`
+(zero achados). A previsão de que o primeiro passe acusaria a base inteira era
+palpite e foi desmentida pela medição.
+
+**Não decidido:** a limpeza das outras chaves por conversa
+(`tarefasDaConversa.<uuid>`, `midiasDaConversa.<uuid>`, aparência de cartão) na
+exclusão e em `excluirDadosDaConta` continua aberta, junto da migração dessas
+lojas de `UserDefaults` para SwiftData.
