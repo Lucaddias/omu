@@ -29,11 +29,29 @@ jobs:
       - name: Bootstrap runtimes (Silero VAD)
         run: ./Scripts/bootstrap-runtimes.sh
 
-      - name: xcodebuild build
+      # `test`, e não `build`: o alvo PapagaioTests existe desde que o
+      # .xcodeproj ganhou um segundo target. Um destino concreto é obrigatório
+      # aqui — `generic/platform=macOS` serve para compilar, não para executar.
+      - name: xcodebuild test
         run: |
-          xcodebuild build \
+          xcodebuild test \
             -project Papagaio.xcodeproj \
             -scheme Papagaio \
-            -destination 'generic/platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO
+
+  formatacao:
+    name: Formatação
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bloqueante desde o primeiro dia porque a base já passa limpa: medido
+      # com --strict em Papagaio, PapagaioTests e PapagaioCore, zero achados.
+      # `--strict` é o que transforma aviso em falha; sem ele o lint sai 0
+      # mesmo reclamando.
+      - name: swift format lint
+        run: |
+          swift format lint --strict --recursive --parallel \
+            Papagaio PapagaioTests PapagaioCore/Sources PapagaioCore/Tests

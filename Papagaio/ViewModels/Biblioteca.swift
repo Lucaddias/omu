@@ -37,6 +37,14 @@ final class Biblioteca {
     private var operacoesDeLixeiraEmAndamento: Set<ArquivoID> = []
     private(set) var erroDaLixeira: String?
 
+    /// Falha ao abrir a biblioteca. Campo próprio, e não uma entrada em
+    /// `erros`: aquele dicionário é chaveado por arquivo, e uma falha de
+    /// carregamento não pertence a arquivo nenhum. Guardá-la ali sob um `UUID()`
+    /// aleatório escondia o erro de toda a interface — nenhuma view procura por
+    /// uma chave que não corresponde a um arquivo — e ainda acumulava uma
+    /// entrada nova a cada tentativa.
+    private(set) var erroDeCarregamento: String?
+
     let armazenamento: Armazenamento
 
     /// De onde os pesos são carregados. A `ContentView` mantém isto igual à
@@ -54,6 +62,18 @@ final class Biblioteca {
     private let repositorio: SwiftDataRepository
     private let ciclo = CicloDeVidaDeModelos()
     private let espaco: EspacoID
+
+    /// Costura para teste: recebe as dependências em vez de descobri-las no
+    /// disco e nos defaults. O `init()` de produção continua sendo o caminho
+    /// normal — este existe para que a fila serial, que é a invariante que
+    /// impede Whisper e Qwen de carregarem juntos, possa ser exercitada com um
+    /// container em memória e uma raiz temporária.
+    init(armazenamento: Armazenamento, repositorio: SwiftDataRepository, espaco: EspacoID) {
+        self.armazenamento = armazenamento
+        self.pastaDeModelos = armazenamento.pastaDeModelos
+        self.repositorio = repositorio
+        self.espaco = espaco
+    }
 
     init() throws {
         let armazenamento = try Armazenamento.padrao()
@@ -90,8 +110,9 @@ final class Biblioteca {
         do {
             arquivos = try await repositorio.listar(espaco: espaco)
             arquivosNaLixeira = try await repositorio.listarNaLixeira(espaco: espaco)
+            erroDeCarregamento = nil
         } catch {
-            erros[UUID()] = "Não foi possível abrir a biblioteca: \(error)"
+            erroDeCarregamento = "Não foi possível abrir a biblioteca: \(error.localizedDescription)"
         }
     }
 
@@ -222,6 +243,9 @@ final class Biblioteca {
 
         do {
             try await repositorio.apagar(arquivo.id)
+            // As preferências visuais moram em UserDefaults, fora do alcance do
+            // repositório: só somem se alguém as apagar aqui.
+            PreferenciasVisuaisDoArquivo.esquecer(arquivo.id)
             arquivosNaLixeira.removeAll { $0.id == arquivo.id }
             filaDeProcessamento.removeAll { $0 == arquivo.id }
             fases[arquivo.id.rawValue] = nil
@@ -282,6 +306,10 @@ final class Biblioteca {
 
     func dispensarErroDaLixeira() {
         erroDaLixeira = nil
+    }
+
+    func dispensarErroDeCarregamento() {
+        erroDeCarregamento = nil
     }
 
     // MARK: - Edição de arquivos

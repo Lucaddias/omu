@@ -487,6 +487,15 @@ struct BibliotecaHomeView: View {
         )
     }
 
+    private var apresentandoErroDeCarregamento: Binding<Bool> {
+        Binding(
+            get: { biblioteca?.erroDeCarregamento != nil },
+            set: { apresentando in
+                if !apresentando { biblioteca?.dispensarErroDeCarregamento() }
+            }
+        )
+    }
+
     private func recuperar(_ arquivo: Arquivo) {
         guard let biblioteca else { return }
         Task { @MainActor in
@@ -744,6 +753,11 @@ struct BibliotecaHomeView: View {
             Button("OK", role: .cancel) { biblioteca?.dispensarErroDaLixeira() }
         } message: {
             Text(biblioteca?.erroDaLixeira ?? "")
+        }
+        .alert("Não foi possível abrir a biblioteca", isPresented: apresentandoErroDeCarregamento) {
+            Button("OK", role: .cancel) { biblioteca?.dispensarErroDeCarregamento() }
+        } message: {
+            Text(biblioteca?.erroDeCarregamento ?? "")
         }
         .alert("Criar pasta", isPresented: $criandoPasta) {
             TextField("Nome da pasta", text: $novaPasta)

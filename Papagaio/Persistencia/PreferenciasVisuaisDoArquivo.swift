@@ -211,6 +211,21 @@ enum PreferenciasVisuaisDoArquivo {
         }
     }
 
+    /// Esquece tudo o que é visual de um arquivo só.
+    ///
+    /// Chamada na exclusão definitiva. Apagar o registro no SwiftData e a pasta
+    /// do disco não toca em `UserDefaults`: sem isto, cada arquivo apagado
+    /// deixava as suas quatro chaves órfãs ali para sempre.
+    @MainActor
+    static func esquecer(_ id: ArquivoID) {
+        let defaults = UserDefaults.standard
+        let sufixo = id.rawValue.uuidString
+        for prefixo in [prefixoFavorito, prefixoPasta, prefixoCapa, prefixoMetadados] {
+            defaults.removeObject(forKey: prefixo + sufixo)
+        }
+        capasDecodificadas.removeObject(forKey: sufixo as NSString)
+    }
+
     @MainActor
     static func removerTodas() {
         let defaults = UserDefaults.standard
