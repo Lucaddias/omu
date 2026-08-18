@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIconFile</key>
-	<string>LoroAppIcon</string>
+	<string>PapagaioAppIcon</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>O Loro grava o áudio da reunião para transcrever a fala do seu interlocutor.</string>
+	<string>O Papagaio grava o áudio da reunião para transcrever a fala do seu interlocutor.</string>
 </dict>
 </plist>

@@ -21,7 +21,7 @@ jobs:
         run: swift test
 
   build-app:
-    name: Build do app (Loro.xcodeproj)
+    name: Build do app (Papagaio.xcodeproj)
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +32,8 @@ jobs:
       - name: xcodebuild build
         run: |
           xcodebuild build \
-            -project Loro.xcodeproj \
-            -scheme Loro \
+            -project Papagaio.xcodeproj \
+            -scheme Papagaio \
             -destination 'generic/platform=macOS' \
             -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO

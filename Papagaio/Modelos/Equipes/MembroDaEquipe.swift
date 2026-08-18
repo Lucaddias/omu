@@ -23,6 +23,6 @@ struct MembroDaEquipe: Identifiable, Equatable, Codable {
     var status: StatusDaEquipe
     var atual: Bool = false
 
-    var iniciais: String { Loro.iniciais(de: nome, vazio: "M") }
+    var iniciais: String { Papagaio.iniciais(de: nome, vazio: "M") }
 
 }

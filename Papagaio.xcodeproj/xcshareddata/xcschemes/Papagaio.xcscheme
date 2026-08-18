@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "PA00000000000000000002"
-               BuildableName = "Loro.app"
-               BlueprintName = "Loro"
-               ReferencedContainer = "container:Loro.xcodeproj">
+               BuildableName = "Papagaio.app"
+               BlueprintName = "Papagaio"
+               ReferencedContainer = "container:Papagaio.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "PA00000000000000000002"
-            BuildableName = "Loro.app"
-            BlueprintName = "Loro"
-            ReferencedContainer = "container:Loro.xcodeproj">
+            BuildableName = "Papagaio.app"
+            BlueprintName = "Papagaio"
+            ReferencedContainer = "container:Papagaio.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "PA00000000000000000002"
-            BuildableName = "Loro.app"
-            BlueprintName = "Loro"
-            ReferencedContainer = "container:Loro.xcodeproj">
+            BuildableName = "Papagaio.app"
+            BlueprintName = "Papagaio"
+            ReferencedContainer = "container:Papagaio.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

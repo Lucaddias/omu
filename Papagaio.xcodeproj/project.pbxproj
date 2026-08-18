@@ -25,7 +25,7 @@
 /* End PBXBuildRule section */
 
 /* Begin PBXFileReference section */
-		PA00000000000000000006 /* Loro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Loro.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		PA00000000000000000006 /* Papagaio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Papagaio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		PA00000000000000000013 /* Papagaio.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Papagaio.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -61,7 +61,7 @@
 		PA00000000000000000005 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				PA00000000000000000006 /* Loro.app */,
+				PA00000000000000000006 /* Papagaio.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -77,9 +77,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		PA00000000000000000002 /* Loro */ = {
+		PA00000000000000000002 /* Papagaio */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = PA0000000000000000000B /* Build configuration list for PBXNativeTarget "Loro" */;
+			buildConfigurationList = PA0000000000000000000B /* Build configuration list for PBXNativeTarget "Papagaio" */;
 			buildPhases = (
 				PA00000000000000000007 /* Sources */,
 				PA00000000000000000008 /* Frameworks */,
@@ -93,12 +93,12 @@
 			fileSystemSynchronizedGroups = (
 				PA00000000000000000003 /* Papagaio */,
 			);
-			name = Loro;
+			name = Papagaio;
 			packageProductDependencies = (
 				PA00000000000000000011 /* PapagaioCore */,
 			);
 			productName = Papagaio;
-			productReference = PA00000000000000000006 /* Loro.app */;
+			productReference = PA00000000000000000006 /* Papagaio.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -116,7 +116,7 @@
 					};
 				};
 			};
-			buildConfigurationList = PA0000000000000000000A /* Build configuration list for PBXProject "Loro" */;
+			buildConfigurationList = PA0000000000000000000A /* Build configuration list for PBXProject "Papagaio" */;
 			developmentRegion = pt_BR;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -133,7 +133,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				PA00000000000000000002 /* Loro */,
+				PA00000000000000000002 /* Papagaio */,
 			);
 		};
 /* End PBXProject section */
@@ -222,7 +222,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Loro;
+				INFOPLIST_KEY_CFBundleDisplayName = Papagaio;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "O Papagaio usa eventos do calendário para reconhecer participantes e o contexto da reunião.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "O Papagaio usa contatos para reconhecer melhor nomes próprios em transcrições.";
@@ -252,7 +252,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Loro;
+				INFOPLIST_KEY_CFBundleDisplayName = Papagaio;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "O Papagaio usa eventos do calendário para reconhecer participantes e o contexto da reunião.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "O Papagaio usa contatos para reconhecer melhor nomes próprios em transcrições.";
@@ -274,7 +274,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		PA0000000000000000000A /* Build configuration list for PBXProject "Loro" */ = {
+		PA0000000000000000000A /* Build configuration list for PBXProject "Papagaio" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				PA0000000000000000000C /* Debug */,
@@ -283,7 +283,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		PA0000000000000000000B /* Build configuration list for PBXNativeTarget "Loro" */ = {
+		PA0000000000000000000B /* Build configuration list for PBXNativeTarget "Papagaio" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				PA0000000000000000000E /* Debug */,
