@@ -113,6 +113,11 @@
 				TargetAttributes = {
 					PA00000000000000000002 = {
 						CreatedOnToolsVersion = 27.0;
+						SystemCapabilities = {
+							com.apple.iCloud = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
