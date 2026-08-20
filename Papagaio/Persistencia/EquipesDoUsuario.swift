@@ -16,6 +16,16 @@ enum EquipesDoUsuario {
         UserDefaults.standard.set(dados, forKey: chave)
     }
 
+    static func incluirOuAtualizar(_ equipe: EquipeDisponivel) {
+        var equipes = carregar()
+        if let indice = equipes.firstIndex(where: { $0.id == equipe.id }) {
+            equipes[indice] = equipe
+        } else {
+            equipes.append(equipe)
+        }
+        salvar(equipes)
+    }
+
     static func remover() {
         UserDefaults.standard.removeObject(forKey: chave)
     }

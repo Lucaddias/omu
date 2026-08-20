@@ -178,6 +178,11 @@ struct ContentView: View {
         // do Mac. Nos outros dois casos isto fixa a aparência da janela, e as
         // cores dinâmicas do tema resolvem em cima dela.
         .preferredColorScheme(aparencia.wrappedValue.esquemaPreferido)
+        .onReceive(NotificationCenter.default.publisher(for: .equipeCloudKitAceita)) { notificacao in
+            guard let equipe = notificacao.object as? EquipeDisponivel else { return }
+            equipes = EquipesDoUsuario.carregar()
+            usarEquipe(equipe)
+        }
         .task {
             notificacoes.preparar()
             perfil.iniciar()

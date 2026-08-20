@@ -3,6 +3,8 @@ import SwiftUI
 
 @main
 struct PapagaioApp: App {
+    @NSApplicationDelegateAdaptor(DelegadoDeConvitesCloudKit.self) private var delegadoDeConvites
+
     /// A gravação nasce aqui, e não dentro da `ContentView`, para que o item da
     /// barra de menus observe o mesmo objeto que a janela — sem isso seriam
     /// duas gravações independentes, cada uma com seu cronômetro.
