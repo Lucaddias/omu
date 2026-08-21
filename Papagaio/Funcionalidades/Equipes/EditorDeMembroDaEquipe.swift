@@ -22,6 +22,12 @@ struct EditorDeMembroDaEquipe: View {
             CampoDoPerfil(titulo: "Nome", texto: $membro.nome, placeholder: "Nome completo")
             CampoDoPerfil(titulo: "Email", texto: $membro.email, placeholder: "email@empresa.com")
 
+            if titulo == "Convidar membro" {
+                Text("Use o e-mail associado ao Apple Account da pessoa. O convite será enviado pelo iCloud.")
+                    .font(.callout)
+                    .foregroundStyle(PapagaioTema.textoSecundario)
+            }
+
             CampoDoPerfil(titulo: "Cargo", texto: $membro.cargo, placeholder: "Ex.: Pesquisador, Designer, Transcritor")
 
             Picker("Status", selection: $membro.status) {
@@ -35,7 +41,7 @@ struct EditorDeMembroDaEquipe: View {
                 Spacer()
                 Button("Cancelar", role: .cancel, action: aoCancelar)
                     .buttonStyle(BotaoDeContornoPapagaio())
-                Button("Salvar", systemImage: "checkmark") {
+                Button(titulo == "Convidar membro" ? "Enviar convite" : "Salvar", systemImage: "checkmark") {
                     aoSalvar(membro)
                 }
                 .buttonStyle(BotaoPrincipalPapagaio())

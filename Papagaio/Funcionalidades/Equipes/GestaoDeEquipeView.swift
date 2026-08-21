@@ -5,11 +5,14 @@ struct GestaoDeEquipeView: View {
     let equipes: [EquipeDisponivel]
     let aoSelecionarEquipe: (EquipeDisponivel) -> Void
     let aoAtualizarQuantidadeDeMembros: (String, Int) -> Void
+    let aoConvidarMembro: (MembroDaEquipe, EquipeDisponivel) async throws -> Void
     @State private var membros: [MembroDaEquipe] = []
     @State private var pagina = 0
     @State private var membroEditando: MembroDaEquipe?
     @State private var mostrandoAdicionar = false
     @State private var mostrandoTrocarEquipe = false
+    @State private var conviteEmAndamento = false
+    @State private var erroDoConvite: String?
 
     var body: some View {
         ScrollView {
@@ -56,13 +59,11 @@ struct GestaoDeEquipeView: View {
         }
         .sheet(isPresented: $mostrandoAdicionar) {
             EditorDeMembroDaEquipe(
-                titulo: "Adicionar membro",
+                titulo: "Convidar membro",
                 membro: MembroDaEquipe(nome: "", email: "", cargo: "Transcritor", status: .ativo),
                 aoCancelar: { mostrandoAdicionar = false },
                 aoSalvar: { novo in
-                    membros.append(novo)
-                    salvarMembrosDaEquipe()
-                    mostrandoAdicionar = false
+                    convidar(novo)
                 }
             )
         }
@@ -91,6 +92,14 @@ struct GestaoDeEquipeView: View {
                 }
             )
         }
+        .alert("Não foi possível enviar o convite", isPresented: Binding(
+            get: { erroDoConvite != nil },
+            set: { if !$0 { erroDoConvite = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(erroDoConvite ?? "")
+        }
     }
 
     private var cabecalho: some View {
@@ -100,7 +109,7 @@ struct GestaoDeEquipeView: View {
                             .font(PapagaioTema.Tipo.tituloDePagina)
                             .foregroundStyle(PapagaioTema.texto)
 
-                        Text("Gerencie os membros de \(nomeDaEquipe) e níveis de acesso\nem um ambiente centralizado e colaborativo.")
+                        Text("Convide pessoas pelo e-mail do Apple Account para compartilhar as conversas de \(nomeDaEquipe).")
                             .font(.title3)
                             .lineSpacing(6)
                             .foregroundStyle(PapagaioTema.textoSecundario)
@@ -113,17 +122,17 @@ struct GestaoDeEquipeView: View {
                     }
                     .buttonStyle(BotaoDeContornoPapagaio())
 
-                    Button("Adicionar Membro", systemImage: "person.badge.plus") {
+                    Button("Convidar membro", systemImage: "person.badge.plus") {
                         mostrandoAdicionar = true
                     }
                     .buttonStyle(BotaoPrincipalPapagaio())
+                    .disabled(conviteEmAndamento || equipeAtiva?.zonaCloudKit == nil)
         }
     }
 
     private func remover(_ membro: MembroDaEquipe) {
         guard !membro.atual else { return }
-        membros.removeAll { $0.id == membro.id }
-        salvarMembrosDaEquipe()
+        erroDoConvite = "A remoção de participantes do iCloud ainda não foi implementada. O acesso de \(membro.nome) permanece ativo para não criar uma falsa impressão de segurança."
     }
 
     private func alternarPagina(_ delta: Int) {
@@ -152,5 +161,21 @@ struct GestaoDeEquipeView: View {
         let ultima = max(0, (membros.count - 1) / TabelaDaEquipe.itensPorPagina)
         pagina = min(pagina, ultima)
         aoAtualizarQuantidadeDeMembros(equipeAtiva.id, membros.count)
+    }
+
+    private func convidar(_ membro: MembroDaEquipe) {
+        guard let equipeAtiva else { return }
+        conviteEmAndamento = true
+        Task {
+            defer { conviteEmAndamento = false }
+            do {
+                try await aoConvidarMembro(membro, equipeAtiva)
+                membros.append(membro)
+                salvarMembrosDaEquipe()
+                mostrandoAdicionar = false
+            } catch {
+                erroDoConvite = error.localizedDescription
+            }
+        }
     }
 }

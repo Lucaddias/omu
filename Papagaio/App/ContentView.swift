@@ -41,6 +41,7 @@ struct ContentView: View {
     @State private var confirmandoCancelamentoDaGravacao = false
     /// Espaço ocupado pelo player na tela atual, anunciado por quem o desenha.
     @State private var alturaDoPlayer: CGFloat = 0
+    private let servicoDeEquipesCloudKit = ServicoDeEquipesCloudKit()
 
     /// Dentro de uma conversa, onde a base pertence ao player.
     private var seloNoTopo: Bool { !conversaAberta.isEmpty }
@@ -283,7 +284,8 @@ struct ContentView: View {
         case .equipe:
             GestaoDeEquipeView(equipeAtiva: equipeAtiva, equipes: equipes,
                                 aoSelecionarEquipe: usarEquipe,
-                                aoAtualizarQuantidadeDeMembros: atualizarQuantidadeDeMembros)
+                                aoAtualizarQuantidadeDeMembros: atualizarQuantidadeDeMembros,
+                                aoConvidarMembro: convidarMembro)
         }
     }
 
@@ -479,9 +481,20 @@ struct ContentView: View {
             papel: "Administrador",
             quantidadeDeMembros: 1
         )
-        equipes.append(nova)
-        EquipesDoUsuario.salvar(equipes)
-        usarEquipe(nova)
+        Task {
+            do {
+                let publicada = try await servicoDeEquipesCloudKit.criarWorkspace(para: nova)
+                equipes.append(publicada)
+                EquipesDoUsuario.salvar(equipes)
+                usarEquipe(publicada)
+            } catch {
+                falhaDeAbertura = "Não foi possível criar a equipe no iCloud: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func convidarMembro(_ membro: MembroDaEquipe, para equipe: EquipeDisponivel) async throws {
+        try await servicoDeEquipesCloudKit.adicionarMembro(email: membro.email, a: equipe)
     }
 
     private func atualizarQuantidadeDeMembros(equipeID: String, quantidade: Int) {
