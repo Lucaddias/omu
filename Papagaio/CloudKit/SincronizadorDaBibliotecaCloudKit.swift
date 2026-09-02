@@ -115,15 +115,17 @@ enum DiagnosticoDaSincronizacaoCloudKit {
             return nil
         case .invalidArguments, .permissionFailure:
             // Tenta extrair a causa específica do erro de argumentos, que
-            // geralmente aponta para campo/tipo não publicado.
-            let texto = ck.localizedDescription.folding(
+            // geralmente aponta para campo/tipo não publicado. O `folding`
+            // serve só para o `contains`: o valor repassado adiante é o texto
+            // original, porque o fallback de `mensagem(paraTexto:)` devolve o
+            // que recebeu — e o nome do tipo que o proprietário precisa
+            // publicar no Dashboard chegaria à interface sem acento e em
+            // minúsculas.
+            let normalizado = ck.localizedDescription.folding(
                 options: [.caseInsensitive, .diacriticInsensitive], locale: .current
             )
-            if texto.contains("production schema") {
-                // Mantém o texto original, que inclui o nome do tipo que
-                // precisa ser publicado — informação que `CKError.code` não
-                // preserva.
-                return mensagem(paraTexto: texto)
+            if normalizado.contains("production schema") {
+                return mensagem(paraTexto: ck.localizedDescription)
             }
             return nil
         default:

@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import PapagaioCore
 import Testing
@@ -21,6 +22,43 @@ func equipeLegadaNaoExigeMetadadosCloudKit() throws {
 
     #expect(equipe.zonaCloudKit == nil)
     #expect(equipe.compartilhamentoCloudKit == nil)
+}
+
+@Test("Configurações iguais comparam iguais, venham de onde vierem")
+func configuracoesDaEquipeComparamPorValor() throws {
+    // O botão "Salvar configurações" é habilitado por
+    // `configuracoes != equipe.configuracoes`. Uma configuração recém-editada
+    // na interface e a mesma configuração vinda do CloudKit precisam comparar
+    // iguais; senão o botão fica aceso sem haver o que salvar e o SwiftUI
+    // rediffa `EquipeDisponivel` sem motivo.
+    var editada = ConfiguracoesDaEquipe()
+    editada.recebimentoDeArquivos = .aguardarRevisao
+
+    let doCloudKit = try JSONDecoder().decode(
+        ConfiguracoesDaEquipe.self,
+        from: try JSONEncoder().encode(editada)
+    )
+
+    #expect(editada == doCloudKit)
+    #expect(editada.hashValue == doCloudKit.hashValue)
+
+    // Blob gravado por uma versão anterior, sem nenhuma das chaves atuais:
+    // cai nos padrões em vez de falhar a decodificação da equipe inteira.
+    let legado = try JSONDecoder().decode(
+        ConfiguracoesDaEquipe.self,
+        from: Data("{}".utf8)
+    )
+    #expect(legado == ConfiguracoesDaEquipe())
+
+    // Blob de uma versão que gravava `versao`: a chave desconhecida é
+    // ignorada e não muda a igualdade.
+    let comVersaoAntiga = try JSONDecoder().decode(
+        ConfiguracoesDaEquipe.self,
+        from: Data("""
+        {"versao":1,"recebimentoDeArquivos":"Aguardar revisão"}
+        """.utf8)
+    )
+    #expect(comVersaoAntiga == editada)
 }
 
 @Test("Download CloudKit consome todos os cursores acima de 200 registros")
@@ -246,6 +284,23 @@ func diagnosticoCloudKitExplicaDependenciaDoProprietario() {
     #expect(esquema.contains("CloudKit Dashboard"))
     #expect(zona.contains("entre novamente"))
     #expect(DiagnosticoDaSincronizacaoCloudKit.exigeAcaoDoProprietario("Zone does not exist"))
+}
+
+@Test("Erro de esquema desconhecido chega à interface sem ser desfigurado")
+func diagnosticoCloudKitPreservaOTextoOriginalDoErro() {
+    // `Tarefa` não é um dos tipos que `mensagem(paraTexto:)` conhece, então o
+    // fallback devolve o texto recebido. Ele precisa chegar legível: é dele
+    // que o proprietário tira o nome do tipo a publicar no CloudKit Dashboard.
+    let original = "Cannot create new type Tarefa in production schema"
+    let erro = CKError(
+        _nsError: NSError(
+            domain: CKErrorDomain,
+            code: CKError.Code.invalidArguments.rawValue,
+            userInfo: [NSLocalizedDescriptionKey: original]
+        )
+    )
+
+    #expect(DiagnosticoDaSincronizacaoCloudKit.mensagem(para: erro) == original)
 }
 
 @Test("Erro de índice orienta a atualizar uma versão anterior do app")
