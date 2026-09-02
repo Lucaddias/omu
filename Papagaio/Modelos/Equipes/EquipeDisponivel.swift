@@ -15,26 +15,26 @@ enum RecebimentoDeArquivosDaEquipe: String, CaseIterable, Codable, Identifiable,
 }
 
 struct ConfiguracoesDaEquipe: Codable, Hashable, Sendable {
-    /// Versão do schema serializado. Equipes gravadas antes desta chave
-    /// existem: na leitura, qualquer valor ausente é tratado como `1`.
-    /// Aumentar aqui exige uma migração correspondente no `init(from:)`.
-    var versao: Int = 2
     var visibilidadeDosArquivos: VisibilidadeDosArquivosDaEquipe = .todosOsMembros
     var recebimentoDeArquivos: RecebimentoDeArquivosDaEquipe = .automatico
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case versao, visibilidadeDosArquivos, recebimentoDeArquivos
+        case visibilidadeDosArquivos, recebimentoDeArquivos
     }
 
+    /// Quem dá compatibilidade retroativa aqui é o `decodeIfPresent(...) ?? padrão`,
+    /// não um número de versão: cada chave ausente cai no padrão sem apagar o
+    /// que o proprietário já tinha definido, e uma chave nova acrescentada
+    /// depois se comporta igual. Um campo `versao` gravado e nunca lido não
+    /// entregava migração nenhuma e ainda entrava no `==` sintetizado — duas
+    /// configurações com os mesmos valores comparavam desiguais só por terem
+    /// sido serializadas em momentos diferentes, o que reativava o botão
+    /// "Salvar configurações" e sujava o diffing do SwiftUI via
+    /// `EquipeDisponivel: Hashable`.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        // Defaults defensivos para qualquer chave ausente. Equipes
-        // serializadas antes do campo `versao` existirem continuam
-        // decodificando como `.automatico` / `.todosOsMembros`, sem
-        // apagar a configuração que o proprietário tinha definido.
-        versao = try container.decodeIfPresent(Int.self, forKey: .versao) ?? 1
         visibilidadeDosArquivos = try container.decodeIfPresent(
             VisibilidadeDosArquivosDaEquipe.self, forKey: .visibilidadeDosArquivos
         ) ?? .todosOsMembros
