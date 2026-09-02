@@ -191,6 +191,49 @@ func falhaCloudKitEhObservavel() async throws {
     #expect(notificacao?.contains("Falha simulada") == true)
 }
 
+@MainActor
+@Test("Página parcialmente falha não é apresentada como equipe sincronizada")
+func downloadParcialNaoAnunciaSincronizacaoConcluida() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let espaco = EspacoID()
+    let recebida = Arquivo(titulo: "Chegou", pastaRelativa: "", espaco: espaco)
+    // O fetch trouxe uma conversa e recusou duas: sucesso para o result block
+    // do CloudKit, mas a equipe não está sincronizada.
+    let transporte = TransporteDeConversasFake(
+        paginas: [[try JSONEncoder().encode(recebida)]],
+        falhasPorRegistro: [
+            FalhaDeConversaCloudKit(id: "conversa-1", mensagem: "Registro recusado pelo servidor."),
+            FalhaDeConversaCloudKit(id: "conversa-2", mensagem: "Registro recusado pelo servidor."),
+        ]
+    )
+    let biblioteca = Biblioteca(
+        armazenamento: Armazenamento(raiz: raiz),
+        repositorio: SwiftDataRepository(
+            modelContainer: try SwiftDataRepository.containerLocal(
+                nome: UUID().uuidString,
+                emMemoria: true
+            )
+        ),
+        espaco: espaco,
+        sincronizadorCloudKit: SincronizadorDaBibliotecaCloudKit(transporte: transporte)
+    )
+    var notificacao: String?
+    biblioteca.aoNotificar = { _, mensagem, _ in notificacao = mensagem }
+
+    await biblioteca.usarEspaco(espaco, equipeCloudKit: equipeCloudKitDeTeste(espaco: espaco))
+
+    // A conversa boa chegou; o estado, mesmo assim, não pode ser `.sincronizado`.
+    #expect(biblioteca.arquivos.contains { $0.id == recebida.id })
+    guard case let .falhou(mensagem) = biblioteca.estadoDaSincronizacaoCloudKit else {
+        Issue.record("Download parcial foi reportado como \(biblioteca.estadoDaSincronizacaoCloudKit)")
+        return
+    }
+    #expect(mensagem.contains("2 conversa(s) não puderam ser baixadas"))
+    #expect(notificacao?.contains("2 conversa(s) não puderam ser baixadas") == true)
+}
+
 @Test("CKShare não concede acesso por link público — apenas por código")
 func shareNaoConcedeAcessoPorLinkPublico() {
     // O link do CKShare vazaria acesso de escrita para qualquer pessoa com a
@@ -436,6 +479,7 @@ private struct FalhaCloudKitFake: LocalizedError {
 private actor TransporteDeConversasFake: TransporteDeConversasCloudKit {
     private let paginas: [[Data]]
     private let falharAoPaginar: Bool
+    private let falhasPorRegistro: [FalhaDeConversaCloudKit]
     private var falharAoSalvar: Bool
     private var indiceDaPagina = 0
     private var arquivoSalvo: Data?
@@ -443,11 +487,13 @@ private actor TransporteDeConversasFake: TransporteDeConversasCloudKit {
     init(
         paginas: [[Data]],
         falharAoPaginar: Bool = false,
-        falharAoSalvar: Bool = false
+        falharAoSalvar: Bool = false,
+        falhasPorRegistro: [FalhaDeConversaCloudKit] = []
     ) {
         self.paginas = paginas
         self.falharAoPaginar = falharAoPaginar
         self.falharAoSalvar = falharAoSalvar
+        self.falhasPorRegistro = falhasPorRegistro
     }
 
     func salvar(_ dados: Data, id: String, equipe: EquipeDisponivel) throws {
@@ -468,7 +514,13 @@ private actor TransporteDeConversasFake: TransporteDeConversasCloudKit {
         let proxima = indiceDaPagina < paginas.count
             ? CursorDeConversasCloudKit("pagina-\(indiceDaPagina)")
             : nil
-        return PaginaDeConversasCloudKit(registros: paginas[atual], proxima: proxima)
+        return PaginaDeConversasCloudKit(
+            registros: paginas[atual],
+            proxima: proxima,
+            // Como no transporte real, as falhas por registro acompanham a
+            // primeira página do fetch.
+            falhas: atual == 0 ? falhasPorRegistro : []
+        )
     }
 
     func remover(id: String, equipe: EquipeDisponivel) {}

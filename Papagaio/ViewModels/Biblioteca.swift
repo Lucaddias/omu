@@ -1108,7 +1108,8 @@ final class Biblioteca {
                 equipeID: equipeCloudKit.id
             )
             var conflitos = 0
-            for conversa in try await sincronizadorCloudKit.baixarComVersoes(da: equipeCloudKit) {
+            let recebido = try await sincronizadorCloudKit.baixarComVersoes(da: equipeCloudKit)
+            for conversa in recebido.conversas {
                 if PoliticaDeConflitoCloudKit.decidir(
                     revisaoRemota: conversa.atualizadoEm,
                     revisaoLocalPendente: revisoesPendentes[conversa.arquivo.id]
@@ -1133,7 +1134,23 @@ final class Biblioteca {
                 try await repositorio.salvar(combinado)
             }
             await carregar()
-            if conflitos == 0 {
+            // Um fetch parcialmente falho traz conversas de menos. Anunciar
+            // "sincronizado" nesse caso esconde do usuário exatamente o que
+            // ele precisa saber, por isso as falhas por registro vêm antes de
+            // qualquer outro desfecho.
+            if !recebido.falhas.isEmpty {
+                // Uma falha de esquema costuma repetir a mesma mensagem em
+                // todos os registros; mostrar a lista crua encheria o aviso
+                // com a mesma frase dezenas de vezes.
+                var vistas: Set<String> = []
+                let distintas = recebido.falhas.map(\.mensagem).filter { vistas.insert($0).inserted }
+                let mensagem = """
+                \(recebido.falhas.count) conversa(s) não puderam ser baixadas: \
+                \(distintas.prefix(3).joined(separator: " "))
+                """
+                estadoDaSincronizacaoCloudKit = .falhou(mensagem)
+                aoNotificar?("Sincronização incompleta do iCloud", mensagem, .aviso)
+            } else if conflitos == 0 {
                 let pendentes = try await filaCloudKit.operacoesPendentes().count
                 if pendentes == 0 {
                     estadoDaSincronizacaoCloudKit = .sincronizado

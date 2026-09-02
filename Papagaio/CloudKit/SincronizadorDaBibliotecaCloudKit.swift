@@ -12,9 +12,37 @@ final class CursorDeConversasCloudKit: @unchecked Sendable {
     }
 }
 
+/// Um registro que o CloudKit devolveu com erro dentro de um fetch que, no
+/// conjunto, teve sucesso. Existe para que uma falha por registro não seja
+/// confundida com "esta conversa não existe mais".
+struct FalhaDeConversaCloudKit: Sendable, Equatable {
+    let id: String
+    let mensagem: String
+}
+
 struct PaginaDeConversasCloudKit: Sendable {
     let registros: [Data]
     let proxima: CursorDeConversasCloudKit?
+    /// Registros que o servidor recusou nesta página. A página continua
+    /// válida — os registros presentes são reais —, mas o chamador precisa
+    /// saber que ela veio incompleta.
+    let falhas: [FalhaDeConversaCloudKit]
+
+    init(
+        registros: [Data],
+        proxima: CursorDeConversasCloudKit?,
+        falhas: [FalhaDeConversaCloudKit] = []
+    ) {
+        self.registros = registros
+        self.proxima = proxima
+        self.falhas = falhas
+    }
+}
+
+/// O que um download da equipe trouxe e o que ele deixou de trazer.
+struct ResultadoDoDownloadCloudKit: Sendable {
+    let conversas: [ConversaRecebidaCloudKit]
+    let falhas: [FalhaDeConversaCloudKit]
 }
 
 struct PayloadDeConversaCloudKit: Codable, Sendable, Equatable {
@@ -230,6 +258,8 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
             guard let paginaPendente = cursor.valor as? PaginaPendenteDeConversasCloudKit else {
                 throw ErroDeEquipeCloudKit.cursorInvalido
             }
+            // As falhas por registro pertencem ao fetch, não à paginação: elas
+            // são reportadas uma única vez, junto da primeira página.
             return Self.pagina(de: paginaPendente.registros, aPartirDe: paginaPendente.proximoIndice)
         }
 
@@ -237,8 +267,12 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
         // produção. Como a equipe já identifica uma zona customizada única,
         // buscamos suas alterações diretamente: esse fluxo não depende de
         // índices e inclui a carga completa quando o token é nulo.
-        let registros = try await registrosDaZona(zona, no: banco)
-        return Self.pagina(de: try Self.dadosDosRegistros(registros), aPartirDe: 0)
+        let resultado = try await registrosDaZona(zona, no: banco)
+        return Self.pagina(
+            de: try Self.dadosDosRegistros(resultado.registros),
+            aPartirDe: 0,
+            falhas: resultado.falhas
+        )
     }
 
     func remover(id: String, equipe: EquipeDisponivel) async throws {
@@ -266,7 +300,8 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
 
     private static func pagina(
         de registros: [Data],
-        aPartirDe indice: Int
+        aPartirDe indice: Int,
+        falhas: [FalhaDeConversaCloudKit] = []
     ) -> PaginaDeConversasCloudKit {
         let limite = min(indice + tamanhoDaPagina, registros.count)
         let proxima = limite < registros.count
@@ -279,37 +314,60 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
             : nil
         return PaginaDeConversasCloudKit(
             registros: Array(registros[indice..<limite]),
-            proxima: proxima
+            proxima: proxima,
+            falhas: falhas
         )
     }
 
+    /// Busca a zona inteira, separando os registros que vieram dos que o
+    /// servidor recusou.
+    ///
+    /// A política antiga — qualquer erro por registro faz o fetch inteiro
+    /// lançar — era agressiva demais: uma única conversa problemática impedia
+    /// o download de todas as outras. Ignorar as falhas, como passou a fazer a
+    /// auditoria, é pior ainda: o fetch parcial vira sucesso completo e a
+    /// interface anuncia "sincronizado" enquanto conversas não chegaram. A
+    /// política intermediária adotada aqui é:
+    ///
+    /// - todos os registros falharam → lança o primeiro erro;
+    /// - alguns falharam → devolve os bons acompanhados das falhas, para o
+    ///   chamador refletir a lacuna no estado da interface.
     private func registrosDaZona(
         _ zona: CKRecordZone.ID,
         no banco: CKDatabase
-    ) async throws -> [CKRecord] {
+    ) async throws -> RegistrosDaZonaCloudKit {
         try await withCheckedThrowingContinuation { continuation in
             let operacao = CKFetchRecordZoneChangesOperation()
             operacao.recordZoneIDs = [zona]
             operacao.fetchAllChanges = true
 
-            // `CKFetchRecordZoneChangesOperation` pode chamar `recordWasChangedBlock`
-            // com `.failure` (erro por registro) e ainda entregar `fetchRecordZoneChangesResultBlock`
-            // com `.success`. Sem o guard, a continuation seria resumida duas vezes
-            // e a segunda chamada travaria o programa.
-            let ponteiro = ResumeUnico()
-            var registros: [CKRecord] = []
-            operacao.recordWasChangedBlock = { _, resultado in
-                if case let .success(registro) = resultado {
-                    registros.append(registro)
+            let acumulado = AcumuladorDaZonaCloudKit()
+            operacao.recordWasChangedBlock = { id, resultado in
+                switch resultado {
+                case let .success(registro):
+                    acumulado.registrar(registro)
+                case let .failure(erro):
+                    acumulado.registrar(erro: erro, em: id)
                 }
             }
+            // A continuation é resumida diretamente: este bloco é chamado uma
+            // única vez por operação e `recordWasChangedBlock` não resume
+            // nada. O que de fato precisa de sincronização é o estado
+            // acumulado, mutado na fila de callbacks da operação e lido aqui —
+            // e é o `AcumuladorDaZonaCloudKit` que cuida disso.
             operacao.fetchRecordZoneChangesResultBlock = { resultado in
-                switch resultado {
-                case .success:
-                    ponteiro.resume(continuation, returning: registros)
-                case let .failure(erro):
-                    ponteiro.resume(continuation, throwing: erro)
+                if case let .failure(erro) = resultado {
+                    continuation.resume(throwing: erro)
+                    return
                 }
+                let (registros, falhas) = acumulado.resultado()
+                if registros.isEmpty, let primeiro = acumulado.primeiroErro() {
+                    continuation.resume(throwing: primeiro)
+                    return
+                }
+                continuation.resume(
+                    returning: RegistrosDaZonaCloudKit(registros: registros, falhas: falhas)
+                )
             }
             banco.add(operacao)
         }
@@ -413,18 +471,23 @@ actor SincronizadorDaBibliotecaCloudKit {
     }
 
     func baixar(da equipe: EquipeDisponivel) async throws -> [Arquivo] {
-        try await baixarComVersoes(da: equipe).map(\.arquivo)
+        try await baixarComVersoes(da: equipe).conversas.map(\.arquivo)
     }
 
+    /// Devolve as conversas baixadas **e** as que o servidor recusou. As
+    /// falhas sobem até aqui de propósito: um download parcial não pode ser
+    /// apresentado como sincronização concluída.
     func baixarComVersoes(
         da equipe: EquipeDisponivel
-    ) async throws -> [ConversaRecebidaCloudKit] {
+    ) async throws -> ResultadoDoDownloadCloudKit {
         let espacoEsperado = try espacoDaEquipe(equipe)
         var cursor: CursorDeConversasCloudKit?
         var conversas: [ConversaRecebidaCloudKit] = []
+        var falhas: [FalhaDeConversaCloudKit] = []
 
         repeat {
             let pagina = try await transporte.pagina(da: equipe, continuando: cursor)
+            falhas.append(contentsOf: pagina.falhas)
             for dados in pagina.registros {
                 let conversa = try Self.decodificar(dados)
                 let arquivo = conversa.arquivo
@@ -434,7 +497,7 @@ actor SincronizadorDaBibliotecaCloudKit {
             cursor = pagina.proxima
         } while cursor != nil
 
-        return conversas
+        return ResultadoDoDownloadCloudKit(conversas: conversas, falhas: falhas)
     }
 
     func remover(_ arquivo: Arquivo, da equipe: EquipeDisponivel) async throws {
@@ -473,26 +536,54 @@ actor SincronizadorDaBibliotecaCloudKit {
     }
 }
 
-/// Garante que `withCheckedThrowingContinuation` não seja resumido mais de
-/// uma vez. O CloudKit entrega falhas por registro e ainda chama o result
-/// block final — sem esta proteção a segunda chamada trava o runtime.
-private final class ResumeUnico: @unchecked Sendable {
-    private var resumed = false
-    private let lock = NSLock()
+/// O que um fetch de zona trouxe, com as recusas por registro à parte.
+private struct RegistrosDaZonaCloudKit: Sendable {
+    let registros: [CKRecord]
+    let falhas: [FalhaDeConversaCloudKit]
+}
 
-    func resume(_ continuation: CheckedContinuation<[CKRecord], any Error>, returning value: [CKRecord]) {
+/// Estado compartilhado entre os dois callbacks de
+/// `CKFetchRecordZoneChangesOperation`.
+///
+/// Substitui o antigo `ResumeUnico`, que guardava contra um double-resume que
+/// nenhuma das versões do código produzia: `recordWasChangedBlock` nunca
+/// resume a continuation e `fetchRecordZoneChangesResultBlock` é chamado uma
+/// vez por operação. O risco de concorrência real neste par de closures é o
+/// acumulador — escrito na fila de callbacks da operação e lido pelo result
+/// block —, e é ele que o lock passa a cobrir.
+private final class AcumuladorDaZonaCloudKit: @unchecked Sendable {
+    private let lock = NSLock()
+    private var registros: [CKRecord] = []
+    private var falhas: [FalhaDeConversaCloudKit] = []
+    private var primeiro: (any Error)?
+
+    func registrar(_ registro: CKRecord) {
         lock.lock()
         defer { lock.unlock() }
-        guard !resumed else { return }
-        resumed = true
-        continuation.resume(returning: value)
+        registros.append(registro)
     }
 
-    func resume(_ continuation: CheckedContinuation<[CKRecord], any Error>, throwing error: any Error) {
+    func registrar(erro: any Error, em id: CKRecord.ID) {
         lock.lock()
         defer { lock.unlock() }
-        guard !resumed else { return }
-        resumed = true
-        continuation.resume(throwing: error)
+        if primeiro == nil { primeiro = erro }
+        falhas.append(
+            FalhaDeConversaCloudKit(
+                id: id.recordName,
+                mensagem: DiagnosticoDaSincronizacaoCloudKit.mensagem(para: erro)
+            )
+        )
+    }
+
+    func resultado() -> (registros: [CKRecord], falhas: [FalhaDeConversaCloudKit]) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (registros, falhas)
+    }
+
+    func primeiroErro() -> (any Error)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return primeiro
     }
 }
