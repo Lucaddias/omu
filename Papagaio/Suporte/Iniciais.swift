@@ -13,9 +13,3 @@ enum Iniciais {
         return letras.isEmpty ? vazio : String(letras).uppercased()
     }
 }
-
-// Manter compatibilidade com código antigo que chama a função global
-@available(*, deprecated, message: "Use Iniciais.de(_:vazio:) em vez disso")
-func iniciais(de nome: String, vazio: String = "?") -> String {
-    Iniciais.de(nome, vazio: vazio)
-}
