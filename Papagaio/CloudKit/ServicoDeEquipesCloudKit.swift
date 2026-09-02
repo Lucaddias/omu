@@ -1,4 +1,5 @@
 import CloudKit
+import CryptoKit
 import Foundation
 
 /// Workspaces colaborativos no container do Papagaio.
@@ -30,15 +31,33 @@ actor ServicoDeEquipesCloudKit {
         static let equipeExcluida = "EquipeExcluida"
     }
 
-    private let container: CKContainer
+    private let containerInjetado: CKContainer?
+    private let transporte: any TransporteDeEquipesCloudKit
+
+    /// Preguiçoso de propósito: construir um `CKContainer` num processo sem a
+    /// entitlement `com.apple.developer.icloud-services` derruba o processo, e
+    /// é exatamente esse o caso do host de testes. Assim, um serviço criado
+    /// com transporte falso nunca chega a tocar o CloudKit.
+    private lazy var container: CKContainer = containerInjetado
+        ?? CKContainer(identifier: Self.identificadorDoContainer)
 
     private enum EstadoDoMarcadorDeExclusao: String {
         case preparando
         case concluida
     }
 
-    init(container: CKContainer = CKContainer(identifier: "iCloud.com.papagaio.Papagaio")) {
-        self.container = container
+    init(container: CKContainer? = nil) {
+        let concreto = container ?? CKContainer(identifier: Self.identificadorDoContainer)
+        self.containerInjetado = concreto
+        self.transporte = TransporteDeEquipesCloudKitReal(container: concreto)
+    }
+
+    /// Usado pelos testes do fluxo de entrada por código. As operações de
+    /// administração do `CKShare` (permissões, participantes, exclusão)
+    /// continuam falando com o CloudKit diretamente e não são cobertas aqui.
+    init(transporte: any TransporteDeEquipesCloudKit) {
+        self.containerInjetado = nil
+        self.transporte = transporte
     }
 
     /// Cria o workspace e o compartilhamento da zona de uma equipe nova.
@@ -51,26 +70,14 @@ actor ServicoDeEquipesCloudKit {
         let zonaID = CKRecordZone.ID(
             zoneName: Self.nomeDaZona(para: equipe.id)
         )
-        let banco = container.privateCloudDatabase
-        _ = try await banco.save(CKRecordZone(zoneID: zonaID))
-
         let espacoID = UUID(uuidString: equipe.espacoID ?? "") ?? UUID()
-        let registro = registroDaEquipe(equipe, espacoID: espacoID, na: zonaID)
-        let compartilhamento = CKShare(recordZoneID: zonaID)
-        compartilhamento[CKShare.SystemFieldKey.title] = equipe.nome as NSString
-        compartilhamento.publicPermission = Self.permissaoDaEntradaPorCodigo
-
-        _ = try await banco.modifyRecords(
-            saving: [registro, compartilhamento],
-            deleting: [],
-            savePolicy: .ifServerRecordUnchanged,
-            atomically: true
+        let compartilhamento = try await transporte.criarEquipeCompartilhada(
+            zona: zonaID,
+            registroDaEquipe: registroDaEquipe(equipe, espacoID: espacoID, na: zonaID),
+            titulo: equipe.nome,
+            permissaoPublica: Self.permissaoDaEntradaPorCodigo
         )
-
-        guard let url = compartilhamento.url else {
-            throw ErroDeEquipeCloudKit.conviteIndisponivel
-        }
-        try await publicarCodigo(equipe.codigoDeEntrada, para: url)
+        try await publicarCodigo(equipe.codigoDeEntrada, para: compartilhamento.url)
 
         return EquipeDisponivel(
             id: equipe.id,
@@ -80,7 +87,7 @@ actor ServicoDeEquipesCloudKit {
             espacoID: espacoID.uuidString,
             zonaCloudKit: zonaID.zoneName,
             donoDaZonaCloudKit: zonaID.ownerName,
-            compartilhamentoCloudKit: compartilhamento.recordID.recordName,
+            compartilhamentoCloudKit: compartilhamento.recordName,
             bancoCloudKit: BancoCloudKitDaEquipe.privado.rawValue,
             codigoDeEntrada: equipe.codigoDeEntrada,
             configuracoes: equipe.configuracoes
@@ -88,21 +95,27 @@ actor ServicoDeEquipesCloudKit {
     }
 
     /// Resolve o código informado e aceita a zona compartilhada da equipe.
+    ///
+    /// A busca é por `recordID` derivado do código, e não por `CKQuery`. A
+    /// versão anterior consultava o tipo público `CodigoDeEquipe` por
+    /// predicado, o que exige o tipo marcado como QUERYABLE — e qualquer conta
+    /// iCloud com o app instalado podia rodar um `CKQuery` com
+    /// `NSPredicate(value: true)` e enumerar `urlDoCompartilhamento` de todas
+    /// as equipes existentes, sem adivinhar código nenhum. Acesso por
+    /// `recordID` não depende de índice, então o índice pode sair do schema.
     func entrarNaEquipe(com codigo: String) async throws -> EquipeDisponivel {
         try await garantirContaICloudDisponivel()
-        let codigoNormalizado = Self.normalizar(codigo)
-        let consulta = CKQuery(
-            recordType: TipoDeRegistro.codigoDeEquipe,
-            predicate: NSPredicate(format: "%K == %@", Campo.codigoDeEntrada, codigoNormalizado)
-        )
-        let resultado = try await container.publicCloudDatabase.records(matching: consulta)
-        guard let registro = try resultado.matchResults.first?.1.get(),
-              let textoDaURL = registro[Campo.urlDoCompartilhamento] as? String,
+        let registro: CKRecord
+        do {
+            registro = try await transporte.registroPublico(comID: Self.idDoCodigo(codigo))
+        } catch let erro as CKError where erro.code == .unknownItem {
+            throw ErroDeEquipeCloudKit.codigoInvalido
+        }
+        guard let textoDaURL = registro[Campo.urlDoCompartilhamento] as? String,
               let url = URL(string: textoDaURL) else {
             throw ErroDeEquipeCloudKit.codigoInvalido
         }
-        let metadados = try await container.shareMetadata(for: url)
-        return try await aceitar(metadados)
+        return try await montarEquipe(apos: try await transporte.aceitarCompartilhamento(em: url))
     }
 
     /// Completa equipes aceitas por versões que ainda guardavam só o nome da
@@ -338,10 +351,16 @@ actor ServicoDeEquipesCloudKit {
     /// compartilhado dessa conta.
     func aceitar(_ metadados: CKShare.Metadata) async throws -> EquipeDisponivel {
         try await garantirContaICloudDisponivel()
-        let compartilhamento = try await container.accept(metadados)
+        return try await montarEquipe(apos: try await container.accept(metadados))
+    }
+
+    /// Monta a equipe local a partir do `CKShare` já aceito. Compartilhado
+    /// pelos dois caminhos de entrada: o convite entregue pelo macOS e o
+    /// código digitado no app.
+    private func montarEquipe(apos compartilhamento: CKShare) async throws -> EquipeDisponivel {
         let zonaID = compartilhamento.recordID.zoneID
         let registroID = CKRecord.ID(recordName: "equipe", zoneID: zonaID)
-        let registro = try await container.sharedCloudDatabase.record(for: registroID)
+        let registro = try await transporte.registroDaZonaCompartilhada(comID: registroID)
 
         guard
             let id = registro[Campo.id] as? String,
@@ -378,21 +397,23 @@ actor ServicoDeEquipesCloudKit {
         codigo.uppercased().filter { $0.isLetter || $0.isNumber }
     }
 
-    /// Permissão pública do CKShare é `.none`: o link do share **não** concede acesso por si só.
-    /// Quem entra o faz porque possui o código e gerou um `CKShare.Metadata`,
-    /// que o sistema entrega via `entrarNaEquipe(com:)` ou via convite do macOS.
-    /// Manter como `.readWrite` permitia que qualquer um com a URL editasse a
-    /// zona compartilhada — um vazamento muito maior do que o código de 6 caracteres.
-    /// legacy: /// Quem possuir o código pode entrar e sincronizar alterações. O código
+    /// Quem possuir o código pode entrar e sincronizar alterações. O código
     /// precisa ser tratado como uma chave de acesso pela equipe.
+    ///
+    /// `.none` não é uma alternativa: com `publicPermission == .none` o
+    /// `CKShare` vira privado e só identidades já adicionadas por
+    /// `share.addParticipant(_:)` conseguem aceitar. Nenhum participante é
+    /// adicionado em lugar nenhum deste app (`git grep addParticipant` não
+    /// retorna nada), então o único caminho de entrada — `entrarNaEquipe(com:)`
+    /// → `shareMetadata(for:)` → `accept` — falharia para todo mundo. Obter o
+    /// metadata a partir da URL não é uma barreira independente: é exatamente
+    /// o que o share público permite.
     nonisolated static var permissaoDaEntradaPorCodigo: CKShare.ParticipantPermission {
-        .none
+        .readWrite
     }
 
     private func garantirContaICloudDisponivel() async throws {
-        guard try await container.accountStatus() == .available else {
-            throw ErroDeEquipeCloudKit.contaICloudIndisponivel
-        }
+        try await transporte.garantirContaDisponivel()
     }
 
     private func registroDaEquipe(
@@ -412,29 +433,49 @@ actor ServicoDeEquipesCloudKit {
         return registro
     }
 
+    /// Endereço público do código, derivado do próprio código.
+    ///
+    /// Trocar `recordName` aleatório + `CKQuery` por um nome derivado é o que
+    /// tira o tipo `CodigoDeEquipe` da condição de QUERYABLE e, com ela, a
+    /// possibilidade de enumerar as URLs de compartilhamento de todas as
+    /// equipes. O sal não transforma o código em segredo forte — o espaço é de
+    /// 32^6 combinações e continua sujeito a tentativa e erro online, limitada
+    /// pelo CloudKit —, mas impede uma tabela de SHA-256 pré-computada sobre
+    /// esse espaço pequeno.
+    ///
+    /// **Compatibilidade:** códigos publicados antes desta mudança têm
+    /// `recordName` aleatório e param de resolver. A migração não é possível
+    /// pelo app — localizar aqueles registros exigiria justamente o `CKQuery`
+    /// que estamos removendo do schema. A decisão é aceitar a quebra: o
+    /// proprietário troca o código em "Acesso e exclusão" e a equipe volta a
+    /// aceitar entradas. Os registros antigos ficam órfãos no banco público e
+    /// inertes assim que o índice de consulta é removido.
+    private nonisolated static func idDoCodigo(_ codigo: String) -> CKRecord.ID {
+        let material = Data((salDoCodigoDeEntrada + normalizar(codigo)).utf8)
+        let digest = SHA256.hash(data: material)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        return CKRecord.ID(recordName: "codigo.\(digest)")
+    }
+
+    private static let salDoCodigoDeEntrada = "papagaio.codigo-de-equipe.v1:"
+
     private func publicarCodigo(_ codigo: String?, para url: URL) async throws {
         guard let codigo else { throw ErroDeEquipeCloudKit.codigoInvalido }
-        let registro = CKRecord(recordType: TipoDeRegistro.codigoDeEquipe)
-        registro[Campo.codigoDeEntrada] = Self.normalizar(codigo) as NSString
+        // O código em claro não é mais gravado: nada o lê (a resolução é pelo
+        // `recordID`) e mantê-lo só deixaria o segredo da equipe exposto no
+        // banco público sem nenhum uso.
+        let registro = CKRecord(
+            recordType: TipoDeRegistro.codigoDeEquipe,
+            recordID: Self.idDoCodigo(codigo)
+        )
         registro[Campo.urlDoCompartilhamento] = url.absoluteString as NSString
-        _ = try await container.publicCloudDatabase.save(registro)
+        try await transporte.salvarRegistroPublico(registro)
     }
 
     private func invalidarCodigoAnterior(_ codigo: String?) async throws {
         guard let codigo else { return }
-        let consulta = CKQuery(
-            recordType: TipoDeRegistro.codigoDeEquipe,
-            predicate: NSPredicate(format: "%K == %@", Campo.codigoDeEntrada, Self.normalizar(codigo))
-        )
-        let resultado = try await container.publicCloudDatabase.records(matching: consulta)
-        let ids = resultado.matchResults.compactMap { chave, valor -> CKRecord.ID? in
-            guard (try? valor.get()) != nil else { return nil }
-            return chave
-        }
-        guard !ids.isEmpty else { return }
-        _ = try await container.publicCloudDatabase.modifyRecords(
-            saving: [], deleting: ids, savePolicy: .ifServerRecordUnchanged, atomically: true
-        )
+        try await transporte.apagarRegistroPublico(comID: Self.idDoCodigo(codigo))
     }
 
     private func compartilhamento(da equipe: EquipeDisponivel) async throws -> CKShare {

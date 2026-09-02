@@ -84,12 +84,37 @@ open Loro.xcodeproj
 No Xcode, selecione o scheme `Loro` e execute no seu Mac. Para usar equipes,
 habilite o container `iCloud.com.papagaio.Papagaio` na assinatura do target e
 publique o schema correspondente no CloudKit Dashboard. O registro público
-`CodigoDeEquipe` precisa disponibilizar os campos `codigoDeEntrada` (consultável)
-e `urlDoCompartilhamento`. A exclusão global de equipes também requer o tipo
-público `EquipeExcluida`, com `equipeID` (String), `excluidaEm` (Date) e
-`estadoDaExclusao` (String). Esse
+`CodigoDeEquipe` precisa disponibilizar o campo `urlDoCompartilhamento`. A
+exclusão global de equipes também requer o tipo público `EquipeExcluida`, com
+`equipeID` (String), `excluidaEm` (Date) e `estadoDaExclusao` (String). Esse
 marcador permite que instalações de participantes removam a cópia local ao se
 conectarem novamente depois que a zona compartilhada foi apagada.
+
+### Ação manual obrigatória no CloudKit Dashboard
+
+O app deixou de resolver o código de entrada por `CKQuery` e passou a buscar o
+registro pelo `recordID`, derivado do próprio código. Isso torna o índice de
+consulta de `CodigoDeEquipe` desnecessário — e ele precisa ser removido, porque
+enquanto existir qualquer conta iCloud com o app instalado pode rodar um
+`CKQuery` com `NSPredicate(value: true)` sobre esse tipo e enumerar a
+`urlDoCompartilhamento` de **todas** as equipes, sem adivinhar código nenhum.
+Essa mudança é de schema e não acompanha o código:
+
+1. No CloudKit Dashboard, em **Schema → Indexes**, selecione o tipo
+   `CodigoDeEquipe`.
+2. Remova o índice `QUERYABLE` de `recordName` e o índice `QUERYABLE` do campo
+   `codigoDeEntrada`, nos ambientes de Development e Production.
+3. O campo `codigoDeEntrada` deixou de ser gravado nesse tipo (o código em
+   claro não fica mais no banco público) e pode ser removido do schema.
+4. Mantenha o tipo publicado: o acesso por `recordID` continua funcionando sem
+   nenhum índice de consulta.
+
+Equipes cujo código foi publicado antes desta mudança têm `recordName`
+aleatório e **param de resolver**: não há migração possível pelo app, porque
+localizar aqueles registros exigiria justamente o `CKQuery` que está sendo
+removido. O proprietário troca o código em "Acesso e exclusão" e a equipe volta
+a aceitar entradas; os registros antigos ficam órfãos e inertes assim que o
+índice sai.
 
 No tipo `Equipe` da zona compartilhada, publique também o campo `nomesDosParticipantes`
 como `Bytes`. Ele guarda o mapa de nomes exibidos pela equipe; cada participante

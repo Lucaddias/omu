@@ -234,13 +234,103 @@ func downloadParcialNaoAnunciaSincronizacaoConcluida() async throws {
     #expect(notificacao?.contains("2 conversa(s) não puderam ser baixadas") == true)
 }
 
-@Test("CKShare não concede acesso por link público — apenas por código")
-func shareNaoConcedeAcessoPorLinkPublico() {
-    // O link do CKShare vazaria acesso de escrita para qualquer pessoa com a
-    // URL. Quem entra de fato passou pelo código e gerou um CKShare.Metadata;
-    // só esse caminho chega no `container.accept`. Aqui o contrato do share
-    // é: nenhum direito público, só participantes aceitos.
-    #expect(ServicoDeEquipesCloudKit.permissaoDaEntradaPorCodigo == .none)
+@Test("Uma segunda conta consegue entrar na equipe com o código publicado")
+func entradaPorCodigoChegaAoAccept() async throws {
+    // O duble modela a regra do CloudKit que importa aqui: um `CKShare` com
+    // `publicPermission == .none` só aceita identidades previamente incluídas
+    // por `addParticipant(_:)`. Como o app nunca adiciona participante nenhum,
+    // esse cenário faz `accept` falhar para qualquer conta. Este teste falha
+    // se `permissaoDaEntradaPorCodigo` voltar a ser `.none`.
+    let servidor = ServidorDeEquipesFake()
+    let proprietario = ServicoDeEquipesCloudKit(transporte: servidor)
+    let equipe = EquipeDisponivel(
+        id: "produto",
+        nome: "Produto",
+        papel: "Administrador",
+        quantidadeDeMembros: 1,
+        espacoID: UUID().uuidString,
+        codigoDeEntrada: "K8CE9H"
+    )
+
+    let publicada = try await proprietario.criarWorkspace(para: equipe)
+    #expect(publicada.compartilhamentoCloudKit != nil)
+
+    // Segunda conta: só tem o código, nunca foi adicionada ao share.
+    let convidado = ServicoDeEquipesCloudKit(transporte: servidor)
+    let entrou = try await convidado.entrarNaEquipe(com: "k8ce-9h")
+
+    #expect(entrou.id == equipe.id)
+    #expect(entrou.bancoCloudKit == BancoCloudKitDaEquipe.compartilhado.rawValue)
+    #expect(await servidor.aceitesRealizados() == 1)
+}
+
+@Test("Código inválido não encontra equipe nenhuma")
+func entradaComCodigoInvalidoFalha() async throws {
+    let servidor = ServidorDeEquipesFake()
+    let servico = ServicoDeEquipesCloudKit(transporte: servidor)
+    _ = try await servico.criarWorkspace(
+        para: EquipeDisponivel(
+            id: "produto",
+            nome: "Produto",
+            papel: "Administrador",
+            quantidadeDeMembros: 1,
+            espacoID: UUID().uuidString,
+            codigoDeEntrada: "K8CE9H"
+        )
+    )
+
+    await #expect(throws: ErroDeEquipeCloudKit.codigoInvalido) {
+        try await servico.entrarNaEquipe(com: "ZZZZZZ")
+    }
+}
+
+@Test("Resolver o código não depende de consulta ao banco público")
+func entradaPorCodigoNaoUsaConsulta() async throws {
+    // O tipo `CodigoDeEquipe` deixa de precisar do índice QUERYABLE — que era
+    // o que permitia a qualquer conta enumerar `urlDoCompartilhamento` de
+    // todas as equipes com um `NSPredicate(value: true)`. O duble falha se o
+    // serviço tentar publicar ou resolver um código sem `recordID` derivado.
+    let servidor = ServidorDeEquipesFake()
+    let servico = ServicoDeEquipesCloudKit(transporte: servidor)
+    _ = try await servico.criarWorkspace(
+        para: EquipeDisponivel(
+            id: "produto",
+            nome: "Produto",
+            papel: "Administrador",
+            quantidadeDeMembros: 1,
+            espacoID: UUID().uuidString,
+            codigoDeEntrada: "K8CE9H"
+        )
+    )
+
+    let publicados = await servidor.registrosPublicos()
+    #expect(publicados.count == 1)
+    let unico = try #require(publicados.first)
+    // Endereçado por um nome derivado, e não aleatório...
+    #expect(unico.key.recordName.hasPrefix("codigo."))
+    // ...e o código em claro não fica guardado no banco público.
+    #expect(unico.value["codigoDeEntrada"] == nil)
+    #expect(unico.value["urlDoCompartilhamento"] as? String != nil)
+}
+
+@Test("Reconfigurar entrada por código só é oferecida quando não lançaria erro")
+func reconfiguracaoExigeCompartilhamentoGravado() async throws {
+    // Contrato entre a flag da interface e o serviço: toda equipe para a qual
+    // o botão aparece precisa sobreviver a `idDoCompartilhamento(de:na:)`.
+    let semShare = EquipeDisponivel(
+        id: "local",
+        nome: "Local",
+        papel: "Administrador",
+        quantidadeDeMembros: 1,
+        zonaCloudKit: "equipe.local",
+        bancoCloudKit: BancoCloudKitDaEquipe.privado.rawValue
+    )
+    #expect(!semShare.precisaReconfigurarEntradaPorCodigo)
+
+    let servico = ServicoDeEquipesCloudKit(transporte: ServidorDeEquipesFake())
+    await #expect(throws: ErroDeEquipeCloudKit.equipeAindaLocal) {
+        try await servico.ativarEntradaPorCodigo(na: semShare)
+    }
 }
 
 @Test("Somente equipe legada do proprietário pede reconfiguração do código")
@@ -612,4 +702,77 @@ private actor TransporteDeConversasFake: TransporteDeConversasCloudKit {
     func quantidadeDePaginasLidas() -> Int { indiceDaPagina }
     func ultimoArquivoSalvo() -> Data? { arquivoSalvo }
     func definirFalhaAoSalvar(_ falhar: Bool) { falharAoSalvar = falhar }
+}
+
+/// Servidor de equipes falso que modela as regras do CloudKit relevantes para
+/// a entrada por código.
+///
+/// A que importa aqui: um `CKShare` com `publicPermission == .none` é privado
+/// e só aceita identidades incluídas por `addParticipant(_:)`. Como o app
+/// nunca adiciona participante nenhum, `aceitarCompartilhamento` falha com
+/// `permissionFailure` nesse caso — igual ao CloudKit real.
+private actor ServidorDeEquipesFake: TransporteDeEquipesCloudKit {
+    private var registrosPorID: [CKRecord.ID: CKRecord] = [:]
+    private var zonaPorURL: [URL: CKRecordZone.ID] = [:]
+    private var permissaoPorURL: [URL: CKShare.ParticipantPermission] = [:]
+    private var participantesPorURL: [URL: Set<String>] = [:]
+    private var publicos: [CKRecord.ID: CKRecord] = [:]
+    private var aceites = 0
+
+    func garantirContaDisponivel() throws {}
+
+    func criarEquipeCompartilhada(
+        zona: CKRecordZone.ID,
+        registroDaEquipe: CKRecord,
+        titulo: String,
+        permissaoPublica: CKShare.ParticipantPermission
+    ) throws -> CompartilhamentoDaEquipe {
+        registrosPorID[registroDaEquipe.recordID] = registroDaEquipe
+        let url = URL(string: "https://www.icloud.com/share/\(zona.zoneName)")!
+        zonaPorURL[url] = zona
+        permissaoPorURL[url] = permissaoPublica
+        participantesPorURL[url] = []
+        return CompartilhamentoDaEquipe(recordName: "cloudkit.zoneshare", url: url)
+    }
+
+    func salvarRegistroPublico(_ registro: CKRecord) throws {
+        publicos[registro.recordID] = registro
+    }
+
+    func registroPublico(comID id: CKRecord.ID) throws -> CKRecord {
+        guard let registro = publicos[id] else {
+            throw CKError(_nsError: NSError(domain: CKErrorDomain, code: CKError.Code.unknownItem.rawValue))
+        }
+        return registro
+    }
+
+    func apagarRegistroPublico(comID id: CKRecord.ID) throws {
+        publicos[id] = nil
+    }
+
+    func aceitarCompartilhamento(em url: URL) throws -> CKShare {
+        guard let zona = zonaPorURL[url] else {
+            throw CKError(_nsError: NSError(domain: CKErrorDomain, code: CKError.Code.unknownItem.rawValue))
+        }
+        // A regra do CloudKit: sem permissão pública, só entra quem já foi
+        // adicionado como participante.
+        if permissaoPorURL[url] == CKShare.ParticipantPermission.none,
+           participantesPorURL[url]?.contains("conta-convidada") != true {
+            throw CKError(
+                _nsError: NSError(domain: CKErrorDomain, code: CKError.Code.permissionFailure.rawValue)
+            )
+        }
+        aceites += 1
+        return CKShare(recordZoneID: zona)
+    }
+
+    func registroDaZonaCompartilhada(comID id: CKRecord.ID) throws -> CKRecord {
+        guard let registro = registrosPorID[id] else {
+            throw CKError(_nsError: NSError(domain: CKErrorDomain, code: CKError.Code.unknownItem.rawValue))
+        }
+        return registro
+    }
+
+    func aceitesRealizados() -> Int { aceites }
+    func registrosPublicos() -> [CKRecord.ID: CKRecord] { publicos }
 }
