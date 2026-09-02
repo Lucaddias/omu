@@ -222,6 +222,26 @@ final class Biblioteca {
             await retomarSincronizacaoCloudKit()
         }
         await baixarAtualizacoesDaEquipe()
+        await avisarSobreFilaIlegivel()
+    }
+
+    /// Uma fila que abriu sem parte do backlog precisa aparecer para o usuário:
+    /// são envios que ele já viu confirmados na interface e que não vão
+    /// acontecer. Sem isto, `operacoesPendentes()` retorna 0 e a sincronização
+    /// se declara concluída sobre uma fila que foi descartada.
+    ///
+    /// Roda depois do ciclo de sincronização, e não antes, porque é ele que
+    /// escreve o estado final — um aviso emitido antes seria sobrescrito por
+    /// `.sincronizado`. Uma falha já reportada pelo ciclo é preservada: o
+    /// aviso da fila ainda sai pela notificação.
+    private func avisarSobreFilaIlegivel() async {
+        guard let aviso = await filaCloudKit.consumirAvisoDeAbertura() else { return }
+        if case .falhou = estadoDaSincronizacaoCloudKit {
+            // O ciclo já reportou uma falha mais específica; ela fica.
+        } else {
+            estadoDaSincronizacaoCloudKit = .falhou(aviso.mensagem)
+        }
+        aoNotificar?("Fila do iCloud recuperada parcialmente", aviso.mensagem, .aviso)
     }
 
     func preparar() async {

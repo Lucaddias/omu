@@ -1,4 +1,5 @@
 import Foundation
+import os
 import PapagaioCore
 
 struct OperacaoPendenteCloudKit: Codable, Equatable, Sendable, Identifiable {
@@ -24,42 +25,166 @@ struct ResultadoDaFilaCloudKit: Sendable, Equatable {
     let proximaTentativa: Date?
 }
 
+/// Relato de uma abertura da fila em que parte do arquivo não pôde ser lida.
+///
+/// A fila não bloqueia por causa disso — mas o usuário precisa saber que
+/// envios que ele viu confirmados na interface não vão acontecer. Sem este
+/// aviso, `operacoesPendentes()` retorna 0 e a `Biblioteca` reporta
+/// `.sincronizado` sobre uma fila que foi descartada.
+struct AvisoDaFilaCloudKit: Sendable, Equatable {
+    let recuperadas: Int
+    let descartadas: Int
+    let arquivoEmQuarentena: URL?
+
+    var mensagem: String {
+        let perdidas = "\(descartadas) alteração(ões) pendentes do iCloud não puderam ser lidas e foram descartadas"
+        let salvas = recuperadas > 0
+            ? "; \(recuperadas) foram recuperadas e continuam na fila"
+            : ""
+        let copia = arquivoEmQuarentena.map { "; uma cópia do arquivo ficou em \($0.lastPathComponent)" } ?? ""
+        return perdidas + salvas + copia + ". Reenvie as conversas afetadas para sincronizá-las de novo."
+    }
+}
+
 /// Outbox durável para alterações do workspace. A operação entra no arquivo
 /// antes da chamada de rede; assim, encerrar o app no meio de uma falha não
 /// transforma uma edição local numa promessa impossível de retomar.
 actor FilaPersistenteCloudKit {
+    /// Quantas quarentenas antigas são mantidas em disco. Sem um teto elas
+    /// acumulam indefinidamente, um arquivo por relançamento com schema
+    /// incompatível.
+    private static let quarentenasMantidas = 3
+    private static let sufixoDaQuarentena = ".corrupted-"
+    private static let registro = Logger(subsystem: "Papagaio", category: "FilaCloudKit")
+
     private let url: URL
     private let fm: FileManager
     private var estadoInicial: Result<[OperacaoPendenteCloudKit], any Error>
     private var operacoesCarregadas: [OperacaoPendenteCloudKit]?
+    private var avisoDeAbertura: AvisoDaFilaCloudKit?
 
     init(url: URL, fm: FileManager = .default) {
         self.url = url
         self.fm = fm
-        do {
-            guard fm.fileExists(atPath: url.path) else {
-                estadoInicial = .success([])
-                return
-            }
-            let dados = try Data(contentsOf: url)
-            // Arquivo truncado (crash no meio de uma escrita) faz o decoder
-            // falhar. Em vez de propagar e bloquear toda a fila — perdendo
-            // edições já confirmadas pelo usuário — movemos o lixo para
-            // `.corrupted-<timestamp>` e seguimos com a fila vazia. A
-            // informação não volta, mas a interface volta a funcionar.
+        estadoInicial = .success([])
+
+        if fm.fileExists(atPath: url.path) {
             do {
-                estadoInicial = .success(
-                    try JSONDecoder().decode([OperacaoPendenteCloudKit].self, from: dados)
-                )
+                let dados = try Data(contentsOf: url)
+                do {
+                    estadoInicial = .success(
+                        try JSONDecoder().decode([OperacaoPendenteCloudKit].self, from: dados)
+                    )
+                } catch {
+                    // O gatilho real aqui é incompatibilidade de schema, não
+                    // truncamento: `salvar` escreve com `.atomic`, então um
+                    // crash no meio de uma escrita deixa o arquivo anterior
+                    // intacto. O que quebra a leitura é `OperacaoPendenteCloudKit`
+                    // embutir `EquipeDisponivel` e `Arquivo` — acrescentar um
+                    // campo não-opcional a qualquer um deles torna todo
+                    // arquivo já persistido indecodificável.
+                    //
+                    // Bloquear a fila perderia a interface inteira, então a
+                    // quarentena fica. Mas ela deixa de ser silenciosa: o que
+                    // der para salvar é recuperado item a item e o resto vira
+                    // um `AvisoDaFilaCloudKit` que a `Biblioteca` mostra.
+                    let recuperado = Self.decodificarTolerante(dados)
+                    let quarentena = Self.colocarEmQuarentena(url, fm: fm)
+                    estadoInicial = .success(recuperado.operacoes)
+                    if !recuperado.operacoes.isEmpty {
+                        try? Self.gravar(recuperado.operacoes, em: url, fm: fm)
+                    }
+                    let aviso = AvisoDaFilaCloudKit(
+                        recuperadas: recuperado.operacoes.count,
+                        descartadas: recuperado.descartadas,
+                        arquivoEmQuarentena: quarentena
+                    )
+                    avisoDeAbertura = aviso
+                    Self.registro.error(
+                        """
+                        Fila do iCloud ilegível (\(String(describing: error), privacy: .public)):                         \(aviso.descartadas, privacy: .public) descartadas,                         \(aviso.recuperadas, privacy: .public) recuperadas.
+                        """
+                    )
+                }
             } catch {
-                let corrompido = url.deletingLastPathComponent()
-                    .appendingPathComponent(url.lastPathComponent + ".corrupted-\(Int(Date().timeIntervalSince1970))")
-                try? fm.moveItem(at: url, to: corrompido)
-                estadoInicial = .success([])
+                estadoInicial = .failure(error)
             }
-        } catch {
-            estadoInicial = .failure(error)
         }
+
+        Self.limparQuarentenasAntigas(de: url, fm: fm)
+    }
+
+    /// Devolve o aviso da abertura uma única vez. É consumido para que a
+    /// `Biblioteca` não repita a notificação a cada ciclo de sincronização.
+    func consumirAvisoDeAbertura() -> AvisoDaFilaCloudKit? {
+        defer { avisoDeAbertura = nil }
+        return avisoDeAbertura
+    }
+
+    /// Decodifica elemento a elemento para que uma única operação irrecuperável
+    /// não leve junto o resto do backlog.
+    private static func decodificarTolerante(
+        _ dados: Data
+    ) -> (operacoes: [OperacaoPendenteCloudKit], descartadas: Int) {
+        guard let elementos = try? JSONSerialization.jsonObject(with: dados) as? [Any] else {
+            return ([], 0)
+        }
+        let decodificador = JSONDecoder()
+        var operacoes: [OperacaoPendenteCloudKit] = []
+        var descartadas = 0
+        for elemento in elementos {
+            guard let bruto = try? JSONSerialization.data(withJSONObject: elemento),
+                  let operacao = try? decodificador.decode(
+                      OperacaoPendenteCloudKit.self, from: bruto
+                  )
+            else {
+                descartadas += 1
+                continue
+            }
+            operacoes.append(operacao)
+        }
+        return (operacoes, descartadas)
+    }
+
+    private static func colocarEmQuarentena(_ url: URL, fm: FileManager) -> URL? {
+        let destino = url.deletingLastPathComponent().appendingPathComponent(
+            url.lastPathComponent + sufixoDaQuarentena + "\(Int(Date().timeIntervalSince1970))"
+        )
+        do {
+            try fm.moveItem(at: url, to: destino)
+            return destino
+        } catch {
+            registro.error("Não foi possível isolar a fila ilegível: \(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    private static func limparQuarentenasAntigas(de url: URL, fm: FileManager) {
+        let pasta = url.deletingLastPathComponent()
+        let prefixo = url.lastPathComponent + sufixoDaQuarentena
+        guard let conteudo = try? fm.contentsOfDirectory(atPath: pasta.path) else { return }
+        // O sufixo é um timestamp de largura crescente mas comparável por
+        // valor; ordenar pelo número evita depender de datas do sistema de
+        // arquivos, que um restore de backup embaralha.
+        let antigas = conteudo
+            .filter { $0.hasPrefix(prefixo) }
+            .sorted { Int($0.dropFirst(prefixo.count)) ?? 0 > Int($1.dropFirst(prefixo.count)) ?? 0 }
+            .dropFirst(quarentenasMantidas)
+        for nome in antigas {
+            try? fm.removeItem(at: pasta.appendingPathComponent(nome))
+        }
+    }
+
+    private static func gravar(
+        _ operacoes: [OperacaoPendenteCloudKit],
+        em url: URL,
+        fm: FileManager
+    ) throws {
+        try fm.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try JSONEncoder().encode(operacoes).write(to: url, options: .atomic)
     }
 
     func agendarEnvio(
@@ -203,12 +328,7 @@ actor FilaPersistenteCloudKit {
     }
 
     private func salvar(_ operacoes: [OperacaoPendenteCloudKit]) throws {
-        try fm.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        let dados = try JSONEncoder().encode(operacoes)
-        try dados.write(to: url, options: .atomic)
+        try Self.gravar(operacoes, em: url, fm: fm)
         operacoesCarregadas = operacoes
         estadoInicial = .success(operacoes)
     }

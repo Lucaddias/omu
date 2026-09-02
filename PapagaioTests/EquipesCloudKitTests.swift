@@ -405,6 +405,90 @@ func filaCloudKitEhPersistente() async throws {
     #expect(FilaPersistenteCloudKit.atraso(para: 20) == 15 * 60)
 }
 
+@Test("Fila com schema incompatível avisa em vez de sumir em silêncio")
+func filaIlegivelEhIsoladaComAviso() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let url = raiz.appendingPathComponent("fila.json")
+    // Formato de uma versão anterior: nenhum elemento decodifica como
+    // `OperacaoPendenteCloudKit`. É o que acontece quando um campo
+    // não-opcional é acrescentado a `EquipeDisponivel` ou a `Arquivo`.
+    try Data("""
+    [{"id":"1","acao":"enviar"},{"id":"2","acao":"remover"}]
+    """.utf8).write(to: url)
+
+    let fila = FilaPersistenteCloudKit(url: url)
+
+    #expect(try await fila.operacoesPendentes().isEmpty)
+    let aviso = try #require(await fila.consumirAvisoDeAbertura())
+    #expect(aviso.descartadas == 2)
+    #expect(aviso.recuperadas == 0)
+    #expect(aviso.mensagem.contains("não puderam ser lidas"))
+    // O aviso é consumido: a interface não repete a notificação a cada ciclo.
+    #expect(await fila.consumirAvisoDeAbertura() == nil)
+
+    let naPasta = try FileManager.default.contentsOfDirectory(atPath: raiz.path)
+    #expect(!naPasta.contains("fila.json"))
+    #expect(naPasta.contains { $0.hasPrefix("fila.json.corrupted-") })
+}
+
+@Test("Um item ilegível não leva junto o resto da fila")
+func filaRecuperaOperacoesLegiveis() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let url = raiz.appendingPathComponent("fila.json")
+    let espaco = EspacoID()
+    let equipe = equipeCloudKitDeTeste(espaco: espaco)
+    let arquivo = Arquivo(titulo: "Sobrevivente", pastaRelativa: "", espaco: espaco)
+
+    // Fila válida gravada normalmente, depois contaminada com um elemento que
+    // o decoder não entende — o caso que a decodificação item a item cobre.
+    let original = FilaPersistenteCloudKit(url: url)
+    try await original.agendarEnvio(arquivo, para: equipe, revisao: Date(timeIntervalSince1970: 10))
+    var elementos = try #require(
+        try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [Any]
+    )
+    elementos.append(["id": "lixo", "acao": "enviar"])
+    try JSONSerialization.data(withJSONObject: elementos).write(to: url)
+
+    let reaberta = FilaPersistenteCloudKit(url: url)
+
+    let pendentes = try await reaberta.operacoesPendentes()
+    #expect(pendentes.count == 1)
+    #expect(pendentes.first?.arquivoID == arquivo.id)
+    let aviso = try #require(await reaberta.consumirAvisoDeAbertura())
+    #expect(aviso.recuperadas == 1)
+    #expect(aviso.descartadas == 1)
+
+    // O que foi recuperado é regravado, para não depender de um `salvar`
+    // posterior que pode nunca acontecer.
+    let apos = FilaPersistenteCloudKit(url: url)
+    #expect(try await apos.operacoesPendentes().count == 1)
+    #expect(await apos.consumirAvisoDeAbertura() == nil)
+}
+
+@Test("Quarentenas antigas não se acumulam indefinidamente")
+func quarentenasAntigasSaoLimpas() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let url = raiz.appendingPathComponent("fila.json")
+    for timestamp in 1...5 {
+        try Data("[]".utf8).write(
+            to: raiz.appendingPathComponent("fila.json.corrupted-\(timestamp)")
+        )
+    }
+
+    _ = FilaPersistenteCloudKit(url: url)
+
+    let restantes = try FileManager.default.contentsOfDirectory(atPath: raiz.path)
+        .filter { $0.hasPrefix("fila.json.corrupted-") }
+        .sorted()
+    #expect(restantes == ["fila.json.corrupted-3", "fila.json.corrupted-4", "fila.json.corrupted-5"])
+}
+
 @Test("Excluir equipe descarta apenas as retentativas daquela equipe")
 func exclusaoDaEquipeDescartaOutboxCorreta() async throws {
     let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
