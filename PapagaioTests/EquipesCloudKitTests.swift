@@ -164,17 +164,34 @@ func shareNaoConcedeAcessoPorLinkPublico() {
 
 @Test("Somente equipe legada do proprietário pede reconfiguração do código")
 func reconfiguracaoDaEntradaPorCodigoSoEhExibidaParaEquipeLegada() {
+    // Equipe nova: share publicado e código já emitido, nada a reconfigurar.
     let equipeNova = EquipeDisponivel(
         id: "nova",
         nome: "Nova",
         papel: "Administrador",
         quantidadeDeMembros: 1,
+        zonaCloudKit: "equipe.nova",
+        compartilhamentoCloudKit: "share-nova",
         bancoCloudKit: BancoCloudKitDaEquipe.privado.rawValue,
         codigoDeEntrada: "K8CE9H"
     )
+    // Equipe legada do proprietário: o `CKShare` existe (foi criado pelo fluxo
+    // de convite antigo) mas nunca teve código. É exatamente esta a população
+    // que o botão de ativar entrada por código atende.
     let equipeLegada = EquipeDisponivel(
         id: "legada",
         nome: "Legada",
+        papel: "Administrador",
+        quantidadeDeMembros: 1,
+        zonaCloudKit: "equipe.legada",
+        compartilhamentoCloudKit: "share-legada",
+        bancoCloudKit: BancoCloudKitDaEquipe.privado.rawValue
+    )
+    // Equipe ainda local: sem share gravado, `ativarEntradaPorCodigo` lançaria
+    // `equipeAindaLocal`. Oferecer o botão aqui só produz erro.
+    let equipeAindaLocal = EquipeDisponivel(
+        id: "local",
+        nome: "Local",
         papel: "Administrador",
         quantidadeDeMembros: 1,
         bancoCloudKit: BancoCloudKitDaEquipe.privado.rawValue
@@ -182,6 +199,7 @@ func reconfiguracaoDaEntradaPorCodigoSoEhExibidaParaEquipeLegada() {
 
     #expect(!equipeNova.precisaReconfigurarEntradaPorCodigo)
     #expect(equipeLegada.precisaReconfigurarEntradaPorCodigo)
+    #expect(!equipeAindaLocal.precisaReconfigurarEntradaPorCodigo)
 }
 
 @Test("Equipe participante preserva o dono da zona compartilhada")

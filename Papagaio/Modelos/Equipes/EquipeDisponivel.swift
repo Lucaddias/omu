@@ -73,14 +73,16 @@ struct EquipeDisponivel: Identifiable, Hashable, Codable, Sendable {
     /// Somente equipes do proprietário que já existiam antes do fluxo atual
     /// precisam reconfigurar o compartilhamento. Equipes novas também usam o
     /// banco privado do proprietário, mas já nascem com código publicado.
-    /// Exigimos também `compartilhamentoCloudKit != nil`: uma equipe pode ter
-    /// `codigoDeEntrada` salvo mas share ausente no servidor, e nesse caso a
-    /// interface mostraria "entrada por código ativa" enquanto o link do share
-    /// não existe — o botão de reconfiguração é o que corrige isso.
+    ///
+    /// `compartilhamentoCloudKit != nil` é obrigatório porque a reconfiguração
+    /// é feita por `ativarEntradaPorCodigo`, que abre o `CKShare` existente por
+    /// `idDoCompartilhamento(de:na:)`. Sem share gravado não há o que
+    /// reconfigurar: a chamada lançaria `equipeAindaLocal` e o caminho correto
+    /// é publicar a equipe, não oferecer o botão.
     var precisaReconfigurarEntradaPorCodigo: Bool {
         bancoCloudKit == BancoCloudKitDaEquipe.privado.rawValue
             && codigoDeEntrada == nil
-            && compartilhamentoCloudKit == nil
+            && compartilhamentoCloudKit != nil
     }
 
     /// `0` não significa que a equipe esteja vazia. Ele é usado pelas versões
