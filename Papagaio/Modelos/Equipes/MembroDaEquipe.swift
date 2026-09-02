@@ -56,7 +56,7 @@ struct MembroDaEquipe: Identifiable, Equatable, Codable, Sendable {
     var atual: Bool = false
     var permissao: PermissaoDoMembroDaEquipe = .escrita
 
-    var iniciais: String { Papagaio.iniciais(de: nome, vazio: "M") }
+    var iniciais: String { Iniciais.de(nome, vazio: "M") }
 
     init(
         id: String = UUID().uuidString,

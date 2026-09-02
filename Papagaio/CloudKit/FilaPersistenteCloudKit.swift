@@ -42,9 +42,21 @@ actor FilaPersistenteCloudKit {
                 return
             }
             let dados = try Data(contentsOf: url)
-            estadoInicial = .success(
-                try JSONDecoder().decode([OperacaoPendenteCloudKit].self, from: dados)
-            )
+            // Arquivo truncado (crash no meio de uma escrita) faz o decoder
+            // falhar. Em vez de propagar e bloquear toda a fila — perdendo
+            // edições já confirmadas pelo usuário — movemos o lixo para
+            // `.corrupted-<timestamp>` e seguimos com a fila vazia. A
+            // informação não volta, mas a interface volta a funcionar.
+            do {
+                estadoInicial = .success(
+                    try JSONDecoder().decode([OperacaoPendenteCloudKit].self, from: dados)
+                )
+            } catch {
+                let corrompido = url.deletingLastPathComponent()
+                    .appendingPathComponent(url.lastPathComponent + ".corrupted-\(Int(Date().timeIntervalSince1970))")
+                try? fm.moveItem(at: url, to: corrompido)
+                estadoInicial = .success([])
+            }
         } catch {
             estadoInicial = .failure(error)
         }

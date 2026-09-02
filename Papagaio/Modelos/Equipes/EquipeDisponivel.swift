@@ -15,8 +15,33 @@ enum RecebimentoDeArquivosDaEquipe: String, CaseIterable, Codable, Identifiable,
 }
 
 struct ConfiguracoesDaEquipe: Codable, Hashable, Sendable {
+    /// Versão do schema serializado. Equipes gravadas antes desta chave
+    /// existem: na leitura, qualquer valor ausente é tratado como `1`.
+    /// Aumentar aqui exige uma migração correspondente no `init(from:)`.
+    var versao: Int = 2
     var visibilidadeDosArquivos: VisibilidadeDosArquivosDaEquipe = .todosOsMembros
     var recebimentoDeArquivos: RecebimentoDeArquivosDaEquipe = .automatico
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case versao, visibilidadeDosArquivos, recebimentoDeArquivos
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Defaults defensivos para qualquer chave ausente. Equipes
+        // serializadas antes do campo `versao` existirem continuam
+        // decodificando como `.automatico` / `.todosOsMembros`, sem
+        // apagar a configuração que o proprietário tinha definido.
+        versao = try container.decodeIfPresent(Int.self, forKey: .versao) ?? 1
+        visibilidadeDosArquivos = try container.decodeIfPresent(
+            VisibilidadeDosArquivosDaEquipe.self, forKey: .visibilidadeDosArquivos
+        ) ?? .todosOsMembros
+        recebimentoDeArquivos = try container.decodeIfPresent(
+            RecebimentoDeArquivosDaEquipe.self, forKey: .recebimentoDeArquivos
+        ) ?? .automatico
+    }
 }
 
 /// Uma equipe do usuário.
@@ -48,9 +73,14 @@ struct EquipeDisponivel: Identifiable, Hashable, Codable, Sendable {
     /// Somente equipes do proprietário que já existiam antes do fluxo atual
     /// precisam reconfigurar o compartilhamento. Equipes novas também usam o
     /// banco privado do proprietário, mas já nascem com código publicado.
+    /// Exigimos também `compartilhamentoCloudKit != nil`: uma equipe pode ter
+    /// `codigoDeEntrada` salvo mas share ausente no servidor, e nesse caso a
+    /// interface mostraria "entrada por código ativa" enquanto o link do share
+    /// não existe — o botão de reconfiguração é o que corrige isso.
     var precisaReconfigurarEntradaPorCodigo: Bool {
         bancoCloudKit == BancoCloudKitDaEquipe.privado.rawValue
             && codigoDeEntrada == nil
+            && compartilhamentoCloudKit == nil
     }
 
     /// `0` não significa que a equipe esteja vazia. Ele é usado pelas versões

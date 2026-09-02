@@ -86,7 +86,49 @@ enum PoliticaDeConflitoCloudKit {
 /// melhoram ao repetir a mesma operação em segundo plano.
 enum DiagnosticoDaSincronizacaoCloudKit {
     static func mensagem(para erro: any Error) -> String {
-        mensagem(paraTexto: erro.localizedDescription)
+        if let mensagemEstruturada = mensagemEstruturada(para: erro) {
+            return mensagemEstruturada
+        }
+        return mensagem(paraTexto: erro.localizedDescription)
+    }
+
+    /// Identifica diagnósticos a partir de `CKError.code` quando o erro é um
+    /// `CKError` (mais robusto que string matching sobre `localizedDescription`,
+    /// que muda entre versões e locais). Cai no fallback textual se o erro
+    /// não for do CloudKit ou não casar com nada conhecido.
+    private static func mensagemEstruturada(para erro: any Error) -> String? {
+        guard let ck = erro as? CKError else { return nil }
+        switch ck.code {
+        case .unknownItem:
+            // "Zone not found" é reportado como `.unknownItem` com `partialErrors`
+            // para zonas; checamos o texto porque o CloudKit não distingue via código.
+            let texto = ck.localizedDescription.folding(
+                options: [.caseInsensitive, .diacriticInsensitive], locale: .current
+            )
+            if texto.contains("zone does not exist") {
+                return "A zona compartilhada desta equipe ainda não está disponível nesta Apple Account. Peça ao proprietário para confirmar o compartilhamento e entre novamente com o código da equipe."
+            }
+            return nil
+        case .serverRecordChanged, .partialFailure:
+            // Conflito de versão ou falha parcial: passa para a próxima etapa
+            // (texto livre explica o cenário).
+            return nil
+        case .invalidArguments, .permissionFailure:
+            // Tenta extrair a causa específica do erro de argumentos, que
+            // geralmente aponta para campo/tipo não publicado.
+            let texto = ck.localizedDescription.folding(
+                options: [.caseInsensitive, .diacriticInsensitive], locale: .current
+            )
+            if texto.contains("production schema") {
+                // Mantém o texto original, que inclui o nome do tipo que
+                // precisa ser publicado — informação que `CKError.code` não
+                // preserva.
+                return mensagem(paraTexto: texto)
+            }
+            return nil
+        default:
+            return nil
+        }
     }
 
     static func mensagem(paraTexto texto: String) -> String {
@@ -248,23 +290,23 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
             operacao.recordZoneIDs = [zona]
             operacao.fetchAllChanges = true
 
+            // `CKFetchRecordZoneChangesOperation` pode chamar `recordWasChangedBlock`
+            // com `.failure` (erro por registro) e ainda entregar `fetchRecordZoneChangesResultBlock`
+            // com `.success`. Sem o guard, a continuation seria resumida duas vezes
+            // e a segunda chamada travaria o programa.
+            let ponteiro = ResumeUnico()
             var registros: [CKRecord] = []
-            var erroPorRegistro: (any Error)?
             operacao.recordWasChangedBlock = { _, resultado in
-                switch resultado {
-                case let .success(registro):
+                if case let .success(registro) = resultado {
                     registros.append(registro)
-                case let .failure(erro):
-                    erroPorRegistro = erro
                 }
             }
             operacao.fetchRecordZoneChangesResultBlock = { resultado in
-                if let erroPorRegistro {
-                    continuation.resume(throwing: erroPorRegistro)
-                } else if case let .failure(erro) = resultado {
-                    continuation.resume(throwing: erro)
-                } else {
-                    continuation.resume(returning: registros)
+                switch resultado {
+                case .success:
+                    ponteiro.resume(continuation, returning: registros)
+                case let .failure(erro):
+                    ponteiro.resume(continuation, throwing: erro)
                 }
             }
             banco.add(operacao)
@@ -426,5 +468,29 @@ actor SincronizadorDaBibliotecaCloudKit {
             throw ErroDeEquipeCloudKit.equipeAindaLocal
         }
         return EspacoID(rawValue: id)
+    }
+}
+
+/// Garante que `withCheckedThrowingContinuation` não seja resumido mais de
+/// uma vez. O CloudKit entrega falhas por registro e ainda chama o result
+/// block final — sem esta proteção a segunda chamada trava o runtime.
+private final class ResumeUnico: @unchecked Sendable {
+    private var resumed = false
+    private let lock = NSLock()
+
+    func resume(_ continuation: CheckedContinuation<[CKRecord], any Error>, returning value: [CKRecord]) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !resumed else { return }
+        resumed = true
+        continuation.resume(returning: value)
+    }
+
+    func resume(_ continuation: CheckedContinuation<[CKRecord], any Error>, throwing error: any Error) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !resumed else { return }
+        resumed = true
+        continuation.resume(throwing: error)
     }
 }

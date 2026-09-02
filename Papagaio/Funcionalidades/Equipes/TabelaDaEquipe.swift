@@ -125,7 +125,7 @@ struct LinhaDeMembroDaEquipe: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: PapagaioTema.Espaco.largo) {
-                AvatarDeMembro(iniciais: Papagaio.iniciais(de: membro.nome, vazio: "M"))
+                AvatarDeMembro(iniciais: Iniciais.de(membro.nome, vazio: "M"))
 
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
                     Text(membro.nome)

@@ -378,10 +378,15 @@ actor ServicoDeEquipesCloudKit {
         codigo.uppercased().filter { $0.isLetter || $0.isNumber }
     }
 
-    /// Quem possuir o código pode entrar e sincronizar alterações. O código
+    /// Permissão pública do CKShare é `.none`: o link do share **não** concede acesso por si só.
+    /// Quem entra o faz porque possui o código e gerou um `CKShare.Metadata`,
+    /// que o sistema entrega via `entrarNaEquipe(com:)` ou via convite do macOS.
+    /// Manter como `.readWrite` permitia que qualquer um com a URL editasse a
+    /// zona compartilhada — um vazamento muito maior do que o código de 6 caracteres.
+    /// legacy: /// Quem possuir o código pode entrar e sincronizar alterações. O código
     /// precisa ser tratado como uma chave de acesso pela equipe.
     nonisolated static var permissaoDaEntradaPorCodigo: CKShare.ParticipantPermission {
-        .readWrite
+        .none
     }
 
     private func garantirContaICloudDisponivel() async throws {

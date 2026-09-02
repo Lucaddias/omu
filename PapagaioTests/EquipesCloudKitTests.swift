@@ -153,9 +153,13 @@ func falhaCloudKitEhObservavel() async throws {
     #expect(notificacao?.contains("Falha simulada") == true)
 }
 
-@Test("Código libera entrada na equipe com permissão de escrita")
-func codigoDaEquipeLiberaEscrita() {
-    #expect(ServicoDeEquipesCloudKit.permissaoDaEntradaPorCodigo == .readWrite)
+@Test("CKShare não concede acesso por link público — apenas por código")
+func shareNaoConcedeAcessoPorLinkPublico() {
+    // O link do CKShare vazaria acesso de escrita para qualquer pessoa com a
+    // URL. Quem entra de fato passou pelo código e gerou um CKShare.Metadata;
+    // só esse caminho chega no `container.accept`. Aqui o contrato do share
+    // é: nenhum direito público, só participantes aceitos.
+    #expect(ServicoDeEquipesCloudKit.permissaoDaEntradaPorCodigo == .none)
 }
 
 @Test("Somente equipe legada do proprietário pede reconfiguração do código")
