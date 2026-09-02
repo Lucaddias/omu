@@ -225,7 +225,7 @@ private func eventoCalendar(
         id: id,
         titulo: "Reunião \(id)",
         dataHora: data,
-        participantes: ["ana@example.com"],
+        participantes: [ParticipanteDaReuniao(legado: "ana@example.com")],
         descricao: descricao
     )
 }

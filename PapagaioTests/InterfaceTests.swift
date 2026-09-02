@@ -111,7 +111,7 @@ func identidadeDaFalaPreservaCanal() {
             == "Interlocutor · áudio do sistema"
     )
     #expect(
-        LinhaDeFala.identidadeAcessivel(fala, nomesDeVoz: ["S1": "Luca"])
+        LinhaDeFala.identidadeAcessivel(fala, falantePreservado: nil, nomesDeVoz: ["S1": "Luca"])
             == "Eu · microfone, Luca"
     )
 }
