@@ -466,7 +466,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.2.1;
 				OTHER_LDFLAGS = "-Wl,-export_dynamic";
 				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaio;
 				PRODUCT_MODULE_NAME = Papagaio;
@@ -506,7 +506,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.2.1;
 				OTHER_LDFLAGS = "-Wl,-export_dynamic";
 				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaio;
 				PRODUCT_MODULE_NAME = Papagaio;
