@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "PA00000000000000000002"
-               BuildableName = "Ōmu.app"
+               BuildableName = "O&#x304;mu.app"
                BlueprintName = "Loro"
                ReferencedContainer = "container:Loro.xcodeproj">
             </BuildableReference>
@@ -62,7 +62,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "PA00000000000000000002"
-            BuildableName = "Ōmu.app"
+            BuildableName = "O&#x304;mu.app"
             BlueprintName = "Loro"
             ReferencedContainer = "container:Loro.xcodeproj">
          </BuildableReference>
@@ -79,7 +79,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "PA00000000000000000002"
-            BuildableName = "Ōmu.app"
+            BuildableName = "O&#x304;mu.app"
             BlueprintName = "Loro"
             ReferencedContainer = "container:Loro.xcodeproj">
          </BuildableReference>
