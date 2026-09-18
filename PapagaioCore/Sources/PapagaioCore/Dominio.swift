@@ -211,6 +211,7 @@ public struct Trecho: Sendable, Identifiable, Codable, Equatable {
             texto: texto,
             speaker: speaker,
             palavras: novas,
+            confianca: confianca,
             noSpeechProb: noSpeechProb
         )
     }

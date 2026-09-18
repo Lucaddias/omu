@@ -9,12 +9,12 @@ struct CartaoDeMidiaNaLixeira: View {
 
     private var prazoDeExclusao: String {
         guard let limite = Calendar.current.date(byAdding: .day, value: 30, to: item.apagadoEm) else {
-            return "Exclui em 30 dias"
+            return "Exclui em 30 dias".localized
         }
         let dias = Calendar.current.dateComponents([.day], from: Date(), to: limite).day ?? 0
-        if dias <= 0 { return "Exclui hoje" }
-        if dias == 1 { return "Exclui em 1 dia" }
-        return "Exclui em \(dias) dias"
+        if dias <= 0 { return "Exclui hoje".localized }
+        if dias == 1 { return "Exclui em 1 dia".localized }
+        return String(format: "Exclui em %d dias".localized, dias)
     }
 
     private var simbolo: String {
@@ -29,8 +29,8 @@ struct CartaoDeMidiaNaLixeira: View {
 
     private var descricao: String {
         item.daGravacao
-            ? "Áudio da gravação de \(item.conversaTitulo). A transcrição e o resumo continuam na conversa; restaure para poder ouvir de novo."
-            : "Anexo removido da mídia de \(item.conversaTitulo). Restaure para voltar à aba Mídia dessa conversa."
+            ? String(format: "Áudio da gravação de %@. A transcrição e o resumo continuam na conversa; restaure para poder ouvir de novo.".localized, item.conversaTitulo)
+            : String(format: "Anexo removido da mídia de %@. Restaure para voltar à aba Mídia dessa conversa.".localized, item.conversaTitulo)
     }
 
     private var tamanhoCurto: String {
@@ -41,8 +41,8 @@ struct CartaoDeMidiaNaLixeira: View {
     }
 
     private var dataCurta: String {
-        item.apagadoEm
-            .formatted(.dateTime.day().month(.abbreviated))
+        return item.apagadoEm
+            .formatted(.dateTime.locale(LocalizacaoDoApp.localeAtual).day().month(.abbreviated))
             .uppercased()
             .replacingOccurrences(of: ".", with: "")
     }
@@ -50,9 +50,11 @@ struct CartaoDeMidiaNaLixeira: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
             HStack(alignment: .top, spacing: PapagaioTema.Espaco.medio) {
-                Label(item.tipo.uppercased(), systemImage: simbolo)
+                Label(item.tipo.localized.uppercased(), systemImage: simbolo)
                     .font(.callout.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSobrePrimario)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                     .padding(.horizontal, PapagaioTema.Espaco.medio)
                     .frame(height: PapagaioTema.Altura.compacta)
                     .background(PapagaioTema.preenchimentoPrimario, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
@@ -66,8 +68,8 @@ struct CartaoDeMidiaNaLixeira: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
-                    .help("Restaurar arquivo")
-                    .accessibilityLabel("Restaurar \(item.nome)")
+                    .help("Restaurar arquivo".localized)
+                    .accessibilityLabel(String(format: "Restaurar %@".localized, item.nome))
 
                     Button(action: aoRevelarNoFinder) {
                         Image(systemName: "folder")
@@ -75,8 +77,8 @@ struct CartaoDeMidiaNaLixeira: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(PapagaioTema.textoSecundario)
-                    .help("Mostrar no Finder")
-                    .accessibilityLabel("Mostrar \(item.nome) no Finder")
+                    .help("Mostrar no Finder".localized)
+                    .accessibilityLabel(String(format: "Mostrar %@ no Finder".localized, item.nome))
 
                     Button(role: .destructive, action: aoApagarDefinitivamente) {
                         Image(systemName: "trash")
@@ -84,8 +86,8 @@ struct CartaoDeMidiaNaLixeira: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(PapagaioTema.perigo)
-                    .help("Apagar definitivamente")
-                    .accessibilityLabel("Apagar definitivamente \(item.nome)")
+                    .help("Apagar definitivamente".localized)
+                    .accessibilityLabel(String(format: "Apagar definitivamente %@".localized, item.nome))
                 }
             }
 
@@ -121,6 +123,8 @@ struct CartaoDeMidiaNaLixeira: View {
                 Text(prazoDeExclusao)
                     .font(.callout.weight(.bold))
                     .foregroundStyle(PapagaioTema.perigo)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .font(.callout.weight(.semibold))
             .foregroundStyle(PapagaioTema.textoSecundario.opacity(0.62))

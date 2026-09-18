@@ -6,6 +6,9 @@ import SwiftUI
 struct ConfiguracoesView: View {
     @Binding var processamentoAutomatico: Bool
     @Binding var exibirFichaAutomaticamente: Bool
+    /// Quando ligado, texto falado em idioma diferente do sistema é traduzido
+    /// localmente antes do resumo. Desligado preserva o idioma falado.
+    @Binding var traducaoAutomatica: Bool
     @Binding var aparencia: AparenciaDoApp
     /// A conexão Granola viva do app. Quem a cria e a observa é a `ContentView`.
     var granola: GranolaViewModel?
@@ -54,7 +57,7 @@ struct ConfiguracoesView: View {
     /// ocupa espaço — dentro de um cartão com borda e sombra.
     private var cabecalhoDeConfiguracoes: some View {
         HStack(alignment: .center, spacing: PapagaioTema.Espaco.medio) {
-            Text("Configurações")
+            Text("Configurações".localized)
                 .font(PapagaioTema.Tipo.tituloDePagina)
                 .foregroundStyle(PapagaioTema.texto)
                 .lineLimit(1)
@@ -66,8 +69,8 @@ struct ConfiguracoesView: View {
             // ficava acima do centro óptico da letra bold de 30pt mesmo com
             // `alignment: .center`.
             BotaoDeAjudaPapagaio(
-                texto: "Aparência do app, os cartões da biblioteca e quando as transcrições começam.",
-                ajuda: "Sobre Configurações",
+                texto: "Aparência do app, os cartões da biblioteca e quando as transcrições começam.".localized,
+                ajuda: "Sobre Configurações".localized,
                 largura: 300
             )
             .offset(y: 3)
@@ -89,7 +92,7 @@ struct ConfiguracoesView: View {
 
     private var secaoDeAparencia: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
-            Label("Aparência", systemImage: "paintpalette")
+            Label("Aparência".localized, systemImage: "paintpalette")
                 .font(PapagaioTema.Tipo.tituloDeSecao)
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
 
@@ -108,7 +111,7 @@ struct ConfiguracoesView: View {
                 }
             }
 
-            Text(aparencia.descricao)
+            Text(aparencia.descricao.localized)
                 .font(PapagaioTema.Tipo.apoio)
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .fixedSize(horizontal: false, vertical: true)
@@ -137,7 +140,7 @@ struct ConfiguracoesView: View {
 
     private var secaoDeTranscricao: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
-            Label("Preferências", systemImage: "text.quote")
+            Label("Preferências".localized, systemImage: "text.quote")
                 .font(PapagaioTema.Tipo.tituloDeSecao)
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
 
@@ -145,11 +148,12 @@ struct ConfiguracoesView: View {
 
             Toggle(isOn: processamentoPausado) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Pausar transcrições e resumos automáticos")
+                    Text("Pausar transcrições e resumos automáticos".localized)
                         .font(PapagaioTema.Tipo.corpo.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Gravações e anexos ficarão prontos para transcrever. Você inicia o processamento pela aba Transcrição.")
+                    Text("Gravações e anexos ficarão prontos para transcrever. Você inicia o processamento pela aba Transcrição.".localized)
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .fixedSize(horizontal: false, vertical: true)
@@ -157,13 +161,30 @@ struct ConfiguracoesView: View {
             }
             .toggleStyle(.switch)
 
-            Toggle(isOn: $painelFlutuante) {
+            Toggle(isOn: $traducaoAutomatica) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Mostrar painel flutuante durante a gravação")
+                    Text("Traduzir automaticamente para o idioma do sistema".localized)
                         .font(PapagaioTema.Tipo.corpo.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Uma janela pequena, sempre visível por cima dos outros apps, para anotar, pausar e finalizar sem voltar ao Ōmu.")
+                    Text("Quando ligado, transcrições e resumos em outro idioma são traduzidos localmente para português ou inglês. Quando desligado, o idioma falado é preservado.".localized)
+                        .font(PapagaioTema.Tipo.apoio)
+                        .foregroundStyle(PapagaioTema.textoSecundario)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(PapagaioTema.preenchimentoPrimario)
+
+            Toggle(isOn: $painelFlutuante) {
+                VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
+                    Text("Mostrar painel flutuante durante a gravação".localized)
+                        .font(PapagaioTema.Tipo.corpo.weight(.semibold))
+                        .foregroundStyle(PapagaioTema.texto)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("Uma janela pequena, sempre visível por cima dos outros apps, para anotar, pausar e finalizar sem voltar ao Ōmu.".localized)
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .fixedSize(horizontal: false, vertical: true)
@@ -174,11 +195,12 @@ struct ConfiguracoesView: View {
 
             Toggle(isOn: $exibirFichaAutomaticamente) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Exibir ficha automaticamente após processar")
+                    Text("Exibir ficha automaticamente após processar".localized)
                         .font(PapagaioTema.Tipo.corpo.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Quando desligado, a ficha não abre automaticamente ao fim do processamento — ideal quando a ficha já foi preenchida pelo calendário.")
+                    Text("Quando desligado, a ficha não abre automaticamente ao fim do processamento — ideal quando a ficha já foi preenchida pelo calendário.".localized)
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .fixedSize(horizontal: false, vertical: true)
@@ -187,16 +209,17 @@ struct ConfiguracoesView: View {
             .toggleStyle(.switch)
             .tint(PapagaioTema.preenchimentoPrimario)
             .accessibilityHint(
-                "Quando ativado, novos áudios não entram na fila até você selecionar Transcrever."
+                "Quando ativado, novos áudios não entram na fila até você selecionar Transcrever.".localized
             )
 
             Toggle(isOn: $mostrarPorcentagemConfianca) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Mostrar porcentagem de confiança")
+                    Text("Mostrar porcentagem de confiança".localized)
                         .font(PapagaioTema.Tipo.corpo.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Quando desligado, as palavras continuam destacadas por cor, mas o percentual não aparece.")
+                    Text("Quando desligado, as palavras continuam destacadas por cor, mas o percentual não aparece.".localized)
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .fixedSize(horizontal: false, vertical: true)
@@ -232,7 +255,7 @@ struct ConfiguracoesView: View {
                     listaDeReunioes(granola)
                 }
 
-                Text("Conectado, o Ōmu pode ver suas reuniões do Granola e importá-las para a biblioteca — notas e resumo sempre; a transcrição quando o seu plano incluir. Nada é enviado para fora do seu Mac além do fluxo de autorização e das chamadas ao próprio Granola.")
+                Text("Conectado, o Ōmu pode ver suas reuniões do Granola e importá-las para a biblioteca — notas e resumo sempre; a transcrição quando o seu plano incluir. Nada é enviado para fora do seu Mac além do fluxo de autorização e das chamadas ao próprio Granola.".localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -248,7 +271,7 @@ struct ConfiguracoesView: View {
 
                 SeparadorPapagaio()
 
-                Text("A biblioteca ainda está abrindo — a conexão com o Granola aparece aqui em instantes.")
+                Text("A biblioteca ainda está abrindo — a conexão com o Granola aparece aqui em instantes.".localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
@@ -274,7 +297,7 @@ struct ConfiguracoesView: View {
                     listaDeReunioesGoogleCalendar(googleCalendar)
                 }
 
-                Text("Conectado, o Ōmu pode ver suas reuniões futuras do Google Calendar e importá-las para a biblioteca — apenas título, data e participantes. Nada é enviado para fora do seu Mac além do fluxo de autorização e das chamadas ao próprio Google.")
+                Text("Conectado, o Ōmu pode ver suas reuniões futuras do Google Calendar e importá-las para a biblioteca — apenas título, data e participantes. Nada é enviado para fora do seu Mac além do fluxo de autorização e das chamadas ao próprio Google.".localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -290,7 +313,7 @@ struct ConfiguracoesView: View {
 
                 SeparadorPapagaio()
 
-                Text("A biblioteca ainda está abrindo — a conexão com o Google Calendar aparece aqui em instantes.")
+                Text("A biblioteca ainda está abrindo — a conexão com o Google Calendar aparece aqui em instantes.".localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
@@ -305,7 +328,7 @@ struct ConfiguracoesView: View {
         switch granola.estado {
         case .desconectado:
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-                Text("Importe reuniões do Granola para a biblioteca, com transcrição quando o plano permitir.")
+                Text("Importe reuniões do Granola para a biblioteca, com transcrição quando o plano permitir.".localized)
                     .font(PapagaioTema.Tipo.corpo)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -313,23 +336,23 @@ struct ConfiguracoesView: View {
                 Button {
                     Task { await granola.conectar() }
                 } label: {
-                    Label("Conectar conta Granola…", systemImage: "person.badge.plus")
+                    Label("Conectar conta Granola…".localized, systemImage: "person.badge.plus")
                 }
-                .help("Abre o navegador do macOS para autorizar o Ōmu na sua conta do Granola.")
+                .help("Abre o navegador do macOS para autorizar o Ōmu na sua conta do Granola.".localized)
             }
 
         case .conectando:
             HStack(spacing: PapagaioTema.Espaco.medio) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Autorize no navegador e volte ao Ōmu…")
+                Text("Autorize no navegador e volte ao Ōmu…".localized)
                     .font(PapagaioTema.Tipo.corpo)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
 
         case let .falhou(mensagem):
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-                Label(mensagem, systemImage: "exclamationmark.triangle.fill")
+                Label(mensagem.localized, systemImage: "exclamationmark.triangle.fill")
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.perigo)
                     .fixedSize(horizontal: false, vertical: true)
@@ -337,7 +360,7 @@ struct ConfiguracoesView: View {
                 Button {
                     Task { await granola.conectar() }
                 } label: {
-                    Label("Tentar novamente", systemImage: "arrow.clockwise")
+                    Label("Tentar novamente".localized, systemImage: "arrow.clockwise")
                 }
             }
 
@@ -349,7 +372,7 @@ struct ConfiguracoesView: View {
                         .foregroundStyle(PapagaioTema.texto)
 
                     if let workspace = conta.workspace, !workspace.isEmpty {
-                        Text("Workspace \(workspace)")
+                        Text("\("Workspace".localized) \(workspace)")
                             .font(PapagaioTema.Tipo.apoio)
                             .foregroundStyle(PapagaioTema.textoSecundario)
                     }
@@ -357,12 +380,12 @@ struct ConfiguracoesView: View {
 
                 Spacer()
 
-                Button("Desconectar") {
+                Button("Desconectar".localized) {
                     selecionadas.removeAll()
                     Task { await granola.desconectar() }
                 }
                 .buttonStyle(.bordered)
-                .help("Apaga as credenciais do Granola do Keychain.")
+                .help("Apaga as credenciais do Granola do Keychain.".localized)
             }
         }
     }
@@ -371,7 +394,7 @@ struct ConfiguracoesView: View {
     private func listaDeReunioes(_ granola: GranolaViewModel) -> some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             HStack {
-                Text("Reuniões acessíveis")
+                Text("Reuniões acessíveis".localized)
                     .font(PapagaioTema.Tipo.corpo.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
 
@@ -380,7 +403,7 @@ struct ConfiguracoesView: View {
                 Button {
                     Task { await granola.recarregar() }
                 } label: {
-                    Label("Atualizar", systemImage: "arrow.clockwise")
+                    Label("Atualizar".localized, systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.plain)
                 .font(PapagaioTema.Tipo.apoio)
@@ -390,12 +413,12 @@ struct ConfiguracoesView: View {
             if granola.carregandoReunioes {
                 HStack(spacing: PapagaioTema.Espaco.medio) {
                     ProgressView().controlSize(.small)
-                    Text("Carregando reuniões…")
+                    Text("Carregando reuniões…".localized)
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
             } else if granola.reunioes.isEmpty {
-                Text("Nenhuma reunião acessível nesta conta.")
+                Text("Nenhuma reunião acessível nesta conta.".localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             } else {
@@ -413,7 +436,7 @@ struct ConfiguracoesView: View {
                     ProgressView().controlSize(.small)
                 } else {
                     Label(
-                        "Importar selecionadas",
+                        "Importar selecionadas".localized,
                         systemImage: "square.and.arrow.down"
                     )
                 }
@@ -421,12 +444,12 @@ struct ConfiguracoesView: View {
             .disabled(biblioteca == nil || selecionadas.isEmpty || granola.importando)
             .help(
                 biblioteca == nil
-                    ? "A biblioteca ainda não abriu."
-                    : "Importa as reuniões marcadas para a biblioteca."
+                    ? "A biblioteca ainda não abriu.".localized
+                    : "Importa as reuniões marcadas para a biblioteca.".localized
             )
 
             if let falha = granola.falhaDeImportacao {
-                Label(falha, systemImage: "exclamationmark.triangle.fill")
+                Label(falha.localized, systemImage: "exclamationmark.triangle.fill")
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.perigo)
                     .fixedSize(horizontal: false, vertical: true)
@@ -452,6 +475,7 @@ struct ConfiguracoesView: View {
                     .font(PapagaioTema.Tipo.corpo)
                     .foregroundStyle(PapagaioTema.texto)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
                 HStack(spacing: PapagaioTema.Espaco.curto) {
                     Text(reuniao.data.formatted(date: .abbreviated, time: .omitted))
@@ -484,13 +508,13 @@ struct ConfiguracoesView: View {
         switch googleCalendar.estado {
         case .desconectado:
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-                Text("Importe reuniões futuras do Google Calendar para a biblioteca.")
+                Text("Importe reuniões futuras do Google Calendar para a biblioteca.".localized)
                     .font(PapagaioTema.Tipo.corpo)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if !CredenciaisGoogle.estaConfigurado {
-                    Label("Client ID/Secret não configurados", systemImage: "exclamationmark.triangle.fill")
+                    Label("Client ID/Secret não configurados".localized, systemImage: "exclamationmark.triangle.fill")
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.aviso)
                         .fixedSize(horizontal: false, vertical: true)
@@ -499,24 +523,24 @@ struct ConfiguracoesView: View {
                 Button {
                     Task { await googleCalendar.conectar(biblioteca: biblioteca!) }
                 } label: {
-                    Label("Conectar conta Google…", systemImage: "person.badge.plus")
+                    Label("Conectar conta Google…".localized, systemImage: "person.badge.plus")
                 }
                 .disabled(!CredenciaisGoogle.estaConfigurado)
-                .help("Abre o navegador para autorizar o Ōmu na sua conta Google.")
+                .help("Abre o navegador para autorizar o Ōmu na sua conta Google.".localized)
             }
 
         case .conectando:
             HStack(spacing: PapagaioTema.Espaco.medio) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Autorize no navegador e volte ao Ōmu…")
+                Text("Autorize no navegador e volte ao Ōmu…".localized)
                     .font(PapagaioTema.Tipo.corpo)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
 
         case let .falhou(mensagem):
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-                Label(mensagem, systemImage: "exclamationmark.triangle.fill")
+                Label(mensagem.localized, systemImage: "exclamationmark.triangle.fill")
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.perigo)
                     .fixedSize(horizontal: false, vertical: true)
@@ -524,7 +548,7 @@ struct ConfiguracoesView: View {
                 Button {
                     Task { await googleCalendar.conectar(biblioteca: biblioteca!) }
                 } label: {
-                    Label("Tentar novamente", systemImage: "arrow.clockwise")
+                    Label("Tentar novamente".localized, systemImage: "arrow.clockwise")
                 }
             }
 
@@ -538,11 +562,11 @@ struct ConfiguracoesView: View {
 
                 Spacer()
 
-                Button("Desconectar") {
+                Button("Desconectar".localized) {
                     Task { await googleCalendar.desconectar() }
                 }
                 .buttonStyle(.bordered)
-                .help("Apaga as credenciais do Google Calendar do Keychain.")
+                .help("Apaga as credenciais do Google Calendar do Keychain.".localized)
             }
         }
     }
@@ -552,7 +576,7 @@ struct ConfiguracoesView: View {
     private func listaDeReunioesGoogleCalendar(_ googleCalendar: GoogleCalendarViewModel) -> some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             HStack {
-                Text("Reuniões futuras (próximas 24 horas)")
+                Text("Reuniões futuras (próximas 24 horas)".localized)
                     .font(PapagaioTema.Tipo.corpo.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
 
@@ -561,7 +585,7 @@ struct ConfiguracoesView: View {
                 Button {
                     Task { await googleCalendar.recarregar() }
                 } label: {
-                    Label("Atualizar", systemImage: "arrow.clockwise")
+                    Label("Atualizar".localized, systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.plain)
                 .font(PapagaioTema.Tipo.apoio)
@@ -571,23 +595,23 @@ struct ConfiguracoesView: View {
             if googleCalendar.carregandoReunioes {
                 HStack(spacing: PapagaioTema.Espaco.medio) {
                     ProgressView().controlSize(.small)
-                    Text("Carregando reuniões…")
+                    Text("Carregando reuniões…".localized)
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
             } else if googleCalendar.reunioesPendentes.isEmpty {
-                Text("Nenhuma reunião futura encontrada.")
+                Text("Nenhuma reunião futura encontrada.".localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             } else {
-                Text("\(googleCalendar.reunioesPendentes.count) reunião(ões) com participantes — sincronizadas automaticamente na aba Calendário da biblioteca.")
+                Text("%d reunião(ões) com participantes — sincronizadas automaticamente na aba Calendário da biblioteca.".localized(googleCalendar.reunioesPendentes.count))
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if let falha = googleCalendar.falhaDeImportacao {
-                Label(falha, systemImage: "exclamationmark.triangle.fill")
+                Label(falha.localized, systemImage: "exclamationmark.triangle.fill")
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.perigo)
                     .fixedSize(horizontal: false, vertical: true)
@@ -606,10 +630,11 @@ private struct AmostraDeAparencia: View {
             VStack(spacing: PapagaioTema.Espaco.curto) {
                 miniatura
 
-                Label(opcao.titulo, systemImage: opcao.simbolo)
+                Label(opcao.titulo.localized, systemImage: opcao.simbolo)
                     .font(PapagaioTema.Tipo.apoio.weight(selecionada ? .semibold : .regular))
                     .foregroundStyle(selecionada ? PapagaioTema.destaqueEscuro : PapagaioTema.textoSecundario)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
             .padding(PapagaioTema.Espaco.medio)
             .frame(maxWidth: .infinity)
@@ -634,9 +659,9 @@ private struct AmostraDeAparencia: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(opcao.descricao)
-        .accessibilityLabel("Aparência \(opcao.titulo)")
-        .accessibilityHint(opcao.descricao)
+        .help(opcao.descricao.localized)
+        .accessibilityLabel("Aparência %@".localized(opcao.titulo.localized))
+        .accessibilityHint(opcao.descricao.localized)
         .accessibilityAddTraits(selecionada ? [.isSelected] : [])
     }
 

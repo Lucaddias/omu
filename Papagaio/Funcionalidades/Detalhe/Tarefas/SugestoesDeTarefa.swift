@@ -31,9 +31,9 @@ struct LinhaDeSugestaoDeTarefa: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: PapagaioTema.Espaco.curto) {
-                botao(simbolo: "xmark", ajuda: "Descartar sugestão", cor: PapagaioTema.perigo, acao: aoRejeitar)
-                botao(simbolo: "pencil", ajuda: "Editar antes de aceitar", cor: PapagaioTema.textoSecundario, acao: aoEditar)
-                botao(simbolo: "checkmark", ajuda: "Aceitar e mandar para o quadro", cor: PapagaioTema.sucesso, preenchido: true, acao: aoAceitar)
+                botao(simbolo: "xmark", ajuda: "Descartar sugestão".localized, cor: PapagaioTema.perigo, acao: aoRejeitar)
+                botao(simbolo: "pencil", ajuda: "Editar antes de aceitar".localized, cor: PapagaioTema.textoSecundario, acao: aoEditar)
+                botao(simbolo: "checkmark", ajuda: "Aceitar e mandar para o quadro".localized, cor: PapagaioTema.sucesso, preenchido: true, acao: aoAceitar)
             }
         }
         .padding(PapagaioTema.Espaco.medio)
@@ -70,7 +70,7 @@ struct SecaoDeSugestoesDeTarefa: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             HStack(spacing: PapagaioTema.Espaco.curto) {
-                Text("Sugestões da conversa")
+                Text("Sugestões da conversa".localized)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(PapagaioTema.texto)
 
@@ -82,7 +82,7 @@ struct SecaoDeSugestoesDeTarefa: View {
             }
             .padding(.leading, PapagaioTema.Espaco.curto)
 
-            Text("Identificadas automaticamente na transcrição. Aceite para mandar para o quadro de tarefas, edite antes de aceitar ou descarte.")
+            Text("Identificadas automaticamente na transcrição. Aceite para mandar para o quadro de tarefas, edite antes de aceitar ou descarte.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .padding(.leading, PapagaioTema.Espaco.curto)

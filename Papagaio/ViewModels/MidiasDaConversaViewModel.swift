@@ -64,9 +64,9 @@ final class MidiasDaConversaViewModel {
 
     func selecionar() {
         let painel = NSOpenPanel()
-        painel.title = "Adicionar mídia"
-        painel.prompt = "Adicionar"
-        painel.message = "Escolha fotos, vídeos, áudios, PDFs ou outros arquivos para salvar nesta conversa."
+        painel.title = "Adicionar mídia".localized
+        painel.prompt = "Adicionar".localized
+        painel.message = "Escolha fotos, vídeos, áudios, PDFs ou outros arquivos para salvar nesta conversa.".localized
         painel.canChooseFiles = true
         painel.canChooseDirectories = false
         painel.allowsMultipleSelection = true
@@ -137,7 +137,7 @@ final class MidiasDaConversaViewModel {
             // aba: a lista de removidos é lida do disco, não deduzida daqui.
             recarregarLixeira()
         } catch {
-            erro = "Não foi possível remover esse arquivo: \(error.localizedDescription)"
+            erro = "Não foi possível remover esse arquivo: %@".localized(error.localizedDescription)
         }
     }
 
@@ -145,7 +145,7 @@ final class MidiasDaConversaViewModel {
         if LixeiraDeMidia.restaurar(item) {
             carregar()
         } else {
-            erro = "Não foi possível restaurar \(item.nome)."
+            erro = "Não foi possível restaurar %@.".localized(item.nome)
         }
     }
 
@@ -153,7 +153,7 @@ final class MidiasDaConversaViewModel {
         do {
             try LixeiraDeMidia.remover(item)
         } catch {
-            erro = "Não foi possível apagar \(item.nome): \(error.localizedDescription)"
+            erro = "Não foi possível apagar %@: %@".localized(item.nome, error.localizedDescription)
         }
         recarregarLixeira()
     }
@@ -163,7 +163,7 @@ final class MidiasDaConversaViewModel {
     /// necessário. O arquivo vai para a lixeira, de onde volta se for o caso.
     private func removerAudioDaGravacao(_ anexo: AnexoDeMidiaDaConversa) {
         guard transcricaoDisponivel else {
-            erro = "O áudio da gravação só pode ser removido depois que a transcrição terminar."
+            erro = "O áudio da gravação só pode ser removido depois que a transcrição terminar.".localized
             return
         }
 
@@ -174,7 +174,7 @@ final class MidiasDaConversaViewModel {
             anexosDaGravacao = gravacoes()
             recarregarLixeira()
         } catch {
-            erro = "Não foi possível mover o áudio da gravação para a lixeira: \(error.localizedDescription)"
+            erro = "Não foi possível mover o áudio da gravação para a lixeira: %@".localized(error.localizedDescription)
         }
     }
 
@@ -219,11 +219,11 @@ final class MidiasDaConversaViewModel {
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
 
         if texto.contains("iphone") || texto.contains("locked") || texto.contains("bloqueado") {
-            return "Você precisa desbloquear seu iPhone antes de importar esse arquivo."
+            return "Você precisa desbloquear seu iPhone antes de importar esse arquivo.".localized
         }
         if nsError.domain == NSCocoaErrorDomain && [257, 260, 513].contains(nsError.code) {
-            return "Não consegui acessar esse arquivo. Se ele estiver no iPhone, desbloqueie o aparelho e tente importar de novo."
+            return "Não consegui acessar esse arquivo. Se ele estiver no iPhone, desbloqueie o aparelho e tente importar de novo.".localized
         }
-        return "Não foi possível guardar esse arquivo: \(error.localizedDescription)"
+        return "Não foi possível guardar esse arquivo: %@".localized(error.localizedDescription)
     }
 }

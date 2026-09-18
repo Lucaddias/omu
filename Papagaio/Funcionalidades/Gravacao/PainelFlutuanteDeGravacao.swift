@@ -88,7 +88,7 @@ struct PainelFlutuanteDeGravacao: View {
 
             BotaoDoSelo(
                 simbolo: gravador.pausado ? "play.fill" : "pause.fill",
-                ajuda: gravador.pausado ? "Continuar" : "Pausar"
+                ajuda: gravador.pausado ? "Continuar".localized : "Pausar".localized
             ) {
                 Task {
                     if gravador.pausado {
@@ -99,28 +99,28 @@ struct PainelFlutuanteDeGravacao: View {
                 }
             }
 
-            BotaoDoSelo(simbolo: "stop.fill", ajuda: "Finalizar gravação") {
+            BotaoDoSelo(simbolo: "stop.fill", ajuda: "Finalizar gravação".localized) {
                 Task { await gravador.alternarGravacao() }
             }
 
-            BotaoDoSelo(simbolo: "xmark", ajuda: "Cancelar gravação", perigo: true) {
+            BotaoDoSelo(simbolo: "xmark", ajuda: "Cancelar gravação".localized, perigo: true) {
                 Task { await gravador.cancelar() }
             }
 
             if exibindoNota {
                 // Só aparece com espaço de sobra: no mínimo, mais um botão
                 // aqui voltava a apertar tudo perto do cronômetro.
-                BotaoDoSelo(simbolo: "arrow.up.left.square", ajuda: "Abrir no app") {
+                BotaoDoSelo(simbolo: "arrow.up.left.square", ajuda: "Abrir no app".localized) {
                     aoAbrirNoApp()
                 }
-                BotaoDoSelo(simbolo: "pip.enter", ajuda: "Minimizar") {
+                BotaoDoSelo(simbolo: "pip.enter", ajuda: "Minimizar".localized) {
                     aoAlternarTamanho()
                 }
             } else {
                 // No mínimo, um botão só faz o trabalho dos dois de cima:
                 // volta pro tamanho de antes, de onde dá pra abrir a nota e
                 // (se precisar) voltar ao app pelo mesmo caminho de sempre.
-                BotaoDoSelo(simbolo: "arrow.up.left.and.arrow.down.right", ajuda: "Restaurar tamanho") {
+                BotaoDoSelo(simbolo: "arrow.up.left.and.arrow.down.right", ajuda: "Restaurar tamanho".localized) {
                     aoAlternarTamanho()
                 }
             }
@@ -144,7 +144,7 @@ struct PainelFlutuanteDeGravacao: View {
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
                     .padding(.top, 3)
 
-                TextField("Escreva e pressione Enter…", text: $gravador.rascunhoDaNota, axis: .vertical)
+                TextField("Escreva e pressione Enter…".localized, text: $gravador.rascunhoDaNota, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...4)
                     .focused($focoNaNota)
@@ -160,7 +160,7 @@ struct PainelFlutuanteDeGravacao: View {
                     )
             }
 
-            Text("Enter salva · Enter vazio marca o instante")
+            Text("Enter salva · Enter vazio marca o instante".localized)
                 .font(.caption2)
                 .foregroundStyle(PapagaioTema.textoSecundario)
         }
@@ -188,7 +188,7 @@ struct PainelFlutuanteDeGravacao: View {
                             .font(.caption.monospaced())
                             .foregroundStyle(PapagaioTema.textoSecundario)
 
-                        Text(nota.texto.isEmpty ? "Marcador" : nota.texto)
+                        Text(nota.texto.isEmpty ? "Marcador".localized : nota.texto)
                             .font(.caption)
                             .foregroundStyle(
                                 nota.texto.isEmpty
@@ -209,7 +209,7 @@ struct PainelFlutuanteDeGravacao: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help("Apagar nota")
+                        .help("Apagar nota".localized)
 
                     }
                 }

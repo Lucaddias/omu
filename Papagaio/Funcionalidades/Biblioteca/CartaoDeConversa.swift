@@ -192,14 +192,14 @@ struct CartaoDeConversa: View {
         if !entrevistadores.isEmpty {
             linhas.append((
                 "person.crop.circle.badge.checkmark",
-                rotuloDeEntrevistadores(nomesDePessoas(metadados.entrevistadores)),
+                rotuloDeEntrevistadores(nomesDePessoas(metadados.entrevistadores)).localized,
                 entrevistadores
             ))
         }
         if !entrevistado.isEmpty {
             linhas.append((
                 "person",
-                rotuloDeEntrevistados(nomesDePessoas(metadados.entrevistado)),
+                rotuloDeEntrevistados(nomesDePessoas(metadados.entrevistado)).localized,
                 entrevistado
             ))
         }
@@ -360,7 +360,7 @@ struct CartaoDeConversa: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Conversa \(titulo). \(estado.descricao)")
+        .accessibilityLabel(String(format: "Conversa %@. %@".localized, titulo, estado.descricao))
         // Altura fixa, e não "o que o conteúdo pedir".
         //
         // Com os campos configuráveis, deixar a altura seguir o conteúdo fazia
@@ -438,7 +438,7 @@ struct CartaoDeConversa: View {
 
                     VStack(spacing: PapagaioTema.Espaco.medio) {
                         SeloDeStatus(
-                            texto: "Concluído",
+                            texto: "Concluído".localized,
                             simbolo: "checkmark.circle.fill",
                             estilo: .sucesso
                         )
@@ -502,20 +502,20 @@ struct CartaoDeConversa: View {
                 aoSalvar: salvarInformacoesDoCard
             )
         }
-        .alert("Criar pasta e mover", isPresented: $criandoPastaParaMover) {
-            TextField("Nome da pasta", text: $nomeDaPasta)
-            Button("Criar e mover") {
+        .alert("Criar pasta e mover".localized, isPresented: $criandoPastaParaMover) {
+            TextField("Nome da pasta".localized, text: $nomeDaPasta)
+            Button("Criar e mover".localized) {
                 let limpa = nomeDaPasta.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !limpa.isEmpty else { return }
                 moverParaPasta(limpa)
             }
-            Button("Cancelar", role: .cancel) {}
+            Button("Cancelar".localized, role: .cancel) {}
         } message: {
-            Text("Crie uma pasta nova e esta conversa será movida para ela.")
+            Text("Crie uma pasta nova e esta conversa será movida para ela.".localized)
         }
         .overlay {
             if emOperacaoDeLixeira {
-                ProgressView("Movendo para a lixeira…")
+                ProgressView("Movendo para a lixeira…".localized)
                     .font(.callout.weight(.medium))
                     .padding(PapagaioTema.Espaco.largo)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
@@ -684,8 +684,10 @@ struct CartaoDeConversa: View {
         HStack(spacing: PapagaioTema.Espaco.minimo) {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 13, weight: .semibold))
-            Text("Cancelar")
+            Text("Cancelar".localized)
                 .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
         .foregroundStyle(PapagaioTema.perigo)
         .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -696,7 +698,7 @@ struct CartaoDeConversa: View {
         }
         .contentShape(Capsule())
         .highPriorityGesture(TapGesture().onEnded(aoMoverParaLixeira))
-        .help("Cancelar o processamento e mover para a lixeira")
+        .help("Cancelar o processamento e mover para a lixeira".localized)
     }
 
     /// O "i" ao lado da data, na cor do cartão (a mesma da tarja) — mesma
@@ -721,12 +723,12 @@ struct CartaoDeConversa: View {
             .popover(isPresented: $pairandoNaInfoDeData, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
                     colunaDeInformacaoDeData(
-                        rotulo: "Gravado em",
+                        rotulo: "Gravado em".localized,
                         valor: DataDigitada.textoComHora(de: arquivo.criadoEm)
                     )
                     if let importadoEm = arquivo.importadoEm {
                         colunaDeInformacaoDeData(
-                            rotulo: "Importado em",
+                            rotulo: "Importado em".localized,
                             valor: DataDigitada.textoComHora(de: importadoEm)
                         )
                     }
@@ -734,11 +736,11 @@ struct CartaoDeConversa: View {
                 .padding(PapagaioTema.Espaco.largo)
                 .frame(width: 240, alignment: .leading)
             }
-            .accessibilityLabel("Datas da conversa")
+            .accessibilityLabel("Datas da conversa".localized)
             .help(
                 importado && arquivo.importadoEm != nil
-                    ? "Gravado em \(DataDigitada.texto(de: arquivo.criadoEm)) · Importado em \(DataDigitada.texto(de: arquivo.importadoEm!))"
-                    : "Gravado em \(DataDigitada.texto(de: arquivo.criadoEm))"
+                    ? String(format: "Gravado em %@ · Importado em %@".localized, DataDigitada.texto(de: arquivo.criadoEm), DataDigitada.texto(de: arquivo.importadoEm!))
+                    : String(format: "Gravado em %@".localized, DataDigitada.texto(de: arquivo.criadoEm))
             )
     }
 
@@ -770,6 +772,7 @@ struct CartaoDeConversa: View {
                 // 14 era tamanho de nota de rodapé para o conteúdo principal.
                 .font(.system(size: 16))
                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
         }
         .foregroundStyle(PapagaioTema.textoSecundario)
     }
@@ -778,8 +781,10 @@ struct CartaoDeConversa: View {
         HStack(spacing: PapagaioTema.Espaco.minimo) {
             Image(systemName: "arrow.right.circle.fill")
                 .font(.system(size: 13, weight: .semibold))
-            Text("Clique para ver a conversa")
+            Text("Clique para ver a conversa".localized)
                 .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
         .foregroundStyle(PapagaioTema.sucesso)
         .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -790,7 +795,7 @@ struct CartaoDeConversa: View {
         }
         .contentShape(Capsule())
         .highPriorityGesture(TapGesture().onEnded(aoAbrirFicha))
-        .help("Ver a conversa")
+        .help("Ver a conversa".localized)
     }
 
     /// Os participantes, e o clique que abre a ficha com os nomes.
@@ -823,8 +828,10 @@ struct CartaoDeConversa: View {
 
                 if nomesDosParticipantes.isEmpty {
                     // Ninguém nomeado na ficha, mas a transcrição separou vozes.
-                    Text(participantes == 1 ? "1 participante" : "\(participantes) participantes")
+                    Text(participantes == 1 ? "1 participante".localized : String(format: "%d participantes".localized, participantes))
                         .font(.system(size: 16))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .padding(.top, 3)
                 } else {
                     PilhaDeParticipantes(nomes: nomesDosParticipantes)
@@ -837,9 +844,9 @@ struct CartaoDeConversa: View {
             // do `NavigationLink` do cartão, e um botão aninhado ali perde o
             // clique para o link — a conversa abriria em vez do popover.
             .highPriorityGesture(TapGesture().onEnded { mostrandoParticipantes = true })
-            .help("Ver quem participou")
+            .help("Ver quem participou".localized)
         } else if campos.contains(.lacunas) && !emProcessamento {
-            linhaDoCorpo("person.badge.plus", "Participantes não informados")
+            linhaDoCorpo("person.badge.plus", "Participantes não informados".localized)
         }
     }
 
@@ -885,16 +892,16 @@ struct CartaoDeConversa: View {
     private var fichaDoCartao: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
             grupoDePessoas(
-                rotuloDeEntrevistadores(nomesDePessoas(metadados.entrevistadores)),
+                rotuloDeEntrevistadores(nomesDePessoas(metadados.entrevistadores)).localized,
                 nomesDePessoas(metadados.entrevistadores)
             )
             grupoDePessoas(
-                rotuloDeEntrevistados(nomesDePessoas(metadados.entrevistado)),
+                rotuloDeEntrevistados(nomesDePessoas(metadados.entrevistado)).localized,
                 nomesDePessoas(metadados.entrevistado)
             )
 
             if pessoasDoCard.isEmpty {
-                Text("Ninguém informado na ficha.")
+                Text("Ninguém informado na ficha.".localized)
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
@@ -924,6 +931,7 @@ struct CartaoDeConversa: View {
                             .font(.callout)
                             .foregroundStyle(PapagaioTema.texto)
                             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                     }
                 }
             }
@@ -1118,7 +1126,7 @@ struct CartaoDeConversa: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(favorito ? "Desfavoritar" : "Favoritar")
+                .help(favorito ? "Desfavoritar".localized : "Favoritar".localized)
                 .onHover { pairandoNaEstrela = $0 }
 
                 Button {
@@ -1135,7 +1143,7 @@ struct CartaoDeConversa: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { pairandoNaPasta = $0 }
-                .help(pasta.map { "Na pasta \($0)" } ?? "Mover para pasta")
+                .help(pasta.map { String(format: "Na pasta %@".localized, $0) } ?? "Mover para pasta".localized)
                 // Popover, e não `confirmationDialog`: o diálogo do macOS
                 // empilha um botão por pasta, sem rolagem, e a partir de umas
                 // poucas pastas simplesmente para de mostrar o resto — foi o
@@ -1184,7 +1192,7 @@ struct CartaoDeConversa: View {
         }
         .buttonStyle(.plain)
         .onHover { pairandoNoMenu = $0 }
-        .accessibilityLabel("Ações de \(titulo)")
+        .accessibilityLabel(String(format: "Ações de %@".localized, titulo))
         .popover(isPresented: $editandoAparencia, arrowEdge: .bottom) {
             EditorDeAparenciaDoCartao(
                 arquivoID: arquivo.id,
@@ -1311,7 +1319,7 @@ struct CartaoDeConversa: View {
     /// A lista de pastas, rolável, com a atual marcada.
     private var seletorDePasta: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-            Text("Mover para pasta")
+            Text("Mover para pasta".localized)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .textCase(.uppercase)
@@ -1333,6 +1341,7 @@ struct CartaoDeConversa: View {
                                     .font(.callout)
                                     .foregroundStyle(PapagaioTema.texto)
                                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
                                 Spacer(minLength: PapagaioTema.Espaco.curto)
 
@@ -1357,7 +1366,7 @@ struct CartaoDeConversa: View {
 
             SeparadorPapagaio()
 
-            Button("Criar nova pasta…", systemImage: "folder.badge.plus") {
+            Button("Criar nova pasta…".localized, systemImage: "folder.badge.plus") {
                 escolhendoPastaDestino = false
                 nomeDaPasta = ""
                 DispatchQueue.main.async { criandoPastaParaMover = true }
@@ -1368,7 +1377,7 @@ struct CartaoDeConversa: View {
             .padding(.horizontal, PapagaioTema.Espaco.curto)
 
             if pasta != nil {
-                Button("Remover da pasta", systemImage: "folder.badge.minus") {
+                Button("Remover da pasta".localized, systemImage: "folder.badge.minus") {
                     pasta = nil
                     PreferenciasVisuaisDoArquivo.definirPasta(nil, para: arquivo.id)
                     aoAlterarPreferenciasVisuais()
@@ -1425,8 +1434,8 @@ struct CartaoDeConversa: View {
         ) else { return }
 
         let painel = NSOpenPanel()
-        painel.title = "Escolha onde salvar \(titulo)"
-        painel.prompt = "Salvar aqui"
+        painel.title = String(format: "Escolha onde salvar %@".localized, titulo)
+        painel.prompt = "Salvar aqui".localized
         painel.canChooseFiles = false
         painel.canChooseDirectories = true
         painel.canCreateDirectories = true
@@ -1544,6 +1553,7 @@ struct PilhaDeParticipantes: View {
             // círculo de onde ele saiu quando há quatro deles lado a lado.
             .foregroundStyle(AvatarDePessoa.corDeAcento(de: nome))
             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             .fixedSize(horizontal: true, vertical: true)
             .padding(.horizontal, PapagaioTema.Espaco.curto)
             .padding(.vertical, PapagaioTema.Espaco.minimo)
@@ -1616,6 +1626,7 @@ struct SeloDaPastaDoCartao: View {
 
             Text(nome)
                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
         }
         .font(PapagaioTema.Tipo.rotulo)
         .foregroundStyle(semCor ? PapagaioTema.texto : cor)
@@ -1639,7 +1650,7 @@ struct SeloDaPastaDoCartao: View {
                     selo.contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .help("Abrir a pasta \(nome)")
+                .help(String(format: "Abrir a pasta %@".localized, nome))
             } else {
                 selo
             }
@@ -1677,6 +1688,7 @@ struct MetadadoDoCard: View {
                     .font(PapagaioTema.Tipo.legenda.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                     .truncationMode(.tail)
             }
         } icon: {

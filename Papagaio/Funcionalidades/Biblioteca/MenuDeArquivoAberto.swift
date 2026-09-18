@@ -35,25 +35,25 @@ struct MenuDeArquivoAberto: View {
             // modelos pequenos), reprocessar re-transcreve tudo.
             ItemDoMenuDeArquivo(
                 simbolo: "person.2.wave.2",
-                titulo: "Distinguir falantes",
+                titulo: "Distinguir falantes".localized,
                 desabilitado: bloqueioDeEdicao || !podeDiarizar,
                 acao: aoDiarizar
             )
             ItemDoMenuDeArquivo(
                 simbolo: "arrow.clockwise",
-                titulo: "Reprocessar",
+                titulo: "Reprocessar".localized,
                 desabilitado: bloqueioDeEdicao,
                 acao: aoReprocessar
             )
 
-            ItemDoMenuDeArquivo(simbolo: "square.and.pencil", titulo: "Editar informações", acao: aoRenomear)
-            ItemDoMenuDeArquivo(simbolo: "arrow.down.circle", titulo: "Baixar", acao: aoBaixar)
-            ItemDoMenuDeArquivo(simbolo: "square.and.arrow.up", titulo: "Compartilhar", acao: aoCompartilhar)
-            ItemDoMenuDeArquivo(simbolo: "rectangle.on.rectangle", titulo: "Duplicar", desabilitado: bloqueioDeEdicao, acao: aoDuplicar)
+            ItemDoMenuDeArquivo(simbolo: "square.and.pencil", titulo: "Editar informações".localized, acao: aoRenomear)
+            ItemDoMenuDeArquivo(simbolo: "arrow.down.circle", titulo: "Baixar".localized, acao: aoBaixar)
+            ItemDoMenuDeArquivo(simbolo: "square.and.arrow.up", titulo: "Compartilhar".localized, acao: aoCompartilhar)
+            ItemDoMenuDeArquivo(simbolo: "rectangle.on.rectangle", titulo: "Duplicar".localized, desabilitado: bloqueioDeEdicao, acao: aoDuplicar)
             // Favoritar e mover para pasta saem daqui: são botões no rodapé do
             // cartão. Repetir a ação no menu só alonga a lista e faz a pessoa
             // procurar em dois lugares o mesmo comando.
-            ItemDoMenuDeArquivo(simbolo: "paintpalette", titulo: "Cor e imagem", acao: aoEditarAparencia)
+            ItemDoMenuDeArquivo(simbolo: "paintpalette", titulo: "Cor e imagem".localized, acao: aoEditarAparencia)
 
             SeparadorPapagaio()
                 .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -61,13 +61,13 @@ struct MenuDeArquivoAberto: View {
 
             ItemDoMenuDeArquivo(
                 simbolo: cancelavel ? "xmark.circle" : "trash",
-                titulo: cancelavel ? "Cancelar processamento" : "Mover para Lixeira",
+                titulo: cancelavel ? "Cancelar processamento".localized : "Mover para Lixeira".localized,
                 destrutivo: true,
                 desabilitado: bloqueioDeLixeira,
                 acao: aoMoverParaLixeira
             )
         }
-        .frame(width: 214)
+        .frame(width: 220)
         .padding(.vertical, PapagaioTema.Espaco.minimo)
         // Sem fundo, moldura e sombra próprios: agora isto vive dentro de um
         // popover, que já traz os três do sistema. Somados, davam duas bordas
@@ -93,6 +93,7 @@ struct ItemDoMenuDeArquivo: View {
                 Text(titulo)
                     .font(.system(size: 14, weight: .regular))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 Spacer(minLength: 0)
             }

@@ -14,14 +14,18 @@ struct AcoesDaLixeira: View {
 
     var body: some View {
         HStack(spacing: PapagaioTema.Espaco.largo) {
-            Button("Restaurar Tudo", systemImage: "arrow.counterclockwise", action: aoRestaurarTudo)
+            Button("Restaurar Tudo".localized, systemImage: "arrow.counterclockwise", action: aoRestaurarTudo)
                 .aplicarSomenteIcone(somenteIcone)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 .buttonStyle(BotaoDeContornoPapagaio())
                 .disabled(!temArquivos)
-                .help("Restaurar todos os arquivos da lixeira")
+                .help("Restaurar todos os arquivos da lixeira".localized)
 
-            Button("Esvaziar Lixeira", systemImage: "trash.square", role: .destructive, action: aoEsvaziar)
+            Button("Esvaziar Lixeira".localized, systemImage: "trash.square", role: .destructive, action: aoEsvaziar)
                 .aplicarSomenteIcone(somenteIcone)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(PapagaioTema.textoSobrePrimario)
                 .padding(.horizontal, somenteIcone ? PapagaioTema.Espaco.medio : PapagaioTema.Espaco.largo)
@@ -30,7 +34,7 @@ struct AcoesDaLixeira: View {
                 .buttonStyle(.plain)
                 .disabled(!temArquivos)
                 .opacity(temArquivos ? 1 : 0.45)
-                .help("Apagar definitivamente todos os arquivos da lixeira")
+                .help("Apagar definitivamente todos os arquivos da lixeira".localized)
         }
     }
 }

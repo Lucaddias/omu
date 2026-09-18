@@ -24,7 +24,7 @@ struct CartaoNovaConversa: View {
                 corpo
             }
             .buttonStyle(.plain)
-            .help("Voltar para a gravação em andamento")
+            .help("Voltar para a gravação em andamento".localized)
         } else {
             corpo
         }
@@ -39,31 +39,35 @@ struct CartaoNovaConversa: View {
                 .background(PapagaioTema.destaqueSuave, in: Circle())
 
             VStack(spacing: PapagaioTema.Espaco.minimo) {
-                Text(gravando ? "Gravação em andamento" : "Gerar nova conversa")
+                Text(gravando ? "Gravação em andamento".localized : "Gerar nova conversa".localized)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
                 Text(
                     gravando
-                        ? "Clique para voltar à tela de gravação."
-                        : "Grave áudio, importe um arquivo ou arraste aqui do Finder."
+                        ? "Clique para voltar à tela de gravação.".localized
+                        : "Grave áudio, importe um arquivo ou arraste aqui do Finder.".localized
                 )
                 .font(.callout)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(PapagaioTema.textoSecundario)
+                .lineLimit(3)
+                .minimumScaleFactor(0.85)
             }
 
             if !prontoParaEntrada {
                 SeloDeStatus(
-                    texto: "Preparando biblioteca",
+                    texto: "Preparando biblioteca".localized,
                     simbolo: "arrow.triangle.2.circlepath",
                     estilo: .neutro
                 )
-                .accessibilityLabel("Preparando a biblioteca. Gravar e importar estarão disponíveis em instantes.")
+                .accessibilityLabel("Preparando a biblioteca. Gravar e importar estarão disponíveis em instantes.".localized)
             }
 
             if bloqueado {
                 SeloDeStatus(
-                    texto: "Preparando áudio",
+                    texto: "Preparando áudio".localized,
                     simbolo: "waveform",
                     estilo: .destaque
                 )
@@ -74,9 +78,11 @@ struct CartaoNovaConversa: View {
             // pessoa dividir a atenção — o cartão passa a ter uma função só,
             // que é levar de volta para a tela de captura.
             if gravando {
-                Label("Voltar para a gravação", systemImage: "waveform")
+                Label("Voltar para a gravação".localized, systemImage: "waveform")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             } else {
                 // Em coluna estreita os dois botões lado a lado eram espremidos
                 // até o rótulo hifenizar ("Impor-tar"). Empilhar é melhor que
@@ -152,13 +158,13 @@ struct CartaoNovaConversa: View {
 
     private var botoes: some View {
         Group {
-            Button("Gravar", systemImage: "mic.fill") {
+            Button("Gravar".localized, systemImage: "mic.fill") {
                 Task { await aoAlternarGravacao() }
             }
             .buttonStyle(BotaoPrincipalPapagaio())
             .disabled(bloqueado || !prontoParaEntrada)
 
-            Button("Importar", systemImage: "arrow.down.doc") {
+            Button("Importar".localized, systemImage: "arrow.down.doc") {
                 aoImportar()
             }
             .buttonStyle(BotaoDeContornoPapagaio())

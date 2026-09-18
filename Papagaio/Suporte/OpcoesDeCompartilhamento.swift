@@ -49,7 +49,7 @@ final class OpcoesDeCompartilhamento: NSObject, NSSharingServicePickerDelegate, 
                     } catch {
                         await MainActor.run {
                             let alerta = NSAlert()
-                            alerta.messageText = "Não foi possível salvar"
+                            alerta.messageText = "Não foi possível salvar".localized
                             alerta.informativeText = error.localizedDescription
                             alerta.alertStyle = .warning
                             alerta.runModal()

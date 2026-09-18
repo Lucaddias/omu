@@ -67,7 +67,7 @@ struct CartaoDeTarefaDaConversa: View {
                     SeloDeStatusDaTarefa(status: .concluida)
                 } else {
                     HStack(spacing: PapagaioTema.Espaco.curto) {
-                        Text("Prioridade:")
+                        Text("Prioridade:".localized)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(PapagaioTema.textoSecundario)
                         SeloDePrioridade(prioridade: tarefa.prioridade)
@@ -80,6 +80,7 @@ struct CartaoDeTarefaDaConversa: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(corDoPrazo)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
         }
         // Recuo extra à esquerda: a tarja de cor mora encostada na borda do
@@ -94,8 +95,8 @@ struct CartaoDeTarefaDaConversa: View {
         .cartaoPapagaio()
         .overlay(alignment: .topTrailing) {
             Menu {
-                Button("Editar", systemImage: "pencil", action: aoEditar)
-                Button(oculta ? "Mostrar" : "Ocultar", systemImage: oculta ? "eye" : "eye.slash", action: aoOcultar)
+                Button("Editar".localized, systemImage: "pencil", action: aoEditar)
+                Button(oculta ? "Mostrar".localized : "Ocultar".localized, systemImage: oculta ? "eye" : "eye.slash", action: aoOcultar)
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .bold))
@@ -105,7 +106,7 @@ struct CartaoDeTarefaDaConversa: View {
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
-            .help("Ações da tarefa")
+            .help("Ações da tarefa".localized)
             .padding(.trailing, PapagaioTema.Espaco.curto)
             .padding(.top, PapagaioTema.Espaco.curto)
         }
@@ -127,13 +128,13 @@ struct CartaoDeTarefaDaConversa: View {
                 .padding(.top, 1)
         }
         .buttonStyle(.plain)
-        .help(concluida ? "Marcar como em andamento" : "Concluir")
+        .help(concluida ? "Marcar como em andamento".localized : "Concluir".localized)
     }
 
     private var rotuloDoPrazo: String {
-        guard let prazo = tarefa.prazo else { return "Sem deadline" }
-        if Calendar.current.isDateInToday(prazo) { return "Hoje" }
-        if Calendar.current.isDateInTomorrow(prazo) { return "Amanhã" }
+        guard let prazo = tarefa.prazo else { return "Sem deadline".localized }
+        if Calendar.current.isDateInToday(prazo) { return "Hoje".localized }
+        if Calendar.current.isDateInTomorrow(prazo) { return "Amanhã".localized }
         return prazo.formatted(.dateTime.day().month().year())
     }
 

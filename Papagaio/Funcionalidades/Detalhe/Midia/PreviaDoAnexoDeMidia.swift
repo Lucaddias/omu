@@ -24,8 +24,11 @@ struct PreviaDoAnexoDeMidia: View {
                 VStack(spacing: PapagaioTema.Espaco.curto) {
                     Image(systemName: anexo.simbolo)
                         .font(.system(size: 34, weight: .semibold))
-                    Text(anexo.tipoVisual)
+                    Text(anexo.tipoVisual.localized)
                         .font(.callout.weight(.semibold))
+                        .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
             }

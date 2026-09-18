@@ -20,10 +20,11 @@ struct LegendaGlobalDaBarra: View {
 
             Group {
                 if let texto {
-                    Text(texto.texto)
+                    Text(texto.texto.localized)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .fixedSize(horizontal: true, vertical: true)
                         .padding(.horizontal, PapagaioTema.Espaco.curto)
                         .padding(.vertical, PapagaioTema.Espaco.minimo)

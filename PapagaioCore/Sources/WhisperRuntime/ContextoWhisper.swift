@@ -130,12 +130,13 @@ public actor ContextoWhisper {
 
     /// Transcreve amostras PCM Float32 mono 16 kHz.
     ///
-    /// - Parameter idioma: código ISO-639-1 (`"pt"`). O peso large-v3 é
-    ///   multilíngue; não há gestão de asset de locale — por isso o protocolo
-    ///   `TranscriptionEngine` não tem parâmetro de locale.
+    /// - Parameter idioma: código ISO-639-1 opcional. `nil` usa a detecção
+    ///   automática do próprio Whisper; nunca deve receber o idioma da
+    ///   interface como se fosse o idioma falado. O peso large-v3 é
+    ///   multilíngue e não exige asset de locale separado.
     public func transcrever(
         amostras: [Float],
-        idioma: String = "pt",
+        idioma: String? = nil,
         initialPrompt: String? = nil,
         threads: Int32 = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))
     ) throws -> [SegmentoWhisper] {
@@ -163,20 +164,12 @@ public actor ContextoWhisper {
         // foi treinado com timestamps de palavra, então o `t0`/`t1` dos tokens
         // é medido, não estimado por distribuição.
         params.token_timestamps = true
-        let codigo: Int32
-        if let initialPrompt, !initialPrompt.isEmpty {
-            codigo = initialPrompt.withCString { prompt in
-                idioma.withCString { ponteiroIdioma in
-                    params.initial_prompt = prompt
-                    params.language = ponteiroIdioma
-                    return amostras.withUnsafeBufferPointer { buffer in
-                        whisper_full(contexto, params, buffer.baseAddress, Int32(buffer.count))
-                    }
-                }
-            }
-        } else {
-            codigo = idioma.withCString { ponteiroIdioma in
+        let lingua = (idioma != nil && !idioma!.isEmpty) ? idioma! : "auto"
+        let codigo = comCStringOpcional(initialPrompt) { prompt in
+            lingua.withCString { ponteiroIdioma in
+                params.initial_prompt = prompt
                 params.language = ponteiroIdioma
+                params.detect_language = false
                 return amostras.withUnsafeBufferPointer { buffer in
                     whisper_full(contexto, params, buffer.baseAddress, Int32(buffer.count))
                 }
@@ -214,6 +207,12 @@ public actor ContextoWhisper {
             ))
         }
         return segmentos
+    }
+
+    /// Executa um bloco garantindo que o ponteiro C opcional permaneça válido durante a chamada.
+    private func comCStringOpcional<R>(_ string: String?, _ corpo: (UnsafePointer<CChar>?) -> R) -> R {
+        guard let string, !string.isEmpty else { return corpo(nil) }
+        return string.withCString { corpo($0) }
     }
 
     /// Agrupa os tokens do segmento em palavras, na ordem da fala.

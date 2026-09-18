@@ -109,9 +109,10 @@ struct TarefasDaConversaView: View {
                                 filtro = opcao
                             }
                         } label: {
-                            Text(opcao.rawValue)
+                            Text(opcao.titulo)
                                 .font(.callout.weight(.semibold))
                                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                                 .fixedSize(horizontal: true, vertical: false)
                                 .foregroundStyle(filtro == opcao ? PapagaioTema.textoSobrePrimario : PapagaioTema.textoSecundario)
                                 .padding(.horizontal, PapagaioTema.Espaco.largo)
@@ -143,12 +144,12 @@ struct TarefasDaConversaView: View {
                         }
                     } label: {
                         Label(
-                            mostrarTarefasOcultas ? "\(tarefasOcultasNestaConversa) ocultas" : "Ocultas",
+                            mostrarTarefasOcultas ? "\(tarefasOcultasNestaConversa) \("ocultas".localized)" : "Ocultas".localized,
                             systemImage: mostrarTarefasOcultas ? "eye" : "eye.slash"
                         )
                     }
                     .buttonStyle(BotaoDeFiltroDeTarefaGeral(ativo: mostrarTarefasOcultas))
-                    .help(mostrarTarefasOcultas ? "Esconder de novo as tarefas ocultas" : "Mostrar as tarefas ocultas")
+                    .help(mostrarTarefasOcultas ? "Esconder de novo as tarefas ocultas".localized : "Mostrar as tarefas ocultas".localized)
                     .layoutPriority(1)
                 }
 
@@ -163,8 +164,8 @@ struct TarefasDaConversaView: View {
                         .background(PapagaioTema.preenchimentoPrimario, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .help("Adicionar tarefa")
-                .accessibilityLabel("Adicionar tarefa")
+                .help("Adicionar tarefa".localized)
+                .accessibilityLabel("Adicionar tarefa".localized)
                 .layoutPriority(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -172,8 +173,8 @@ struct TarefasDaConversaView: View {
             if tarefasVisiveis.isEmpty && sugestoes.isEmpty {
                 CartaoDeEstadoVazio(
                     simbolo: "list.clipboard",
-                    titulo: "Nenhuma tarefa aqui",
-                    mensagem: "Use o botão de adicionar para criar uma tarefa nesta conversa."
+                    titulo: "Nenhuma tarefa aqui".localized,
+                    mensagem: "Use o botão de adicionar para criar uma tarefa nesta conversa.".localized
                 )
                 .frame(minHeight: 280)
                 .cartaoPapagaio()
@@ -208,7 +209,7 @@ struct TarefasDaConversaView: View {
 
     private func secaoNaoIniciado(tarefas: [TarefaDaConversa]) -> some View {
         SecaoDeTarefas(
-            titulo: "Não iniciado",
+            titulo: "Não iniciado".localized,
             cor: PapagaioTema.aviso,
             tarefas: tarefas,
             destino: .naoIniciado,
@@ -224,7 +225,7 @@ struct TarefasDaConversaView: View {
 
     private func secaoEmAndamento(tarefas: [TarefaDaConversa]) -> some View {
         SecaoDeTarefas(
-            titulo: "Em andamento",
+            titulo: "Em andamento".localized,
             cor: PapagaioTema.destaque,
             tarefas: tarefas,
             destino: .emAndamento,
@@ -240,7 +241,7 @@ struct TarefasDaConversaView: View {
 
     private func secaoConcluidas(tarefas: [TarefaDaConversa]) -> some View {
         SecaoDeTarefas(
-            titulo: "Concluídas",
+            titulo: "Concluídas".localized,
             cor: PapagaioTema.sucesso,
             tarefas: tarefas,
             destino: .concluida,
@@ -260,7 +261,7 @@ struct TarefasDaConversaView: View {
     /// iniciado" mesmo.
     private func secaoAtrasada(tarefas: [TarefaDaConversa]) -> some View {
         SecaoDeTarefas(
-            titulo: "Atrasada",
+            titulo: "Atrasada".localized,
             cor: PapagaioTema.perigo,
             tarefas: tarefas,
             destino: .naoIniciado,

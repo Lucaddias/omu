@@ -22,19 +22,19 @@ struct TabelaDaEquipe: View {
     }
 
     private var intervaloAtual: String {
-        guard !membros.isEmpty else { return "Nenhum membro" }
+        guard !membros.isEmpty else { return "Nenhum membro".localized }
         let fim = min((pagina + 1) * Self.itensPorPagina, membros.count)
-        return "\(fim) de \(membros.count) membros"
+        return "%d de %d membros".localized(fim, membros.count)
     }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
             VStack(spacing: 0) {
                 HStack {
-                    CabecalhoDeColuna("MEMBRO", largura: 300)
-                    CabecalhoDeColuna("IDENTIDADE", largura: 330)
-                    CabecalhoDeColuna("ACESSO", largura: 210)
-                    CabecalhoDeColuna("AÇÕES", alinhamento: .trailing)
+                    CabecalhoDeColuna("MEMBRO".localized, largura: 300)
+                    CabecalhoDeColuna("IDENTIDADE".localized, largura: 330)
+                    CabecalhoDeColuna("ACESSO".localized, largura: 210)
+                    CabecalhoDeColuna("AÇÕES".localized, alinhamento: .trailing)
                 }
                 .padding(.horizontal, PapagaioTema.Espaco.secao)
                 .frame(height: 64)
@@ -107,9 +107,11 @@ struct CabecalhoDeColuna: View {
     }
 
     var body: some View {
-        Text(texto)
+        Text(texto.localized)
             .font(.callout.weight(.bold))
             .foregroundStyle(PapagaioTema.textoSecundario)
+            .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             .frame(width: largura, alignment: alinhamento)
             .frame(maxWidth: largura == nil ? .infinity : nil, alignment: alinhamento)
     }
@@ -131,19 +133,19 @@ struct LinhaDeMembroDaEquipe: View {
                     Text(membro.nome)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(PapagaioTema.texto)
-                    Text(membro.eProprietario ? "Conta proprietária" : "Participante aceito")
+                    Text(membro.eProprietario ? "Conta proprietária".localized : "Participante aceito".localized)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
             }
             .frame(width: 300, alignment: .leading)
 
-            Text("Apple Account compartilhada")
+            Text("Apple Account compartilhada".localized)
                 .font(.title3)
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .frame(width: 330, alignment: .leading)
 
-            Text(membro.descricaoDaPermissao)
+            Text(membro.descricaoDaPermissao.localized)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .padding(.horizontal, PapagaioTema.Espaco.largo)
@@ -155,10 +157,10 @@ struct LinhaDeMembroDaEquipe: View {
 
             if podeGerenciar || membro.eAtual {
                 Menu {
-                    Button("Editar nome", systemImage: "pencil", action: aoEditarNome)
+                    Button("Editar nome".localized, systemImage: "pencil", action: aoEditarNome)
                     if podeGerenciar && !membro.eProprietario {
-                        Button("Alterar permissão", systemImage: "lock", action: aoEditar)
-                        Button("Remover", systemImage: "trash", role: .destructive, action: aoRemover)
+                        Button("Alterar permissão".localized, systemImage: "lock", action: aoEditar)
+                        Button("Remover".localized, systemImage: "trash", role: .destructive, action: aoRemover)
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -168,7 +170,7 @@ struct LinhaDeMembroDaEquipe: View {
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .foregroundStyle(PapagaioTema.textoSecundario)
-                .help("Ações")
+                .help("Ações".localized)
             } else {
                 Text("—")
                     .foregroundStyle(PapagaioTema.textoSecundario)

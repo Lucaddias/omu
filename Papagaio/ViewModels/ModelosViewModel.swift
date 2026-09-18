@@ -50,7 +50,7 @@ final class ModelosViewModel {
             pastaEscolhida = PastaDeModelosDoUsuario.resolver()
             erro = nil
         } catch {
-            erro = "Não foi possível guardar a pasta escolhida: \(error)"
+            erro = "Não foi possível guardar a pasta escolhida: %@".localized(error.localizedDescription)
         }
         verificar()
     }
@@ -72,8 +72,7 @@ final class ModelosViewModel {
         // usuário está ativa deixaria um peso em cada lugar, e os motores só
         // olham para uma pasta.
         guard pastaEscolhida == nil else {
-            erro = "Falta um modelo na pasta escolhida. Complete a pasta, "
-                + "ou volte a usar a pasta do app para baixar."
+            erro = "Falta um modelo na pasta escolhida. Complete a pasta ou volte a usar a pasta do app para baixar.".localized
             return
         }
         let pesos = faltando

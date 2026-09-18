@@ -189,9 +189,9 @@ struct BibliotecaHomeView: View {
     private var ajudaDaBiblioteca: some View {
         BotaoDeAjudaPapagaio(
             texto: filtroSelecionado == .pastas
-                ? "Gerencie suas pastas de conversas."
-                : "Gerencie suas transcrições e insights de conversas.",
-            ajuda: "Sobre a biblioteca",
+                ? "Gerencie suas pastas de conversas.".localized
+                : "Gerencie suas transcrições e insights de conversas.".localized,
+            ajuda: "Sobre a biblioteca".localized,
             largura: 300
         )
     }
@@ -202,7 +202,7 @@ struct BibliotecaHomeView: View {
     /// lacuna sem trocar o título principal, que continua sendo o nome da
     /// seção mesmo dentro do filtro.
     private var tituloDaBibliotecaComFiltro: String {
-        filtroSelecionado == .pastas ? "Biblioteca de Conversas (Pastas)" : "Biblioteca de Conversas"
+        filtroSelecionado == .pastas ? "Biblioteca de Conversas (Pastas)".localized : "Biblioteca de Conversas".localized
     }
 
     private func atalhosDaBiblioteca(somenteIcone: Bool = false) -> some View {
@@ -293,13 +293,17 @@ struct BibliotecaHomeView: View {
         return AnyView(
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
                 HStack {
-                    Label("Próximas 24h", systemImage: "calendar.badge.clock")
+                    Label("Próximas 24h".localized, systemImage: "calendar.badge.clock")
                         .font(PapagaioTema.Tipo.tituloDeSecao)
                         .foregroundStyle(PapagaioTema.destaqueEscuro)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     Spacer()
-                    Text("\(googleCalendar.reunioesPendentes.count) reun\(googleCalendar.reunioesPendentes.count == 1 ? "ião" : "iões")")
+                    Text(googleCalendar.reunioesPendentes.count == 1 ? "1 reunião".localized : String(format: "%d reuniões".localized, googleCalendar.reunioesPendentes.count))
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -391,7 +395,7 @@ CartaoReuniaoPendente(
         // ("2 participantes"): nomes já são cobertos por entrevistado(es)
         // abaixo, mas "quantos eram" também é uma forma válida de lembrar.
         let participantes = metadados.participantes.map {
-            $0 == 1 ? "1 participante" : "\($0) participantes"
+            $0 == 1 ? "1 participante".localized : String(format: "%d participantes".localized, $0)
         } ?? ""
 
         if titulo.casaComBusca(termo)
@@ -432,19 +436,19 @@ CartaoReuniaoPendente(
         switch secaoSelecionada {
         case .todos:
             emCaptura
-                ? "Grave, transcreva e revise suas conversas."
-                : "Gerencie suas transcrições e insights de conversas."
+                ? "Grave, transcreva e revise suas conversas.".localized
+                : "Gerencie suas transcrições e insights de conversas.".localized
         case .lixeira:
-            "Gerencie conversas excluídas. Itens na lixeira serão removidos permanentemente após 30 dias."
+            "Gerencie conversas excluídas. Itens na lixeira serão removidos permanentemente após 30 dias.".localized
         }
     }
 
     private var tituloDaPagina: String {
         switch secaoSelecionada {
         case .todos:
-            emCaptura ? "Gravações" : "Biblioteca de Conversas"
+            emCaptura ? "Gravações".localized : "Biblioteca de Conversas".localized
         case .lixeira:
-            "Lixeira"
+            "Lixeira".localized
         }
     }
 
@@ -558,8 +562,8 @@ CartaoReuniaoPendente(
             do {
                 let pacote = try await pacoteDaPasta(nome)
                 let painel = NSOpenPanel()
-                painel.title = "Escolha onde salvar a pasta \(nome)"
-                painel.prompt = "Salvar aqui"
+                painel.title = String(format: "Escolha onde salvar a pasta %@".localized, nome)
+                painel.prompt = "Salvar aqui".localized
                 painel.canChooseFiles = false
                 painel.canChooseDirectories = true
                 painel.canCreateDirectories = true
@@ -758,10 +762,12 @@ CartaoReuniaoPendente(
             // filtrada, com o mesmo termo ainda casando o nome da pasta aberta.
             if pastaSelecionada == nil, filtroSelecionado != .pastas, !pastasEncontradas.isEmpty {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                    Text("Pastas")
+                    Text("Pastas".localized)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .textCase(.uppercase)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
 
                     GradeDePastas(
                         pastas: pastasEncontradas,
@@ -857,7 +863,7 @@ CartaoReuniaoPendente(
                             // visível e recuperável numa nova tentativa.
                             LixeiraDeTarefas.restaurarTudo(arquivos: biblioteca.arquivos)
                             if !LixeiraDeMidia.restaurarTudo() {
-                                erroDaLixeiraDeMidia = "Um ou mais anexos não puderam ser restaurados. Revise os itens restantes na lixeira."
+                                erroDaLixeiraDeMidia = "Um ou mais anexos não puderam ser restaurados. Revise os itens restantes na lixeira.".localized
                             }
                             atualizarPreferenciasVisuais()
                         }
@@ -976,31 +982,31 @@ CartaoReuniaoPendente(
                 }
             }
         } message: {
-            Text("Essa ação remove o áudio, a transcrição e o resumo do Mac e não pode ser desfeita.")
+            Text("Essa ação remove o áudio, a transcrição e o resumo do Mac e não pode ser desfeita.".localized)
         }
-        .alert("Não foi possível concluir", isPresented: Binding(
+        .alert("Não foi possível concluir".localized, isPresented: Binding(
             get: { erroDaLixeiraDeMidia != nil },
             set: { if !$0 { erroDaLixeiraDeMidia = nil } }
         )) {
-            Button("OK", role: .cancel) { erroDaLixeiraDeMidia = nil }
+            Button("OK".localized, role: .cancel) { erroDaLixeiraDeMidia = nil }
         } message: {
-            Text(erroDaLixeiraDeMidia ?? "")
+            Text((erroDaLixeiraDeMidia ?? "").localized)
         }
-        .alert("Não foi possível exportar", isPresented: Binding(
+        .alert("Não foi possível exportar".localized, isPresented: Binding(
             get: { erroDeExportacao != nil },
             set: { if !$0 { erroDeExportacao = nil } }
         )) {
-            Button("OK", role: .cancel) { erroDeExportacao = nil }
+            Button("OK".localized, role: .cancel) { erroDeExportacao = nil }
         } message: {
-            Text(erroDeExportacao ?? "")
+            Text((erroDeExportacao ?? "").localized)
         }
         .confirmationDialog(
-            "Esvaziar lixeira?",
+            "Esvaziar lixeira?".localized,
             isPresented: $confirmandoEsvaziarLixeira,
             titleVisibility: .visible
         ) {
             if let biblioteca {
-                Button("Esvaziar lixeira", role: .destructive) {
+                Button("Esvaziar lixeira".localized, role: .destructive) {
                     Task { @MainActor in
                         await biblioteca.esvaziarLixeira()
                         // A exclusão de conversas parou em uma falha. Tarefas,
@@ -1021,18 +1027,18 @@ CartaoReuniaoPendente(
                     }
                 }
             }
-            Button("Cancelar", role: .cancel) {}
+            Button("Cancelar".localized, role: .cancel) {}
         } message: {
-            Text("Essa ação remove permanentemente todos os arquivos da lixeira e não pode ser desfeita.")
+            Text("Essa ação remove permanentemente todos os arquivos da lixeira e não pode ser desfeita.".localized)
         }
-        .alert("Não foi possível concluir a operação", isPresented: apresentandoErroDaLixeira) {
-            Button("OK", role: .cancel) { biblioteca?.dispensarErroDaLixeira() }
+        .alert("Não foi possível concluir a operação".localized, isPresented: apresentandoErroDaLixeira) {
+            Button("OK".localized, role: .cancel) { biblioteca?.dispensarErroDaLixeira() }
         } message: {
-            Text(biblioteca?.erroDaLixeira ?? "")
+            Text((biblioteca?.erroDaLixeira ?? "").localized)
         }
-        .alert("Criar pasta", isPresented: $criandoPasta) {
-            TextField("Nome da pasta", text: $novaPasta)
-            Button("Criar") {
+        .alert("Criar pasta".localized, isPresented: $criandoPasta) {
+            TextField("Nome da pasta".localized, text: $novaPasta)
+            Button("Criar".localized) {
                 let nome = novaPasta.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !nome.isEmpty else { return }
                 PreferenciasVisuaisDoArquivo.criarPasta(nome)
@@ -1043,11 +1049,11 @@ CartaoReuniaoPendente(
                 novaPasta = ""
                 atualizarPreferenciasVisuais()
             }
-            Button("Cancelar", role: .cancel) {
+            Button("Cancelar".localized, role: .cancel) {
                 novaPasta = ""
             }
         } message: {
-            Text("A pasta ficará disponível para organizar conversas.")
+            Text("A pasta ficará disponível para organizar conversas.".localized)
         }
     }
 
@@ -1120,7 +1126,7 @@ CartaoReuniaoPendente(
             if !emCaptura,
                (filtroSelecionado != .pastas || pastaSelecionada != nil),
                biblioteca?.arquivos.isEmpty ?? true {
-                Text("A primeira conversa aparecerá aqui depois de gravar ou importar um áudio.")
+                Text("A primeira conversa aparecerá aqui depois de gravar ou importar um áudio.".localized)
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -1132,16 +1138,16 @@ CartaoReuniaoPendente(
             if (biblioteca?.arquivosNaLixeira.isEmpty ?? true) && !temPendentesIgnoradas && tarefasNaLixeira.isEmpty && midiasNaLixeira.isEmpty && pastasNaLixeira.isEmpty {
                 CartaoDeEstadoVazio(
                     simbolo: "trash",
-                    titulo: "A lixeira está vazia",
-                    mensagem: "Arquivos movidos da biblioteca aparecerão aqui e poderão ser recuperados."
+                    titulo: "A lixeira está vazia".localized,
+                    mensagem: "Arquivos movidos da biblioteca aparecerão aqui e poderão ser recuperados.".localized
                 )
                 .frame(minHeight: 280)
                 .cartaoPapagaio()
             } else if arquivosFiltrados.isEmpty && !temPendentesIgnoradas && tarefasNaLixeira.isEmpty && midiasNaLixeira.isEmpty && pastasNaLixeira.isEmpty {
                 CartaoDeEstadoVazio(
                     simbolo: "magnifyingglass",
-                    titulo: "Nenhum arquivo encontrado",
-                    mensagem: "Tente buscar por outro título na lixeira."
+                    titulo: "Nenhum arquivo encontrado".localized,
+                    mensagem: "Tente buscar por outro título na lixeira.".localized
                 )
                 .frame(minHeight: 220)
                 .cartaoPapagaio()
@@ -1152,7 +1158,7 @@ CartaoReuniaoPendente(
                 // clique de distância, sem rolar a lixeira inteira.
                 if let googleCalendar, !googleCalendar.reunioesIgnoradas.isEmpty {
                     VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-                        Label("Reuniões pendentes ignoradas", systemImage: "calendar.badge.exclamationmark")
+                        Label("Reuniões pendentes ignoradas".localized, systemImage: "calendar.badge.exclamationmark")
                             .font(PapagaioTema.Tipo.tituloDeSecao)
                             .foregroundStyle(PapagaioTema.aviso)
 
@@ -1204,7 +1210,7 @@ CartaoReuniaoPendente(
                                 // Falha silenciosa aqui foi o que fez o player
                                 // ficar mudo sem ninguém entender o motivo.
                                 if !LixeiraDeMidia.restaurar(item) {
-                                    erroDaLixeiraDeMidia = "Não foi possível devolver “\(item.nome)” para a conversa. O arquivo pode ter sido movido ou apagado por fora do app."
+                                    erroDaLixeiraDeMidia = "Não foi possível devolver “%@” para a conversa. O arquivo pode ter sido movido ou apagado por fora do app.".localized(item.nome)
                                 }
                                 atualizarPreferenciasVisuais()
                             },
@@ -1212,7 +1218,7 @@ CartaoReuniaoPendente(
                                 do {
                                     try LixeiraDeMidia.remover(item)
                                 } catch {
-                                    erroDaLixeiraDeMidia = "Não foi possível apagar “\(item.nome)”: \(error.localizedDescription)"
+                                    erroDaLixeiraDeMidia = "Não foi possível apagar “%@”: %@".localized(item.nome, error.localizedDescription)
                                 }
                                 atualizarPreferenciasVisuais()
                             },
@@ -1342,18 +1348,18 @@ CartaoReuniaoPendente(
     }
 
     private var tituloDoVazio: String {
-        if let pastaSelecionada { return "A pasta \(pastaSelecionada) está vazia" }
-        if atalhoSelecionado == .favoritos { return "Nenhum favorito ainda" }
-        return "Nenhuma conversa encontrada"
+        if let pastaSelecionada { return "A pasta %@ está vazia".localized(pastaSelecionada) }
+        if atalhoSelecionado == .favoritos { return "Nenhum favorito ainda".localized }
+        return "Nenhuma conversa encontrada".localized
     }
 
     private var mensagemDoVazio: String {
         if pastaSelecionada != nil {
-            return "Use Mover para pasta no menu de um card para organizar conversas aqui."
+            return "Use Mover para pasta no menu de um card para organizar conversas aqui.".localized
         }
         if atalhoSelecionado == .favoritos {
-            return "Favorite uma conversa pelo botão de estrela para ela aparecer aqui."
+            return "Favorite uma conversa pelo botão de estrela para ela aparecer aqui.".localized
         }
-        return "Tente buscar por outro título ou estado de processamento."
+        return "Tente buscar por outro título ou estado de processamento.".localized
     }
 }

@@ -20,25 +20,25 @@ enum ErroOAuthGoogle: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .credenciaisNaoConfiguradas:
-            return "Client ID do Google não configurado. Configure-o no arquivo local do projeto."
+            return "Client ID do Google não configurado. Configure-o no arquivo local do projeto.".localized
         case .autorizacaoNegada:
-            return "Autorização cancelada ou recusada no navegador."
+            return "Autorização cancelada ou recusada no navegador.".localized
         case .semCodigoDeAutorizacao:
-            return "O navegador voltou sem o código de autorização. Tente de novo."
+            return "O navegador voltou sem o código de autorização. Tente de novo.".localized
         case .respostaInvalida:
-            return "O servidor do Google respondeu de forma inesperada."
+            return "O servidor do Google respondeu de forma inesperada.".localized
         case let .servidor(mensagem):
-            return "O servidor respondeu: \(mensagem)."
+            return "O servidor respondeu: %@.".localized(mensagem)
         case .semRefreshToken:
-            return "A sessão expirou e não há refresh token. Conecte de novo."
+            return "A sessão expirou e não há refresh token. Conecte de novo.".localized
         case .navegadorNaoAbriu:
-            return "O navegador não abriu — confira se o Ōmu pode abrir janelas e tente de novo."
+            return "O navegador não abriu — confira se o Ōmu pode abrir janelas e tente de novo.".localized
         case .tempoEsgotado:
-            return "Tempo esgotado esperando sua autorização — volte ao navegador e tente de novo."
+            return "Tempo esgotado esperando sua autorização — volte ao navegador e tente de novo.".localized
         case let .servidorLocalFalhou(msg):
-            return "Falha ao iniciar servidor local para OAuth: \(msg)"
+            return "Falha ao iniciar servidor local para OAuth: %@".localized(msg)
         case .estadoAusente, .estadoInvalido:
-            return "O retorno de autorização não corresponde à conexão iniciada. Tente conectar novamente."
+            return "O retorno de autorização não corresponde à conexão iniciada. Tente conectar novamente.".localized
         }
     }
 }
@@ -207,7 +207,7 @@ final class SessaoOAuthGoogle: Sendable {
             URLQueryItem(name: "state", value: estado),
             URLQueryItem(name: "scope", value: escopos),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent"),
+            URLQueryItem(name: "prompt", value: "none"),
         ]
         componentes.queryItems = itens
         guard let url = componentes.url else {
@@ -358,12 +358,15 @@ actor ServidorOAuthLocal {
 
     private let estadoEsperado: String
     private var listener: FileHandle?
+    private var conexao = ConexaoOAuthLocal()
 
     init(estadoEsperado: String) {
         self.estadoEsperado = estadoEsperado
     }
 
     func iniciar() async throws -> Int {
+        parar()
+        conexao = ConexaoOAuthLocal()
         let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
         guard socket >= 0 else {
             throw ErroOAuthGoogle.servidorLocalFalhou("socket falhou")
@@ -414,7 +417,7 @@ actor ServidorOAuthLocal {
         guard let listener else {
             throw ErroOAuthGoogle.servidorLocalFalhou("servidor não iniciado")
         }
-        let socket = listener.fileDescriptor
+        let conexao = self.conexao
         let estadoEsperado = self.estadoEsperado
 
         return try await withTaskCancellationHandler {
@@ -422,7 +425,8 @@ actor ServidorOAuthLocal {
                 Self.filaDeSocket.async {
                     do {
                         let codigo = try Self.receberCallback(
-                            no: socket,
+                            no: listener.fileDescriptor,
+                            conexao: conexao,
                             estadoEsperado: estadoEsperado
                         )
                         continuacao.resume(returning: codigo)
@@ -432,15 +436,18 @@ actor ServidorOAuthLocal {
                 }
             }
         } onCancel: {
-            Task { await self.parar() }
+            conexao.cancelar()
+            Darwin.shutdown(listener.fileDescriptor, SHUT_RDWR)
         }
     }
 
     func parar() {
+        conexao.cancelar()
         if let descritor = listener?.fileDescriptor, descritor >= 0 {
             Darwin.shutdown(descritor, SHUT_RDWR)
         }
-        listener?.closeFile()
+        // O worker retém o FileHandle até sair do accept. Fechá-lo aqui
+        // permitiria que o sistema reutilizasse o descritor antes do worker.
         listener = nil
     }
 
@@ -476,6 +483,7 @@ actor ServidorOAuthLocal {
 
     nonisolated private static func receberCallback(
         no socket: Int32,
+        conexao: ConexaoOAuthLocal,
         estadoEsperado: String
     ) throws -> String {
         var endereco = sockaddr_in()
@@ -488,10 +496,11 @@ actor ServidorOAuthLocal {
         guard cliente >= 0 else {
             throw CancellationError()
         }
-        defer {
-            Darwin.shutdown(cliente, SHUT_RDWR)
+        guard conexao.registrar(cliente) else {
             Darwin.close(cliente)
+            throw CancellationError()
         }
+        defer { conexao.fechar() }
         var semSIGPIPE = 1
         setsockopt(
             cliente,
@@ -501,11 +510,18 @@ actor ServidorOAuthLocal {
             socklen_t(MemoryLayout<Int>.size)
         )
 
-        var buffer = [UInt8](repeating: 0, count: 8_192)
-        let quantidade = Darwin.read(cliente, &buffer, buffer.count)
-        guard quantidade > 0,
-              let requisicao = String(bytes: buffer.prefix(quantidade), encoding: .utf8)
-        else {
+        var dados = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        // TCP pode dividir a primeira linha em vários pacotes. O limite
+        // restringe memória; cancelar fecha também a conexão já aceita.
+        while dados.count < 8_192 && dados.range(of: Data("\r\n\r\n".utf8)) == nil {
+            let quantidade = Darwin.read(cliente, &buffer, min(buffer.count, 8_192 - dados.count))
+            if conexao.cancelada { throw CancellationError() }
+            guard quantidade > 0 else { throw ErroOAuthGoogle.respostaInvalida }
+            dados.append(contentsOf: buffer.prefix(quantidade))
+        }
+        guard dados.range(of: Data("\r\n\r\n".utf8)) != nil,
+              let requisicao = String(data: dados, encoding: .utf8) else {
             try? enviarResposta(status: "400 Bad Request", no: cliente)
             throw ErroOAuthGoogle.respostaInvalida
         }
@@ -528,9 +544,11 @@ actor ServidorOAuthLocal {
         no socket: Int32
     ) throws {
         let sucesso = status.hasPrefix("200")
-        let corpo = sucesso
-            ? "<html><body><h1>Autorização concluída</h1><p>Pode fechar esta janela e voltar ao Ōmu.</p></body></html>"
-            : "<html><body><h1>Autorização recusada</h1><p>Volte ao Ōmu e tente novamente.</p></body></html>"
+        let titulo = sucesso ? "Autorização concluída".localized : "Autorização recusada".localized
+        let mensagem = sucesso
+            ? "Pode fechar esta janela e voltar ao Ōmu.".localized
+            : "Volte ao Ōmu e tente novamente.".localized
+        let corpo = "<html><body><h1>\(titulo)</h1><p>\(mensagem)</p></body></html>"
         let corpoData = Data(corpo.utf8)
         var resposta = Data("HTTP/1.1 \(status)\r\n".utf8)
         resposta.append(Data("Content-Type: text/html; charset=utf-8\r\n".utf8))
@@ -551,6 +569,42 @@ actor ServidorOAuthLocal {
                     throw ErroOAuthGoogle.servidorLocalFalhou("resposta HTTP falhou")
                 }
                 enviados += quantidade
+            }
+        }
+    }
+}
+
+/// A posse do socket aceito cruza a fila bloqueante e o cancelamento Swift.
+/// Shutdown desbloqueia read; só o worker fecha, sob a mesma trava, evitando
+/// fechar um descritor que o sistema já tenha reutilizado.
+private final class ConexaoOAuthLocal: @unchecked Sendable {
+    private let trava = NSLock()
+    private var cliente: Int32?
+    private var foiCancelada = false
+
+    var cancelada: Bool { trava.withLock { foiCancelada } }
+
+    func registrar(_ descritor: Int32) -> Bool {
+        trava.withLock {
+            guard !foiCancelada else { return false }
+            cliente = descritor
+            return true
+        }
+    }
+
+    func cancelar() {
+        trava.withLock {
+            foiCancelada = true
+            if let cliente { Darwin.shutdown(cliente, SHUT_RDWR) }
+        }
+    }
+
+    func fechar() {
+        trava.withLock {
+            if let cliente {
+                Darwin.shutdown(cliente, SHUT_RDWR)
+                Darwin.close(cliente)
+                self.cliente = nil
             }
         }
     }

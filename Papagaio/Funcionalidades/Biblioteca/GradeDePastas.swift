@@ -35,7 +35,7 @@ struct GradeDePastas: View {
                 HStack {
                     Spacer()
 
-                    Button("Nova pasta", systemImage: "folder.badge.plus", action: aoCriarPasta)
+                    Button("Nova pasta".localized, systemImage: "folder.badge.plus", action: aoCriarPasta)
                         .buttonStyle(BotaoDeContornoPapagaio())
                 }
             }
@@ -43,10 +43,10 @@ struct GradeDePastas: View {
             if pastas.isEmpty {
                 CartaoDeEstadoVazio(
                     simbolo: apenasFavoritas ? "star" : "folder",
-                    titulo: apenasFavoritas ? "Nenhuma pasta favorita" : "Nenhuma pasta ainda",
-                    mensagem: apenasFavoritas
+                    titulo: (apenasFavoritas ? "Nenhuma pasta favorita" : "Nenhuma pasta ainda").localized,
+                    mensagem: (apenasFavoritas
                         ? "Toque na estrela de uma pasta para ela aparecer aqui."
-                        : "Crie uma pasta para organizar conversas por projeto, cliente ou tema."
+                        : "Crie uma pasta para organizar conversas por projeto, cliente ou tema.").localized
                 )
                 .frame(minHeight: 220)
                 .cartaoPapagaio()
@@ -74,7 +74,7 @@ struct GradeDePastas: View {
                 }
             }
         }
-        .accessibilityLabel("Pastas da biblioteca")
+        .accessibilityLabel("Pastas da biblioteca".localized)
     }
 }
 
@@ -176,6 +176,7 @@ struct CartaoDePasta: View {
                         // de texto do tema, como qualquer outro cartão dele.
                         .foregroundStyle(corDoTextoPrincipal)
                         .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                         .truncationMode(.tail)
 
                     // A contagem de volta à face da fileira: escondida só no
@@ -185,6 +186,7 @@ struct CartaoDePasta: View {
                         .font(.caption)
                         .foregroundStyle(corDoTextoSecundario)
                         .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 }
 
                 Spacer(minLength: PapagaioTema.Espaco.curto)
@@ -244,28 +246,28 @@ struct CartaoDePasta: View {
         // perto de abrir, e um segundo alvo clicável dentro de um cartão que
         // inteiro já é um botão confunde quem só quer entrar na pasta.
         .contextMenu {
-            Button("Editar…", systemImage: "pencil") {
+            Button("Editar…".localized, systemImage: "pencil") {
                 escolhendoAparencia = true
             }
 
-            Button("Apagar pasta", systemImage: "trash", role: .destructive) {
+            Button("Apagar pasta".localized, systemImage: "trash", role: .destructive) {
                 confirmandoExclusao = true
             }
         }
         .confirmationDialog(
-            "Apagar a pasta \(pasta.nome)?",
+            "Apagar a pasta %@?".localized(pasta.nome),
             isPresented: $confirmandoExclusao,
             titleVisibility: .visible
         ) {
-            Button("Apagar pasta", role: .destructive, action: aoApagar)
-            Button("Cancelar", role: .cancel) {}
+            Button("Apagar pasta".localized, role: .destructive, action: aoApagar)
+            Button("Cancelar".localized, role: .cancel) {}
         } message: {
             // O texto tira o susto: a palavra "apagar" ao lado de um número de
             // conversas faz qualquer um imaginar que elas vão junto.
             Text(
                 pasta.quantidade == 0
-                    ? "A pasta é só um rótulo. Nada mais será removido."
-                    : "As \(pasta.quantidade) conversas continuam na biblioteca — só deixam de estar nesta pasta."
+                    ? "A pasta é só um rótulo. Nada mais será removido.".localized
+                    : "As %d conversas continuam na biblioteca — só deixam de estar nesta pasta.".localized(pasta.quantidade)
             )
         }
         .popover(isPresented: $escolhendoAparencia, arrowEdge: .bottom) {
@@ -299,26 +301,26 @@ struct CartaoDePasta: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Ações da pasta")
+            .help("Ações da pasta".localized)
             .popover(isPresented: $menuAberto, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 0) {
                     ItemDoMenuDeArquivo(
                         simbolo: favorita ? "star.slash" : "star",
-                        titulo: favorita ? "Desfavoritar" : "Favoritar"
+                        titulo: (favorita ? "Desfavoritar" : "Favoritar").localized
                     ) {
                         menuAberto = false
                         favorita.toggle()
                         AparenciaDasPastas.definirFavorita(favorita, para: pasta.nome)
                     }
 
-                    ItemDoMenuDeArquivo(simbolo: "arrow.down.circle", titulo: "Baixar") {
+                    ItemDoMenuDeArquivo(simbolo: "arrow.down.circle", titulo: "Baixar".localized) {
                         menuAberto = false
                         DispatchQueue.main.async { aoBaixar() }
                     }
                     // Um "Editar" só: o popover que ele abre já tem o nome, a
                     // cor e a imagem. Dois itens abrindo exatamente a mesma
                     // tela obrigavam a escolher entre eles sem diferença.
-                    ItemDoMenuDeArquivo(simbolo: "pencil", titulo: "Editar") {
+                    ItemDoMenuDeArquivo(simbolo: "pencil", titulo: "Editar".localized) {
                         menuAberto = false
                         DispatchQueue.main.async { escolhendoAparencia = true }
                     }
@@ -328,7 +330,7 @@ struct CartaoDePasta: View {
                         .padding(.horizontal, PapagaioTema.Espaco.medio)
                         .padding(.vertical, PapagaioTema.Espaco.minimo)
 
-                    ItemDoMenuDeArquivo(simbolo: "square.and.arrow.up", titulo: "Compartilhar") {
+                    ItemDoMenuDeArquivo(simbolo: "square.and.arrow.up", titulo: "Compartilhar".localized) {
                         menuAberto = false
                         DispatchQueue.main.async { aoCompartilhar() }
                     }
@@ -338,7 +340,7 @@ struct CartaoDePasta: View {
 
                     ItemDoMenuDeArquivo(
                         simbolo: "trash",
-                        titulo: "Mover para Lixeira",
+                        titulo: "Mover para Lixeira".localized,
                         destrutivo: true
                     ) {
                         menuAberto = false
@@ -409,7 +411,7 @@ struct CartaoDePasta: View {
     }
 
     private var textoDaQuantidade: String {
-        pasta.quantidade == 1 ? "1 conversa" : "\(pasta.quantidade) conversas"
+        pasta.quantidade == 1 ? "1 conversa".localized : "%d conversas".localized(pasta.quantidade)
     }
 
     private func sincronizar() {
@@ -474,8 +476,10 @@ struct CabecalhoDaPastaAberta: View {
             // Seta à esquerda, como em qualquer navegação: é o gesto que a
             // pessoa já tem no dedo antes de aprender esta tela.
             Button(action: aoVoltar) {
-                Label("Pastas", systemImage: "chevron.left")
+                Label("Pastas".localized, systemImage: "chevron.left")
                     .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                     // Na cor da pasta aberta, e não mais fixo no coral da
                     // marca — o mesmo acento que já identifica essa pasta no
                     // ícone e na fileira da grade. A cor **crua**, e não
@@ -491,7 +495,7 @@ struct CabecalhoDaPastaAberta: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .help("Voltar para todas as pastas")
+            .help("Voltar para todas as pastas".localized)
 
             HStack(spacing: PapagaioTema.Espaco.curto) {
                 marca
@@ -500,10 +504,13 @@ struct CabecalhoDaPastaAberta: View {
                     .font(.title3.weight(.bold))
                     .foregroundStyle(PapagaioTema.texto)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
-                Text(quantidade == 1 ? "1 conversa" : "\(quantidade) conversas")
+                Text(quantidade == 1 ? "1 conversa".localized : "%d conversas".localized(quantidade))
                     .font(.callout.weight(.medium))
                     .foregroundStyle(PapagaioTema.textoSecundario)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
             Spacer(minLength: 0)
@@ -549,14 +556,14 @@ struct AparenciaDaPastaPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-            Text("Nome")
+            Text("Nome".localized)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .textCase(.uppercase)
 
             // Renomear mora aqui, e não num diálogo próprio: trocar o nome e
             // trocar a cor são a mesma tarefa — "arrumar esta pasta".
-            TextField("Nome da pasta", text: $nomeDigitado)
+            TextField("Nome da pasta".localized, text: $nomeDigitado)
                 .textFieldStyle(.plain)
                 .font(.callout)
                 .onSubmit { aoRenomear(nomeDigitado) }
@@ -570,7 +577,7 @@ struct AparenciaDaPastaPopover: View {
 
             SeparadorPapagaio()
 
-            Text("Cor")
+            Text("Cor".localized)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .textCase(.uppercase)
@@ -596,7 +603,7 @@ struct AparenciaDaPastaPopover: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .help(opcao.titulo)
+                    .help(opcao.titulo.localized)
                 }
             }
 
@@ -627,17 +634,17 @@ struct AparenciaDaPastaPopover: View {
             if modelo == .comCapa {
                 SeparadorPapagaio()
 
-                Text("Imagem")
+                Text("Imagem".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .textCase(.uppercase)
 
                 HStack(spacing: PapagaioTema.Espaco.curto) {
-                    Button(capa == nil ? "Escolher imagem…" : "Trocar imagem…", action: escolherImagem)
+                    Button((capa == nil ? "Escolher imagem…" : "Trocar imagem…").localized, action: escolherImagem)
                         .buttonStyle(BotaoDeContornoPapagaio())
 
                     if capa != nil {
-                        Button("Remover", systemImage: "trash") {
+                        Button("Remover".localized, systemImage: "trash") {
                             AparenciaDasPastas.removerCapa(de: pasta)
                             capa = nil
                         }
@@ -695,8 +702,8 @@ struct AparenciaDaPastaPopover: View {
 
     private func escolherImagem() {
         let painel = NSOpenPanel()
-        painel.title = "Escolha uma imagem para a pasta"
-        painel.prompt = "Usar imagem"
+        painel.title = "Escolha uma imagem para a pasta".localized
+        painel.prompt = "Usar imagem".localized
         painel.canChooseFiles = true
         painel.canChooseDirectories = false
         painel.allowsMultipleSelection = false

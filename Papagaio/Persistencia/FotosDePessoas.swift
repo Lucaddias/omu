@@ -170,8 +170,8 @@ enum FotosDePessoas {
     @discardableResult
     static func escolherImagem(para nome: String) -> Bool {
         let painel = NSOpenPanel()
-        painel.title = "Escolha uma foto para \(nome)"
-        painel.prompt = "Usar foto"
+        painel.title = "Escolha uma foto para %@".localized(nome)
+        painel.prompt = "Usar foto".localized
         painel.canChooseFiles = true
         painel.canChooseDirectories = false
         painel.allowsMultipleSelection = false

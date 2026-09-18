@@ -165,3 +165,30 @@ private final class CofreOAuthGoogleEmMemoria: CofreDeTokensOAuthGoogle, @unchec
         }
     }
 }
+
+@Test("Cancelar OAuth também desbloqueia cliente conectado que não envia cabeçalho")
+func cancelarOAuthComClienteSilencioso() async throws {
+    let servidor = ServidorOAuthLocal(estadoEsperado: "estado")
+    let porta = try await servidor.iniciar()
+    let cliente = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+    guard cliente >= 0 else { throw ErroOAuthGoogle.respostaInvalida }
+    defer { Darwin.close(cliente) }
+    var endereco = sockaddr_in()
+    endereco.sin_family = sa_family_t(AF_INET)
+    endereco.sin_addr.s_addr = inet_addr("127.0.0.1")
+    endereco.sin_port = UInt16(porta).bigEndian
+    let conectado = withUnsafePointer(to: &endereco) {
+        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            Darwin.connect(cliente, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+        }
+    }
+    #expect(conectado == 0)
+    let espera = Task { try await servidor.aguardarCodigo() }
+    try await Task.sleep(for: .milliseconds(50))
+    espera.cancel()
+    do {
+        _ = try await espera.value
+        Issue.record("Callback silencioso não respeitou cancelamento")
+    } catch { #expect(error is CancellationError) }
+    await servidor.parar()
+}

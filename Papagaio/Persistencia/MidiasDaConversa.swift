@@ -25,8 +25,8 @@ enum MidiasDaConversa {
         let bookmark: Data
     }
 
-    static func carregar(_ arquivoID: ArquivoID) -> [AnexoDeMidiaDaConversa] {
-        guard let dados = UserDefaults.standard.data(forKey: chave(arquivoID)),
+    static func carregar(_ arquivoID: ArquivoID, em defaults: UserDefaults = .standard) -> [AnexoDeMidiaDaConversa] {
+        guard let dados = defaults.data(forKey: chave(arquivoID)),
               let registros = try? JSONDecoder().decode([Registro].self, from: dados)
         else { return [] }
 
@@ -147,7 +147,7 @@ enum MidiasDaConversa {
         }
     }
 
-    static func salvar(_ anexos: [AnexoDeMidiaDaConversa], para arquivoID: ArquivoID) throws {
+    static func salvar(_ anexos: [AnexoDeMidiaDaConversa], para arquivoID: ArquivoID, em defaults: UserDefaults = .standard) throws {
         let registros = try anexos.map { anexo in
             let bookmark = try anexo.url.bookmarkData(
                 options: .withSecurityScope,
@@ -163,7 +163,7 @@ enum MidiasDaConversa {
             )
         }
         let dados = try JSONEncoder().encode(registros)
-        UserDefaults.standard.set(dados, forKey: chave(arquivoID))
+        defaults.set(dados, forKey: chave(arquivoID))
     }
 
     static func removerTodas(em defaults: UserDefaults = .standard) {

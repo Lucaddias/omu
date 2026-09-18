@@ -39,8 +39,8 @@ struct PainelDeGravacao: View {
 
     private var medidores: some View {
         VStack(spacing: 5) {
-            medidorDeCanal("Microfone", icone: "mic.fill", amostras: waveform)
-            medidorDeCanal("Áudio do sistema", icone: "speaker.wave.2.fill", amostras: waveformSistema)
+            medidorDeCanal("Microfone".localized, icone: "mic.fill", amostras: waveform)
+            medidorDeCanal("Áudio do sistema".localized, icone: "speaker.wave.2.fill", amostras: waveformSistema)
         }
         .frame(minWidth: 190, maxWidth: .infinity)
     }
@@ -50,7 +50,10 @@ struct PainelDeGravacao: View {
             Label(titulo, systemImage: icone)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(PapagaioTema.textoSecundario)
-                .frame(width: 122, alignment: .leading)
+                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: 130, alignment: .leading)
             Waveform(amostras: amostras, ativo: !pausado)
                 .frame(height: 20)
         }
@@ -83,8 +86,8 @@ struct PainelDeGravacao: View {
     /// nunca gravou.
     private var botaoDeAjuda: some View {
         BotaoDeAjudaPapagaio(
-            texto: "Grave, transcreva e revise suas conversas. O áudio fica no seu Mac, e a transcrição começa assim que você finalizar.",
-            ajuda: "Sobre a gravação",
+            texto: "Grave, transcreva e revise suas conversas. O áudio fica no seu Mac, e a transcrição começa assim que você finalizar.".localized,
+            ajuda: "Sobre a gravação".localized,
             largura: 300
         )
     }
@@ -103,7 +106,7 @@ struct PainelDeGravacao: View {
 
     private var botoes: some View {
         Group {
-            Button(pausado ? "Continuar" : "Pausar", systemImage: pausado ? "play.fill" : "pause.fill") {
+            Button(pausado ? "Continuar".localized : "Pausar".localized, systemImage: pausado ? "play.fill" : "pause.fill") {
                 Task {
                     if pausado {
                         await aoContinuar()
@@ -114,12 +117,12 @@ struct PainelDeGravacao: View {
             }
             .buttonStyle(BotaoDeContornoPapagaio())
 
-            Button("Finalizar", systemImage: "stop.fill") {
+            Button("Finalizar".localized, systemImage: "stop.fill") {
                 Task { await aoFinalizar() }
             }
             .buttonStyle(BotaoPrincipalPapagaio())
 
-            Button("Cancelar", systemImage: "xmark") {
+            Button("Cancelar".localized, systemImage: "xmark") {
                 Task { await aoCancelar() }
             }
             .buttonStyle(BotaoDeContornoPapagaio())
@@ -135,7 +138,7 @@ struct AvisosDaGravacao: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
             ForEach(avisos, id: \.self) { aviso in
-                Label(aviso, systemImage: "exclamationmark.triangle.fill")
+                Label(aviso.localized, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.aviso)
             }
@@ -157,7 +160,7 @@ struct FalhaDaGravacao: View {
     let mensagem: String
 
     var body: some View {
-        Label(mensagem, systemImage: "xmark.octagon.fill")
+        Label(mensagem.localized, systemImage: "xmark.octagon.fill")
             .font(.callout)
             .foregroundStyle(PapagaioTema.perigo)
             .padding(PapagaioTema.Espaco.largo)

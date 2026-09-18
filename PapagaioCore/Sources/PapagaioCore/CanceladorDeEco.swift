@@ -10,7 +10,7 @@ import Accelerate
 /// **Pré-condições de uso:**
 /// - Ambos os sinais (microfone e sistema) devem estar em 16 kHz mono.
 /// - O sinal do sistema é o *reference*; o do microfone é o *input*.
-public final class CanceladorDeEco: @unchecked Sendable {
+public final class CanceladorDeEco {
 
     /// Tamanho do bloco processado por chamada.
     public let tamanhoBloco: Int
@@ -24,17 +24,11 @@ public final class CanceladorDeEco: @unchecked Sendable {
     /// Coeficientes do filtro adaptativo.
     private var filtros: [Float]
 
-    /// Energia do vetor de referência (para normalização NLMS).
-    private var energiaRef: Float = 1e-6
-
     /// Buffer circular com as últimas amostras de referência (sistema).
     private var refBuffer: [Float]
 
     /// Posição de escrita no buffer circular.
     private var refIdx: Int = 0
-
-    /// Contador de amostras desde a última estimativa de atraso.
-    private var contadorEstimativa: Int = 0
 
     // MARK: - Init
 
@@ -72,13 +66,13 @@ public final class CanceladorDeEco: @unchecked Sendable {
 
         var saida = [Float](repeating: 0, count: tamanhoBloco)
 
+        var refBloco = [Float](repeating: 0, count: comprimentoFiltro)
         for i in 0..<tamanhoBloco {
             // Insere a amostra de referência no buffer circular.
             let idx = (refIdx + i) % comprimentoFiltro
             refBuffer[idx] = blocoSistema[i]
 
             // Extrai o vetor de referência na ordem do filtro (mais recente → mais antigo).
-            var refBloco = [Float](repeating: 0, count: comprimentoFiltro)
             for j in 0..<comprimentoFiltro {
                 refBloco[j] = refBuffer[(idx &- j &+ comprimentoFiltro) % comprimentoFiltro]
             }
@@ -108,12 +102,29 @@ public final class CanceladorDeEco: @unchecked Sendable {
         return saida
     }
 
+    /// Processa um canal completo sem perder a cauda ou o último bloco parcial.
+    /// A referência ausente equivale a silêncio, preservando a memória do filtro.
+    func processar(microfone: [Float], sistema: [Float]) -> [Float] {
+        var saida: [Float] = []
+        saida.reserveCapacity(microfone.count)
+        for inicio in stride(from: 0, to: microfone.count, by: tamanhoBloco) {
+            let fim = min(inicio + tamanhoBloco, microfone.count)
+            var mic = Array(microfone[inicio..<fim])
+            mic.append(contentsOf: repeatElement(0, count: tamanhoBloco - mic.count))
+            var referencia = [Float](repeating: 0, count: tamanhoBloco)
+            if inicio < sistema.count {
+                let fimReferencia = min(inicio + tamanhoBloco, sistema.count)
+                referencia.replaceSubrange(0..<(fimReferencia - inicio), with: sistema[inicio..<fimReferencia])
+            }
+            saida.append(contentsOf: processar(blocoMicrofone: mic, blocoSistema: referencia).prefix(fim - inicio))
+        }
+        return saida
+    }
+
     /// Redefine o estado interno do cancelador.
     public func resetar() {
         filtros = [Float](repeating: 0, count: comprimentoFiltro)
         refBuffer = [Float](repeating: 0, count: comprimentoFiltro)
         refIdx = 0
-        energiaRef = 1e-6
-        contadorEstimativa = 0
     }
 }

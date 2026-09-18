@@ -27,12 +27,12 @@ struct EditorDeNomesDeVoz: View {
                 Image(systemName: "person.text.rectangle")
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
-                Text("Quem é quem?")
+                Text("Quem é quem?".localized)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
                 BotaoDeAjudaPapagaio(
-                    texto: "Dê um nome de verdade a cada voz identificada pela diarização. Isso atualiza todas as falas dela na transcrição de uma vez.",
-                    ajuda: "Sobre nomear vozes",
+                    texto: "Dê um nome de verdade a cada voz identificada pela diarização. Isso atualiza todas as falas dela na transcrição de uma vez.".localized,
+                    ajuda: "Sobre nomear vozes".localized,
                     largura: 300
                 )
             }
@@ -96,6 +96,9 @@ private struct CampoDeNomeDeVoz: View {
             Text(rotuloPadrao)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(PapagaioTema.textoSecundario)
+                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: true, vertical: false)
 
             TextField(rotuloPadrao, text: $texto)
                 .textFieldStyle(.plain)

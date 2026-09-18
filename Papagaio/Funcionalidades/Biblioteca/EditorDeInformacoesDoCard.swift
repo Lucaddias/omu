@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct EditorDeInformacoesDoCard: View {
+    /// Exemplo neutro e válido, usado ao cadastrar alguém da equipe.
+    ///
+    /// Não é um domínio corporativo real: o formulário não deve sugerir que a
+    /// pessoa precise ter e-mail em uma empresa para preencher a ficha.
+    static let emailSugeridoDaEquipe = "joao.santos@email.com"
+
     let modo: Modo
     @Binding var titulo: String
     @Binding var entrevistado: String
@@ -26,15 +32,15 @@ struct EditorDeInformacoesDoCard: View {
 
         var titulo: String {
             switch self {
-            case .nova: "Nova Entrevista"
-            case .edicao: "Editar informações"
+            case .nova: "Nova Entrevista".localized
+            case .edicao: "Editar informações".localized
             }
         }
 
         var subtitulo: String {
             switch self {
-            case .nova: "Configure os detalhes da sua nova sessão"
-            case .edicao: "Atualize os dados que aparecem no card e no cabeçalho."
+            case .nova: "Configure os detalhes da sua nova sessão".localized
+            case .edicao: "Atualize os dados que aparecem no card e no cabeçalho.".localized
             }
         }
 
@@ -43,8 +49,8 @@ struct EditorDeInformacoesDoCard: View {
             // Mesmo rótulo nos dois modos: o formulário não leva a lugar
             // nenhum, ele grava a ficha e fecha. "Continuar" prometia uma
             // próxima etapa que não existe.
-            case .nova: "Salvar informações"
-            case .edicao: "Salvar informações"
+            case .nova: "Salvar informações".localized
+            case .edicao: "Salvar informações".localized
             }
         }
     }
@@ -60,9 +66,13 @@ struct EditorDeInformacoesDoCard: View {
                     Text(modo.titulo)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(PapagaioTema.texto)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     Text(modo.subtitulo)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
 
                 Spacer()
@@ -71,7 +81,7 @@ struct EditorDeInformacoesDoCard: View {
                 // cinza ele lia como glifo do sistema, não como botão do app.
                 BotaoCircularPapagaio(
                     simbolo: "xmark",
-                    ajuda: "Fechar sem salvar",
+                    ajuda: "Fechar sem salvar".localized,
                     destaque: true,
                     acao: aoCancelar
                 )
@@ -85,8 +95,8 @@ struct EditorDeInformacoesDoCard: View {
             // formulário nem da altura da janela.
             ScrollView {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.secao) {
-                campo("Título da entrevista", obrigatorio: true) {
-                    TextField("Ex.: Entrevista com Stakeholders - UX Research", text: $titulo)
+                campo("Título da entrevista".localized, obrigatorio: true) {
+                    TextField("Ex.: Entrevista com Stakeholders - UX Research".localized, text: $titulo)
                         .textFieldStyle(.plain)
                         .campoPapagaio()
                 }
@@ -95,9 +105,9 @@ struct EditorDeInformacoesDoCard: View {
                 // é a continuação do "sobre o que é esta conversa". Em largura
                 // cheia e com várias linhas, porque uma linha só forçava a
                 // pessoa a resumir o resumo.
-                campo("Descrição") {
+                campo("Descrição".localized) {
                     TextField(
-                        "Adicione uma descrição",
+                        "Adicione uma descrição".localized,
                         text: $descricao,
                         axis: .vertical
                     )
@@ -107,18 +117,18 @@ struct EditorDeInformacoesDoCard: View {
                 }
 
                 PessoasDaFichaDaEntrevista(
-                    titulo: "Equipe",
+                    titulo: "Equipe".localized,
                     nome: $entrevistadores,
                     email: $emailDosEntrevistadores,
-                    placeholderNome: "Ex.: João Santos",
-                    placeholderEmail: "joao.santos@empresa.com"
+                    placeholderNome: "Ex.: João Santos".localized,
+                    placeholderEmail: Self.emailSugeridoDaEquipe
                 )
 
                 PessoasDaFichaDaEntrevista(
-                    titulo: "Externos",
+                    titulo: "Externos".localized,
                     nome: $entrevistado,
                     email: $emailDoEntrevistado,
-                    placeholderNome: "Ex.: Ana Silva",
+                    placeholderNome: "Ex.: Ana Silva".localized,
                     placeholderEmail: "ana.silva@email.com"
                 )
 
@@ -176,9 +186,9 @@ struct EditorDeInformacoesDoCard: View {
 
     private var textoDeParticipantes: String {
         switch participantesCalculados {
-        case 0: "Nenhum informado"
-        case 1: "1 participante"
-        default: "\(participantesCalculados) participantes"
+        case 0: "Nenhum informado".localized
+        case 1: "1 participante".localized
+        default: "%d participantes".localized(participantesCalculados)
         }
     }
 
@@ -192,19 +202,19 @@ struct EditorDeInformacoesDoCard: View {
 
     private var participantesEDuracao: some View {
         Group {
-            campo("Participantes") {
+            campo("Participantes".localized) {
                 valorCalculado(
                     textoDeParticipantes,
                     simbolo: participantesCalculados > 1 ? "person.2" : "person",
-                    ajuda: "Somado a partir dos nomes de Equipe e Externos."
+                    ajuda: "Somado a partir dos nomes de Equipe e Externos.".localized
                 )
             }
 
-            campo("Duração") {
+            campo("Duração".localized) {
                 valorCalculado(
                     duracao.isEmpty ? "—" : duracao,
                     simbolo: "clock",
-                    ajuda: "Vem da duração do áudio desta conversa."
+                    ajuda: "Vem da duração do áudio desta conversa.".localized
                 )
             }
         }
@@ -217,6 +227,7 @@ struct EditorDeInformacoesDoCard: View {
             Image(systemName: simbolo)
             Text(texto)
                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             Spacer(minLength: 0)
         }
         .font(.callout.weight(.semibold))
@@ -230,20 +241,20 @@ struct EditorDeInformacoesDoCard: View {
                 .stroke(PapagaioTema.borda.opacity(0.6), lineWidth: 1)
         }
         .help(ajuda)
-        .accessibilityLabel("\(texto). \(ajuda)")
+        .accessibilityLabel("%@. %@".localized(texto, ajuda))
     }
 
     private var campoDeData: some View {
-        campo("Data") {
+        campo("Data".localized) {
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                CampoDeDataPapagaio(data: $data, rotuloAcessivel: "Data da entrevista")
+                CampoDeDataPapagaio(data: $data, rotuloAcessivel: "Data da entrevista".localized)
 
                 // Só aparece em arquivos importados: aqui "Data" já é a data
                 // real da gravação, e esta legenda deixa claro que ela não é
                 // o dia em que o arquivo apareceu na biblioteca — os dois
                 // podem ser bem diferentes.
                 if let importadoEm {
-                    Text("Importado para o app em \(DataDigitada.texto(de: importadoEm))")
+                    Text("Importado para o app em %@".localized(DataDigitada.texto(de: importadoEm)))
                         .font(.caption)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
@@ -262,7 +273,7 @@ struct EditorDeInformacoesDoCard: View {
                 if obrigatorio {
                     Text("*")
                         .foregroundStyle(PapagaioTema.perigo)
-                        .accessibilityLabel("obrigatório")
+                        .accessibilityLabel("obrigatório".localized)
                 }
             }
             .font(.caption.weight(.bold))
@@ -295,7 +306,7 @@ struct BotaoDeFotoDaPessoa: View {
                 .id(versao)
 
             VStack(alignment: .leading, spacing: 2) {
-                Button(FotosDePessoas.url(de: nomeLimpo) == nil ? "Escolher…" : "Trocar…") {
+                Button((FotosDePessoas.url(de: nomeLimpo) == nil ? "Escolher…" : "Trocar…").localized) {
                     guard !nomeLimpo.isEmpty else { return }
                     if FotosDePessoas.escolherImagem(para: nomeLimpo) { versao += 1 }
                 }
@@ -304,7 +315,7 @@ struct BotaoDeFotoDaPessoa: View {
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
 
                 if FotosDePessoas.url(de: nomeLimpo) != nil {
-                    Button("Remover") {
+                    Button("Remover".localized) {
                         FotosDePessoas.remover(de: nomeLimpo)
                         versao += 1
                     }
@@ -316,7 +327,7 @@ struct BotaoDeFotoDaPessoa: View {
         }
         // Sem nome não há onde guardar a foto — a chave é o próprio nome.
         .opacity(nomeLimpo.isEmpty ? 0.45 : 1)
-        .help(nomeLimpo.isEmpty ? "Escreva o nome primeiro" : "Foto de \(nomeLimpo)")
+        .help(nomeLimpo.isEmpty ? "Escreva o nome primeiro".localized : "Foto de %@".localized(nomeLimpo))
     }
 }
 
@@ -353,7 +364,7 @@ struct PessoasDaFichaDaEntrevista: View {
             Button {
                 adicionarPessoa()
             } label: {
-                Label("Adicionar pessoa", systemImage: "plus.circle")
+                Label("Adicionar pessoa".localized, systemImage: "plus.circle")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
             }
@@ -367,18 +378,18 @@ struct PessoasDaFichaDaEntrevista: View {
             // A foto vive ao lado do nome, e não numa tela à parte: é aqui que
             // a pessoa está pensando naquele participante. O avatar já mostra
             // as iniciais, então o botão nunca é um vazio — é uma troca.
-            campo("Foto") {
+            campo("Foto".localized) {
                 BotaoDeFotoDaPessoa(nome: valorDaLinha(nome, indice: indice))
             }
             .fixedSize()
 
-            campo("Nome") {
+            campo("Nome".localized) {
                 TextField(placeholderNome, text: bindingLinha($nome, indice: indice))
                     .textFieldStyle(.plain)
                     .campoPapagaio()
             }
 
-            campo("E-mail") {
+            campo("E-mail".localized) {
                 TextField(placeholderEmail, text: bindingLinha($email, indice: indice))
                     .textFieldStyle(.plain)
                     .campoPapagaio()
@@ -394,7 +405,7 @@ struct PessoasDaFichaDaEntrevista: View {
                                 .frame(width: 36, height: 42)
                         }
                         .buttonStyle(.plain)
-                        .help("Remover pessoa")
+                        .help("Remover pessoa".localized)
             }
         }
     }
@@ -465,8 +476,10 @@ struct BotaoDeFormatoDaEntrevista: View {
 
     var body: some View {
         Button(action: acao) {
-            Label(titulo, systemImage: simbolo)
+            Label(titulo.localized, systemImage: simbolo)
                 .font(.callout.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 .foregroundStyle(selecionado ? PapagaioTema.textoSobrePrimario : PapagaioTema.textoSecundario)
                 .frame(maxWidth: .infinity)
                 .frame(height: PapagaioTema.Altura.padrao)

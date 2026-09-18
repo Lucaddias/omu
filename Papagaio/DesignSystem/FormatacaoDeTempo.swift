@@ -9,14 +9,14 @@ extension TimeInterval {
     /// `3:07` — posições e durações no meio do texto.
     var comoRelogio: String {
         let total = Self.segundosValidos(self)
-        return String(format: "%d:%02d", total / 60, total % 60)
+        return "\(total / 60):\(Self.doisDigitos(total % 60))"
     }
 
     /// `03:07` — cronômetro da gravação, onde a largura fixa evita o número
     /// "pular" a cada dígito que entra.
     var comoCronometro: String {
         let total = Self.segundosValidos(self)
-        return String(format: "%02d:%02d", total / 60, total % 60)
+        return "\(Self.doisDigitos(total / 60)):\(Self.doisDigitos(total % 60))"
     }
 
     /// `3 min 7 s` — para VoiceOver, que não lê "3:07" como tempo.
@@ -45,7 +45,10 @@ extension TimeInterval {
         if minutos > 0 {
             return segundos > 0 ? "\(minutos) min \(segundos) s" : "\(minutos) min"
         }
-        return "\(segundos) segundos"
+        if segundos == 1 {
+            return "1 segundo".localized
+        }
+        return "%d segundos".localized(segundos)
     }
 
     /// Lê o que a pessoa digitou no campo de duração: `1h 15min`, `45 min`,
@@ -76,15 +79,40 @@ extension TimeInterval {
             }
         }
 
+        guard total.isFinite else { return nil }
         if total > 0 { return total }
         // Número solto: a intenção quase sempre é minutos.
-        return Double(limpo).map { $0 * 60 }
+        guard let minutos = Double(limpo), minutos.isFinite, minutos >= 0,
+              (minutos * 60).isFinite else { return nil }
+        return minutos * 60
+    }
+
+    private static func doisDigitos(_ valor: Int) -> String {
+        valor < 10 ? "0\(valor)" : String(valor)
     }
 
     /// `AVPlayer` devolve `NaN` antes de carregar a duração, e `Int(NaN)`
     /// derruba o processo — por isso a validação fica num lugar só.
     private static func segundosValidos(_ valor: TimeInterval) -> Int {
         guard valor.isFinite, valor > 0 else { return 0 }
+        // Double(Int.max) arredonda para 2^63, fora do domínio de Int.
+        // O limite exclusivo protege inclusive valores finitos extremos.
+        guard valor < Double(Int.max) else { return 0 }
         return Int(valor)
+    }
+}
+
+public extension Date {
+    /// Formatação de data relativa: "Hoje", "Ontem", "Amanhã" ou data formatada.
+    var formatadaRelativa: String {
+        let calendario = Calendar.current
+        if calendario.isDateInToday(self) {
+            return "Hoje".localized
+        } else if calendario.isDateInYesterday(self) {
+            return "Ontem".localized
+        } else if calendario.isDateInTomorrow(self) {
+            return "Amanhã".localized
+        }
+        return formatted(.dateTime.day(.twoDigits).month(.twoDigits).year())
     }
 }

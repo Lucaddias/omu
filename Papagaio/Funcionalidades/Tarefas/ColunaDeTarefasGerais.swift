@@ -62,7 +62,7 @@ struct ColunaDeTarefasGerais: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help(oculta ? "Mostrar coluna \(titulo)" : "Ocultar coluna \(titulo)")
+                .help(oculta ? "Mostrar coluna %@".localized(titulo) : "Ocultar coluna %@".localized(titulo))
             }
             .padding(.horizontal, PapagaioTema.Espaco.curto)
             .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
@@ -76,7 +76,7 @@ struct ColunaDeTarefasGerais: View {
                 // sempre, coerente com o `.dropDestination` que já envolve
                 // a coluna inteira (ver o fim do arquivo).
                 if permiteSoltar {
-                    Text("Coluna recolhida — pode soltar aqui.")
+                    Text("Coluna recolhida — pode soltar aqui.".localized)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -88,7 +88,7 @@ struct ColunaDeTarefasGerais: View {
             } else {
             VStack(spacing: compacto ? PapagaioTema.Espaco.curto : PapagaioTema.Espaco.medio) {
                 if tarefas.isEmpty {
-                    Text("Solte uma tarefa aqui.")
+                    Text("Solte uma tarefa aqui.".localized)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .frame(maxWidth: .infinity, minHeight: compacto ? 44 : 72)
@@ -112,7 +112,7 @@ struct ColunaDeTarefasGerais: View {
                     // cards. Sem esta faixa, só alguns poucos pixels viravam
                     // destino de soltura e mover uma tarefa era impreciso.
                     // Some quando a coluna não aceita soltura (Atrasada).
-                    Label("Arraste uma tarefa para cá", systemImage: "arrow.down.to.line")
+                    Label("Arraste uma tarefa para cá".localized, systemImage: "arrow.down.to.line")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .frame(maxWidth: .infinity, minHeight: 44)

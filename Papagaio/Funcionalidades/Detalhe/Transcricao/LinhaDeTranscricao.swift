@@ -35,8 +35,6 @@ struct LinhaDeTranscricao: View {
     /// Callback ao cancelar edição inline
     var aoCancelarEdicao: () -> Void = {}
 
-    @FocusState private var focoEditor: Bool
-
     private var isBaixaConfiancaTrecho: Bool {
         guard mostrarConfianca, let c = trecho.confianca else { return false }
         if let nsp = trecho.noSpeechProb, nsp > 0.6 { return false }
@@ -47,45 +45,6 @@ struct LinhaDeTranscricao: View {
         if isBaixaConfiancaTrecho { return Color.yellow.opacity(0.22) }
         if ativo { return PapagaioTema.destaqueSuave.opacity(0.76) }
         return PapagaioTema.superficie
-    }
-
-    @ViewBuilder
-    private var editorInline: some View {
-        VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-            TextEditor(text: $textoEditado)
-                .font(.body)
-                .foregroundStyle(PapagaioTema.texto)
-                .scrollContentBackground(.hidden)
-                .textEditorStyle(.plain)
-                .padding(PapagaioTema.Espaco.medio)
-                .frame(minHeight: 120)
-                .background(PapagaioTema.superficie, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous)
-                        .stroke(PapagaioTema.borda, lineWidth: 1)
-                }
-                .focused($focoEditor)
-
-            HStack(spacing: PapagaioTema.Espaco.curto) {
-                Spacer()
-                Button("Cancelar") {
-                    aoCancelarEdicao()
-                }
-                .buttonStyle(BotaoDeContornoPapagaio())
-
-                Button("Salvar") {
-                    aoSalvarEdicao()
-                }
-                .buttonStyle(BotaoPrincipalPapagaio())
-                .keyboardShortcut(.return, modifiers: [.command])
-            }
-            .onAppear {
-                focoEditor = true
-            }
-            .onDisappear {
-                focoEditor = false
-            }
-        }
     }
 
     var body: some View {
@@ -104,10 +63,19 @@ struct LinhaDeTranscricao: View {
                         return nil
                     }()
                     HStack(spacing: 6) {
+                        Text(LinhaDeFala.rotuloDoCanal(trecho.speaker))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(PapagaioTema.textoSecundario)
+                            .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                            .fixedSize(horizontal: true, vertical: false)
                         if let acustico = falanteParaExibir {
                             Text(RotuloDeVoz.exibicao(acustico, nomes: nomesDeVoz))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(PapagaioTema.destaqueEscuro)
+                                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                                .fixedSize(horizontal: true, vertical: false)
                                 .padding(.horizontal, PapagaioTema.Espaco.minimo)
                                 .padding(.vertical, 1)
                                 .background(
@@ -127,7 +95,11 @@ struct LinhaDeTranscricao: View {
                     }
 
                     if estaEditando {
-                        editorInline
+                        EditorInlineDaTranscricao(
+                            texto: $textoEditado,
+                            aoSalvar: aoSalvarEdicao,
+                            aoCancelar: aoCancelarEdicao
+                        )
                     } else {
                         corpoDaTranscricao
                     }
@@ -162,7 +134,7 @@ struct LinhaDeTranscricao: View {
         .accessibilityAction {
             aoTocarLinha()
         }
-        .accessibilityHint("Inicia a reprodução a partir de \(trecho.start.faladoPorExtenso).")
+        .accessibilityHint("Inicia a reprodução a partir de %@.".localized(trecho.start.faladoPorExtenso))
         .accessibilityAddTraits(ativo ? [.isSelected] : [])
     }
 
@@ -180,8 +152,8 @@ struct LinhaDeTranscricao: View {
                 }
         }
         .buttonStyle(.plain)
-        .help("Corrigir o texto deste trecho")
-        .accessibilityLabel("Corrigir o texto deste trecho")
+        .help("Corrigir o texto deste trecho".localized)
+        .accessibilityLabel("Corrigir o texto deste trecho".localized)
     }
 
     @ViewBuilder
@@ -270,15 +242,15 @@ struct BotaoDePalavra: View {
         .animation(animacao, value: isBaixaConfianca)
         .help(helpText)
         .accessibilityLabel(palavra.texto)
-        .accessibilityHint("Salta o áudio para o instante desta palavra.")
+        .accessibilityHint("Salta o áudio para o instante desta palavra.".localized)
         .accessibilityAddTraits(ativa ? [.isSelected] : [])
     }
 
     private var helpText: String {
         if isBaixaConfianca, let c = palavra.confianca {
-            return String(format: "Confiança %.0f%% — baixa", c * 100)
+            return "Confiança %.0f%% — baixa".localized(c * 100)
         }
-        return "Ouvir a partir desta palavra"
+        return "Ouvir a partir desta palavra".localized
     }
 
     private var foregroundColor: Color {

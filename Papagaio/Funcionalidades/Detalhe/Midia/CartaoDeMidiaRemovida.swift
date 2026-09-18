@@ -36,8 +36,11 @@ struct CartaoDeMidiaRemovida: View {
                 VStack(spacing: PapagaioTema.Espaco.curto) {
                     Image(systemName: "trash")
                         .font(.system(size: 22, weight: .medium))
-                    Text("Removido")
+                    Text("Removido".localized)
                         .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .foregroundStyle(PapagaioTema.textoSecundario)
             }
@@ -56,7 +59,7 @@ struct CartaoDeMidiaRemovida: View {
                 .strikethrough(true, color: PapagaioTema.textoSecundario.opacity(0.6))
 
             HStack(spacing: PapagaioTema.Espaco.curto) {
-                SeloDeMidia(texto: item.tipo, simbolo: simbolo)
+                SeloDeMidia(texto: item.tipo.localized, simbolo: simbolo)
                 SeloDeMidia(texto: formatoDeBytes(item.tamanho), simbolo: "externaldrive")
             }
 
@@ -68,17 +71,23 @@ struct CartaoDeMidiaRemovida: View {
             // conversavam com o resto da grade.
             HStack {
                 Button(action: aoRestaurar) {
-                    Label("Restaurar", systemImage: "arrow.uturn.backward")
+                    Label("Restaurar".localized, systemImage: "arrow.uturn.backward")
                         .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .buttonStyle(BotaoDeContornoPapagaio())
 
                 Spacer()
 
-                Button("Apagar de vez", systemImage: "trash") {
+                Button("Apagar de vez".localized, systemImage: "trash") {
                     confirmandoExclusao = true
                 }
                 .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(.plain)
                 .foregroundStyle(PapagaioTema.perigo)
             }
@@ -99,14 +108,14 @@ struct CartaoDeMidiaRemovida: View {
                 )
         }
         .confirmationDialog(
-            "Apagar \(item.nome) definitivamente?",
+            "Apagar %@ definitivamente?".localized(item.nome),
             isPresented: $confirmandoExclusao,
             titleVisibility: .visible
         ) {
-            Button("Apagar definitivamente", role: .destructive, action: aoApagarDeVez)
-            Button("Cancelar", role: .cancel) {}
+            Button("Apagar definitivamente".localized, role: .destructive, action: aoApagarDeVez)
+            Button("Cancelar".localized, role: .cancel) {}
         } message: {
-            Text("O arquivo sai do seu Mac e não poderá ser recuperado.")
+            Text("O arquivo sai do seu Mac e não poderá ser recuperado.".localized)
         }
     }
 

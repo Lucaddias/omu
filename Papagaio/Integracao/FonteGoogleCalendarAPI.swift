@@ -211,7 +211,7 @@ struct FonteGoogleCalendarAPI: FonteDeReunioesExternas {
 
         return EventoCalendarSimples(
             id: id,
-            titulo: (evento["summary"] as? String) ?? "Evento sem título",
+            titulo: (evento["summary"] as? String) ?? "Evento sem título".localized,
             dataHora: inicio,
             participantes: participantes,
             descricao: evento["description"] as? String
@@ -228,13 +228,13 @@ enum FonteGoogleCalendarErro: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .semToken:
-            return "Não foi possível obter token de acesso."
+            return "Não foi possível obter token de acesso.".localized
         case .respostaInesperada:
-            return "O Google Calendar respondeu algo inesperado."
+            return "O Google Calendar respondeu algo inesperado.".localized
         case let .reuniaoNaoEncontrada(id):
-            return "A reunião \(id) não foi encontrada no Google Calendar."
+            return "A reunião %@ não foi encontrada no Google Calendar.".localized(id)
         case let .dataInvalida(id):
-            return "A reunião \(id) tem uma data inválida no Google Calendar."
+            return "A reunião %@ tem uma data inválida no Google Calendar.".localized(id)
         }
     }
 }

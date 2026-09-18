@@ -26,7 +26,7 @@ struct LinhaDeTarefaDaConversa: View {
 
     private var concluida: Bool { tarefa.status == .concluida }
     private var dataDoPrazo: String {
-        tarefa.prazo?.formatted(.dateTime.day().month().year()) ?? "Sem deadline"
+        tarefa.prazo?.formatted(.dateTime.day().month().year()) ?? "Sem deadline".localized
     }
 
     /// Comparando dia com dia, não hora com hora — mesmo critério de
@@ -74,30 +74,31 @@ struct LinhaDeTarefaDaConversa: View {
                 .frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
 
             SeparadorDaLinhaDeTarefa()
-            ColunaDaTarefa(rotulo: "Prioridade") {
+            ColunaDaTarefa(rotulo: "Prioridade".localized) {
                 SeloDePrioridade(prioridade: tarefa.prioridade)
             }
             .frame(minWidth: 96, idealWidth: 128, maxWidth: 150, alignment: .leading)
 
             SeparadorDaLinhaDeTarefa()
-            ColunaDaTarefa(rotulo: "Responsável") {
+            ColunaDaTarefa(rotulo: "Responsável".localized) {
                 responsavelDaTarefa
             }
             .frame(minWidth: 130, idealWidth: 190, maxWidth: 220, alignment: .leading)
 
             SeparadorDaLinhaDeTarefa()
-            ColunaDaTarefa(rotulo: "Status") {
+            ColunaDaTarefa(rotulo: "Status".localized) {
                 seloDeStatus
             }
             .frame(minWidth: 96, idealWidth: 124, maxWidth: 150, alignment: .leading)
 
             SeparadorDaLinhaDeTarefa()
-            ColunaDaTarefa(rotulo: "Data") {
+            ColunaDaTarefa(rotulo: "Data".localized) {
                 Label(dataDoPrazo, systemImage: concluida ? "checkmark.circle" : "calendar")
                     .font(.callout.weight(.bold))
                     .foregroundStyle(concluida ? PapagaioTema.sucesso : PapagaioTema.perigo)
                     .monospacedDigit()
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
             .frame(minWidth: 104, idealWidth: 136, maxWidth: 160, alignment: .leading)
 
@@ -122,21 +123,22 @@ struct LinhaDeTarefaDaConversa: View {
                 alignment: .leading,
                 spacing: PapagaioTema.Espaco.medio
             ) {
-                ColunaDaTarefa(rotulo: "Prioridade") {
+                ColunaDaTarefa(rotulo: "Prioridade".localized) {
                     SeloDePrioridade(prioridade: tarefa.prioridade)
                 }
-                ColunaDaTarefa(rotulo: "Responsável") {
+                ColunaDaTarefa(rotulo: "Responsável".localized) {
                     responsavelDaTarefa
                 }
-                ColunaDaTarefa(rotulo: "Status") {
+                ColunaDaTarefa(rotulo: "Status".localized) {
                     seloDeStatus
                 }
-                ColunaDaTarefa(rotulo: "Data") {
+                ColunaDaTarefa(rotulo: "Data".localized) {
                     Label(dataDoPrazo, systemImage: concluida ? "checkmark.circle" : "calendar")
                         .font(.callout.weight(.bold))
                         .foregroundStyle(concluida ? PapagaioTema.sucesso : PapagaioTema.perigo)
                         .monospacedDigit()
                         .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 }
             }
         }
@@ -149,7 +151,7 @@ struct LinhaDeTarefaDaConversa: View {
     private var seloDeStatus: some View {
         Group {
             if atrasada {
-                Text("Atrasada")
+                Text("Atrasada".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.perigo)
                     .padding(.horizontal, PapagaioTema.Espaco.curto)
@@ -168,7 +170,7 @@ struct LinhaDeTarefaDaConversa: View {
                 .foregroundStyle(concluida ? PapagaioTema.sucesso : PapagaioTema.textoSecundario)
         }
         .buttonStyle(.plain)
-        .help(concluida ? "Marcar como em andamento" : "Concluir")
+        .help(concluida ? "Marcar como em andamento".localized : "Concluir".localized)
     }
 
     private var acoes: some View {
@@ -187,7 +189,7 @@ struct LinhaDeTarefaDaConversa: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(oculta ? "Mostrar tarefa" : "Ocultar tarefa")
+        .help(oculta ? "Mostrar tarefa".localized : "Ocultar tarefa".localized)
     }
 
     private var botaoEditar: some View {
@@ -199,7 +201,7 @@ struct LinhaDeTarefaDaConversa: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help("Editar tarefa")
+        .help("Editar tarefa".localized)
     }
 
     private var tituloDaTarefa: some View {
@@ -214,6 +216,7 @@ struct LinhaDeTarefaDaConversa: View {
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
         }
     }
 
@@ -226,16 +229,18 @@ struct LinhaDeTarefaDaConversa: View {
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             } else {
                 Image(systemName: "person.crop.circle.badge.questionmark")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .frame(width: 30, height: 30)
 
-                Text("Sem responsável")
+                Text("Sem responsável".localized)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
         }
     }

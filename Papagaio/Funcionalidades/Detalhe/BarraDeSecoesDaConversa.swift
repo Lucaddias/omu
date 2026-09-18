@@ -79,10 +79,11 @@ struct BarraDeSecoesDaConversa<Acessorio: View>: View {
                     aoSelecionar(secao)
                 } label: {
                     VStack(spacing: PapagaioTema.Espaco.curto) {
-                        Label(secao.rawValue, systemImage: secao.simbolo)
+                        Label(secao.rawValue.localized, systemImage: secao.simbolo)
                             .labelStyle(.titleAndIcon)
                             .font(PapagaioTema.Tipo.apoio.weight(estaSelecionada ? .semibold : .regular))
                             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                             .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(
                                 estaSelecionada

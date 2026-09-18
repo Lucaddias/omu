@@ -14,7 +14,7 @@ struct EquipesDoPerfil: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
             HStack {
-                Text("Equipes")
+                Text("Equipes".localized)
                     .font(.title3)
                     .foregroundStyle(PapagaioTema.texto)
 
@@ -30,9 +30,9 @@ struct EquipesDoPerfil: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
                 .background(PapagaioTema.destaqueSuave, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
-                .help("Adicionar nova equipe")
+                .help("Adicionar nova equipe".localized)
 
-                Button("Entrar com código", systemImage: "number") {
+                Button("Entrar com código".localized, systemImage: "number") {
                     mostrandoEntrada = true
                 }
                 .buttonStyle(BotaoDeContornoPapagaio())
@@ -41,7 +41,7 @@ struct EquipesDoPerfil: View {
             SeparadorPapagaio()
 
             if equipes.isEmpty {
-                Text("Você ainda não tem equipes. Use o + para criar a primeira ou entre com um código.")
+                Text("Você ainda não tem equipes. Use o + para criar a primeira ou entre com um código.".localized)
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -64,11 +64,13 @@ struct EquipesDoPerfil: View {
                                     .font(.callout.weight(.semibold))
                                     .foregroundStyle(PapagaioTema.texto)
                                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
-                                Text("\(equipe.papel) • \(equipe.resumoDeMembros)")
+                                Text("\(equipe.papel.localized) • \(equipe.resumoDeMembros.localized)")
                                     .font(.caption)
                                     .foregroundStyle(PapagaioTema.textoSecundario)
                                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                             }
 
                             Spacer(minLength: 0)
@@ -86,28 +88,28 @@ struct EquipesDoPerfil: View {
         .padding(PapagaioTema.Espaco.secao)
         .frame(maxWidth: .infinity, minHeight: 226, alignment: .topLeading)
         .cartaoPapagaio()
-        .alert("Nova equipe", isPresented: $mostrandoNovaEquipe) {
-            TextField("Nome da equipe", text: $nomeDaNovaEquipe)
-            Button("Cancelar", role: .cancel) {
+        .alert("Nova equipe".localized, isPresented: $mostrandoNovaEquipe) {
+            TextField("Nome da equipe".localized, text: $nomeDaNovaEquipe)
+            Button("Cancelar".localized, role: .cancel) {
                 nomeDaNovaEquipe = ""
             }
-            Button("Adicionar") {
+            Button("Adicionar".localized) {
                 adicionarEquipe()
             }
             .disabled(nomeDaNovaEquipe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } message: {
-            Text("Crie uma equipe para vincular ao seu perfil.")
+            Text("Crie uma equipe para vincular ao seu perfil.".localized)
         }
-        .alert("Entrar em uma equipe", isPresented: $mostrandoEntrada) {
-            TextField("Código da equipe", text: $codigoDaEquipe)
-            Button("Cancelar", role: .cancel) { codigoDaEquipe = "" }
-            Button("Entrar") {
+        .alert("Entrar em uma equipe".localized, isPresented: $mostrandoEntrada) {
+            TextField("Código da equipe".localized, text: $codigoDaEquipe)
+            Button("Cancelar".localized, role: .cancel) { codigoDaEquipe = "" }
+            Button("Entrar".localized) {
                 aoEntrarComCodigo(codigoDaEquipe)
                 codigoDaEquipe = ""
             }
             .disabled(codigoDaEquipe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } message: {
-            Text("Peça o código ao administrador da equipe.")
+            Text("Peça o código ao administrador da equipe.".localized)
         }
     }
 

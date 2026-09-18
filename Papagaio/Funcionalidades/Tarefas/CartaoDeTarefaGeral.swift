@@ -80,6 +80,7 @@ struct CartaoDeTarefaGeral: View {
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                     .truncationMode(.tail)
                     .minimumScaleFactor(0.8)
             }
@@ -90,10 +91,10 @@ struct CartaoDeTarefaGeral: View {
             // faltava nos cartões. Duas colunas, mesmo componente
             // `ColunaDaTarefa` da aba Tarefas de cada conversa.
             HStack(alignment: .top, spacing: PapagaioTema.Espaco.largo) {
-                ColunaDaTarefa(rotulo: "Responsável") {
+                ColunaDaTarefa(rotulo: "Responsável".localized) {
                     responsavelDaTarefa
                 }
-                ColunaDaTarefa(rotulo: "Status") {
+                ColunaDaTarefa(rotulo: "Status".localized) {
                     seloDeStatus
                 }
             }
@@ -102,7 +103,7 @@ struct CartaoDeTarefaGeral: View {
             // cada lado, como já era.
             HStack {
                 HStack(spacing: PapagaioTema.Espaco.curto) {
-                    Text("Prioridade:")
+                    Text("Prioridade:".localized)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(PapagaioTema.textoSecundario)
                     SeloDePrioridade(prioridade: tarefa.tarefa.prioridade)
@@ -138,13 +139,13 @@ struct CartaoDeTarefaGeral: View {
             // sozinho antes de mais nada agora é o próprio respiro do
             // título com o topo do cartão.
             Menu {
-                Button("Editar", systemImage: "pencil", action: aoEditar)
-                Button(oculta ? "Mostrar" : "Ocultar", systemImage: oculta ? "eye" : "eye.slash", action: aoOcultar)
+                Button("Editar".localized, systemImage: "pencil", action: aoEditar)
+                Button(oculta ? "Mostrar".localized : "Ocultar".localized, systemImage: oculta ? "eye" : "eye.slash", action: aoOcultar)
                 // "Marcar concluída" saiu daqui: com três colunas agora, o
                 // gesto que muda o status é arrastar o cartão até a que
                 // representa o novo estado — este atalho pulava direto
                 // para Concluída, sem passar por Em andamento.
-                Button("Excluir", systemImage: "trash", role: .destructive, action: aoExcluir)
+                Button("Excluir".localized, systemImage: "trash", role: .destructive, action: aoExcluir)
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .bold))
@@ -154,7 +155,7 @@ struct CartaoDeTarefaGeral: View {
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
-            .help("Ações da tarefa")
+            .help("Ações da tarefa".localized)
             .padding(.trailing, PapagaioTema.Espaco.curto)
             .padding(.top, PapagaioTema.Espaco.curto)
         }
@@ -196,7 +197,7 @@ struct CartaoDeTarefaGeral: View {
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .frame(width: 26, height: 26)
 
-                Text("Sem responsável")
+                Text("Sem responsável".localized)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(1)
@@ -210,7 +211,7 @@ struct CartaoDeTarefaGeral: View {
     private var seloDeStatus: some View {
         Group {
             if atrasada {
-                Text("Atrasada")
+                Text("Atrasada".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.perigo)
                     .padding(.horizontal, PapagaioTema.Espaco.curto)
@@ -223,9 +224,9 @@ struct CartaoDeTarefaGeral: View {
     }
 
     private var rotuloDoPrazo: String {
-        guard let prazo = tarefa.tarefa.prazo else { return "Sem deadline" }
-        if Calendar.current.isDateInToday(prazo) { return "Hoje" }
-        if Calendar.current.isDateInTomorrow(prazo) { return "Amanhã" }
+        guard let prazo = tarefa.tarefa.prazo else { return "Sem deadline".localized }
+        if Calendar.current.isDateInToday(prazo) { return "Hoje".localized }
+        if Calendar.current.isDateInTomorrow(prazo) { return "Amanhã".localized }
         return prazo.formatted(.dateTime.day().month().year())
     }
 

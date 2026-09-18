@@ -11,13 +11,13 @@ enum LixeiraDeMidia {
         var errorDescription: String? {
             switch self {
             case .caminhoForaDasGravacoes:
-                "O anexo não está dentro da pasta de gravações e não foi alterado."
+                "O anexo não está dentro da pasta de gravações e não foi alterado.".localized
             case let .falhaAoEsvaziar(quantidade):
                 quantidade == 1
-                    ? "Um anexo não pôde ser apagado e continua na lixeira."
-                    : "\(quantidade) anexos não puderam ser apagados e continuam na lixeira."
+                    ? "Um anexo não pôde ser apagado e continua na lixeira.".localized
+                    : "%d anexos não puderam ser apagados e continuam na lixeira.".localized(quantidade)
             case .falhaAoReverterMovimento:
-                "O anexo foi movido para a lixeira, mas a lista da conversa não pôde ser atualizada. Ele continua na lixeira para não ser perdido."
+                "O anexo foi movido para a lixeira, mas a lista da conversa não pôde ser atualizada. Ele continua na lixeira para não ser perdido.".localized
             }
         }
     }
@@ -125,7 +125,7 @@ enum LixeiraDeMidia {
             )
             try FileManager.default.moveItem(at: origem, to: destino)
             do {
-                try registrarAnexoRestaurado(item, em: destino)
+                try registrarAnexoRestaurado(item, em: destino, defaults: defaults)
             } catch {
                 // O arquivo voltou para a conversa, mas o bookmark não
                 // pôde ser salvo. Reverte o move para a lixeira, que é o
@@ -248,16 +248,17 @@ enum LixeiraDeMidia {
     /// deixaria invisíveis no próximo carregamento.
     private static func registrarAnexoRestaurado(
         _ item: MidiaNaLixeira,
-        em destino: URL
+        em destino: URL,
+        defaults: UserDefaults
     ) throws {
         guard !item.daGravacao else { return }
         let anexo = try MidiasDaConversa.anexo(para: destino)
-        var anexos = MidiasDaConversa.carregar(item.arquivoID)
+        var anexos = MidiasDaConversa.carregar(item.arquivoID, em: defaults)
         guard !anexos.contains(where: {
             $0.url.standardizedFileURL == destino.standardizedFileURL
         }) else { return }
         anexos.append(anexo)
-        try MidiasDaConversa.salvar(anexos, para: item.arquivoID)
+        try MidiasDaConversa.salvar(anexos, para: item.arquivoID, em: defaults)
     }
 
     /// Os dois caminhos vêm de UserDefaults e não podem ganhar autoridade

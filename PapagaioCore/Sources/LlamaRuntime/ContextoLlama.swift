@@ -8,6 +8,7 @@ public enum ErroLlama: Error, CustomStringConvertible {
     case gramaticaInvalida
     case falhaNoDecode(Int32)
     case promptGrandeDemais(tokens: Int, limite: Int)
+    case limiteDeSaidaInvalido(Int)
 
     public var description: String {
         switch self {
@@ -19,6 +20,8 @@ public enum ErroLlama: Error, CustomStringConvertible {
             "a gramática GBNF foi recusada pelo llama.cpp"
         case let .falhaNoDecode(codigo):
             "llama_decode falhou (código \(codigo))"
+        case let .limiteDeSaidaInvalido(limite):
+            "limite de saída inválido: \(limite)"
         case let .promptGrandeDemais(tokens, limite):
             "prompt de \(tokens) tokens excede o limite de \(limite)"
         }
@@ -135,12 +138,20 @@ public actor ContextoLlama {
         gramatica: String? = nil,
         maxTokens: Int = 2_048
     ) throws -> String {
+        guard maxTokens > 0, maxTokens < Int(janela) else {
+            throw ErroLlama.limiteDeSaidaInvalido(maxTokens)
+        }
+        try Task.checkCancellation()
         try carregar()
         guard let contexto = caixa.contexto, let modelo = caixa.modelo else {
             throw ErroLlama.contextoNaoCriado
         }
         let vocab = llama_model_get_vocab(modelo)
 
+        // Também limpa em erro/cancelamento: o próximo prompt não pode herdar
+        // um prefill parcial da chamada anterior.
+        llama_memory_clear(llama_get_memory(contexto), true)
+        defer { llama_memory_clear(llama_get_memory(contexto), true) }
         var tokens = Self.tokenizar(prompt, vocab: vocab, adicionarEspeciais: true)
         guard tokens.count < Int(janela) - maxTokens else {
             throw ErroLlama.promptGrandeDemais(
@@ -168,6 +179,7 @@ public actor ContextoLlama {
         // entre chamadas consecutivas de `llama_decode`.
         var offset = 0
         while offset < tokens.count {
+            try Task.checkCancellation()
             let fim = min(offset + Self.tokensPorLote, tokens.count)
             let codigo: Int32 = tokens.withUnsafeMutableBufferPointer { buffer in
                 let fatia = buffer.baseAddress! + offset
@@ -176,22 +188,23 @@ public actor ContextoLlama {
             guard codigo == 0 else { throw ErroLlama.falhaNoDecode(codigo) }
             offset = fim
         }
-        var lote = llama_batch()
 
         // Decode token a token.
-        var saida = ""
+        var saida: [UInt8] = []
         var gerados = 0
         var proximo = llama_sampler_sample(cadeia, contexto, -1)
 
         while gerados < maxTokens, !llama_vocab_is_eog(vocab, proximo) {
-            saida += Self.pedaco(de: proximo, vocab: vocab)
+            try Task.checkCancellation()
+            saida.append(contentsOf: Self.pedaco(de: proximo, vocab: vocab))
             // Nada de `llama_sampler_accept` aqui: `llama_sampler_sample` é
             // "sample **and accept**" — aceitar de novo avança a pilha da
             // gramática duas vezes e mata o processo com
             // "Unexpected empty grammar stack after accepting piece".
             var unico = proximo
-            lote = withUnsafeMutablePointer(to: &unico) { llama_batch_get_one($0, 1) }
-            let passo = llama_decode(contexto, lote)
+            let passo = withUnsafeMutablePointer(to: &unico) {
+                llama_decode(contexto, llama_batch_get_one($0, 1))
+            }
             guard passo == 0 else { throw ErroLlama.falhaNoDecode(passo) }
 
             proximo = llama_sampler_sample(cadeia, contexto, -1)
@@ -200,8 +213,9 @@ public actor ContextoLlama {
 
         // Sessão nova a cada chamada: no modo map-reduce, o contexto de um
         // chunk não pode vazar para o próximo.
-        llama_memory_clear(llama_get_memory(contexto), true)
-        return saida
+        // Tokens são fragmentos de bytes; um acento pode atravessar dois.
+        // Decodificar antes de reuni-los produz U+FFFD irreversível.
+        return String(decoding: saida, as: UTF8.self)
     }
 
     // MARK: - Ponte de tokens
@@ -211,30 +225,41 @@ public actor ContextoLlama {
         vocab: OpaquePointer?,
         adicionarEspeciais: Bool
     ) -> [llama_token] {
-        let utf8 = Array(texto.utf8)
-        // O pior caso é ~1 token por byte; a folga evita uma segunda chamada.
+        let utf8 = texto.utf8CString
         var tokens = [llama_token](repeating: 0, count: utf8.count + 8)
-        let total = utf8.withUnsafeBufferPointer { entrada in
-            entrada.baseAddress!.withMemoryRebound(to: CChar.self, capacity: utf8.count) { cTexto in
+        func preencher() -> Int32 {
+            utf8.withUnsafeBufferPointer { entrada in
                 tokens.withUnsafeMutableBufferPointer { saida in
                     llama_tokenize(
-                        vocab, cTexto, Int32(utf8.count),
+                        vocab, entrada.baseAddress, Int32(utf8.count - 1),
                         saida.baseAddress, Int32(saida.count),
                         adicionarEspeciais, true
                     )
                 }
             }
         }
+        var total = preencher()
+        if total < 0 {
+            tokens = [llama_token](repeating: 0, count: -Int(total))
+            total = preencher()
+        }
         guard total > 0 else { return [] }
         return Array(tokens.prefix(Int(total)))
     }
 
-    private static func pedaco(de token: llama_token, vocab: OpaquePointer?) -> String {
+    private static func pedaco(de token: llama_token, vocab: OpaquePointer?) -> [UInt8] {
         var buffer = [CChar](repeating: 0, count: 256)
-        let total = buffer.withUnsafeMutableBufferPointer { destino in
-            llama_token_to_piece(vocab, token, destino.baseAddress, Int32(destino.count), 0, false)
+        func preencher() -> Int32 {
+            buffer.withUnsafeMutableBufferPointer { destino in
+                llama_token_to_piece(vocab, token, destino.baseAddress, Int32(destino.count), 0, false)
+            }
         }
-        guard total > 0 else { return "" }
-        return String(decoding: buffer.prefix(Int(total)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        var total = preencher()
+        if total < 0 {
+            buffer = [CChar](repeating: 0, count: -Int(total))
+            total = preencher()
+        }
+        guard total > 0 else { return [] }
+        return buffer.prefix(Int(total)).map { UInt8(bitPattern: $0) }
     }
 }

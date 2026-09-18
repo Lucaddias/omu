@@ -173,12 +173,12 @@ final class NotasDaConversaViewModel {
 
     func aplicarFormato(_ formato: FormatoDeNota) {
         switch formato {
-        case .negrito: acrescentar("**texto em destaque**")
-        case .italico: acrescentar("_observação_")
-        case .lista: acrescentar("- item da conversa")
-        case .imagem: acrescentar("![descrição da imagem](arquivo)")
-        case .anexo: acrescentar("[anexo](arquivo)")
-        case .link: acrescentar("[link](https://)")
+        case .negrito: acrescentar("**" + "texto em destaque".localized + "**")
+        case .italico: acrescentar("_" + "observação".localized + "_")
+        case .lista: acrescentar("- " + "item da conversa".localized)
+        case .imagem: acrescentar("![" + "descrição da imagem".localized + "](arquivo)")
+        case .anexo: acrescentar("[" + "anexo".localized + "](arquivo)")
+        case .link: acrescentar("[" + "link".localized + "](https://)")
         }
     }
 

@@ -6,7 +6,7 @@ struct TituloDeSecaoDoPerfil: View {
     let titulo: String
 
     var body: some View {
-        Label(titulo, systemImage: simbolo)
+        Label(titulo.localized, systemImage: simbolo)
             .font(.title3)
             .foregroundStyle(PapagaioTema.texto)
             .labelStyle(.titleAndIcon)
@@ -20,11 +20,11 @@ struct CampoDoPerfil: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-            Text(titulo)
+            Text(titulo.localized)
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(PapagaioTema.textoSecundario)
 
-            TextField(placeholder, text: $texto)
+            TextField(placeholder.localized, text: $texto)
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .foregroundStyle(PapagaioTema.texto)
@@ -59,11 +59,15 @@ struct AvatarDoPerfil: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Image(systemName: "person.crop.circle.fill")
+                // `person.fill`, não `person.crop.circle.fill`: o glifo
+                // circular somava um segundo anel ao recorte do avatar.
+                Image(systemName: "person.fill")
                     .resizable()
                     .scaledToFit()
                     .foregroundStyle(PapagaioTema.textoSecundario.opacity(0.35))
-                    .padding(PapagaioTema.Espaco.curto)
+                    .padding(tamanho * 0.25)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(PapagaioTema.textoSecundario.opacity(0.1))
             }
         }
         .frame(width: tamanho, height: tamanho)

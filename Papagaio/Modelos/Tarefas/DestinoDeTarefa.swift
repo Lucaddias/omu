@@ -15,9 +15,9 @@ enum DestinoDeTarefa {
 
     var titulo: String {
         switch self {
-        case .naoIniciado: "Não iniciado"
-        case .emAndamento: "Em andamento"
-        case .concluida: "Concluída"
+        case .naoIniciado: "Não iniciado".localized
+        case .emAndamento: "Em andamento".localized
+        case .concluida: "Concluída".localized
         }
     }
 

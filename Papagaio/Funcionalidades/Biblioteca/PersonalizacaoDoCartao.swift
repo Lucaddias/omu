@@ -15,10 +15,12 @@ struct PersonalizacaoDoCartao: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: PapagaioTema.Espaco.medio) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Personalizar cartões")
+                    Text("Personalizar cartões".localized)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(PapagaioTema.texto)
-                    Text("Escolha o que aparece nos cartões da biblioteca. Vale para todos.")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Text("Escolha o que aparece nos cartões da biblioteca. Vale para todos.".localized)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
@@ -27,7 +29,7 @@ struct PersonalizacaoDoCartao: View {
 
                 BotaoCircularPapagaio(
                     simbolo: "xmark",
-                    ajuda: "Fechar",
+                    ajuda: "Fechar".localized,
                     destaque: true,
                     acao: aoFechar
                 )
@@ -44,7 +46,7 @@ struct PersonalizacaoDoCartao: View {
                     // folha, então nem sempre dá para ver o efeito no cartão
                     // real enquanto se mexe nos interruptores.
                     VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                        Text("Exemplo")
+                        Text("Exemplo".localized)
                             .font(.caption.weight(.bold))
                             .foregroundStyle(PapagaioTema.textoSecundario)
                             .textCase(.uppercase)
@@ -61,14 +63,14 @@ struct PersonalizacaoDoCartao: View {
             HStack {
                 // Sem confirmação: nada aqui é destrutivo, e voltar ao padrão é
                 // um clique de desfazer para quem desligou demais e se perdeu.
-                Button("Restaurar padrão") {
+                Button("Restaurar padrão".localized) {
                     withAnimation(.snappy(duration: 0.22)) { campos = .padrao }
                 }
                 .buttonStyle(BotaoDeContornoPapagaio())
 
                 Spacer()
 
-                Button("Concluir", action: aoFechar)
+                Button("Concluir".localized, action: aoFechar)
                     .buttonStyle(BotaoPrincipalPapagaio())
             }
             .padding(PapagaioTema.Espaco.secao)

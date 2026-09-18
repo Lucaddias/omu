@@ -33,6 +33,9 @@ final class GravadorViewModel {
                                       _ notas: [NotaDaConversa],
                                       _ dataDeGravacao: Date?) async -> Void)?
 
+    /// Limpa o contexto de destino da gravação em qualquer superfície da UI.
+    var aoCancelarGravacao: (@MainActor () -> Void)?
+
     /// Amostras de nível para a waveform ao vivo, ~20 Hz, janela de ~6 s.
     private(set) var waveform: [Float] = []
     /// A waveform da saída do sistema é independente: não confunda uma linha
@@ -70,7 +73,7 @@ final class GravadorViewModel {
     init() {
         armazenamento = try? Armazenamento.padrao()
         if armazenamento == nil {
-            estado = .falhou("não foi possível abrir a pasta de suporte do app")
+            estado = .falhou("não foi possível abrir a pasta de suporte do app".localized)
         }
     }
 
@@ -104,6 +107,7 @@ final class GravadorViewModel {
     }
 
     func cancelar() async {
+        aoCancelarGravacao?()
         tarefaNivel?.cancel()
         tarefaNivel = nil
         guard let sessao else {
@@ -114,7 +118,7 @@ final class GravadorViewModel {
         await sessao.descartar()
         self.sessao = nil
         identificadorDaGravacao = nil
-        avisos = ["Gravação cancelada — nenhum arquivo foi criado."]
+        avisos = ["Gravação cancelada — nenhum arquivo foi criado.".localized]
         tempoDeGravacao = 0
         waveform = []
         waveformSistema = []
@@ -221,7 +225,7 @@ final class GravadorViewModel {
             )
         } else if !notasDaGravacao.isEmpty {
             avisos.append(
-                "As notas também foram descartadas porque a gravação era curta demais para criar um arquivo."
+                "As notas também foram descartadas porque a gravação era curta demais para criar um arquivo.".localized
             )
         }
 
@@ -263,7 +267,7 @@ final class GravadorViewModel {
     /// alguma coisa enquanto isso.
     private static func tituloParaAgora() -> String {
         let formato = Date.FormatStyle(date: .abbreviated, time: .shortened)
-        return "Gravação de \(Date().formatted(formato))"
+        return "Gravação de %@".localized(Date().formatted(formato))
     }
 
     /// Cada nota da gravação continua sendo uma nota na conversa.
@@ -349,7 +353,7 @@ final class GravadorViewModel {
 
         notasDaGravacao.append(
             NotaDaConversa(
-                texto: "Marcador",
+                texto: "Marcador".localized,
                 start: tempoDeGravacao,
                 critica: proximaNotaSeraCritica,
                 tipo: .marcador
@@ -371,7 +375,7 @@ final class GravadorViewModel {
         estado = .processando
         do {
             let importado = try await ImportadorAudio(armazenamento: armazenamento).importar(de: url)
-            avisos = ["Arquivo importado: um canal só, sem separação de falante."]
+            avisos = ["Arquivo importado: um canal só, sem separação de falante.".localized]
             estado = .ocioso
             await aoProduzirAudio?(
                 importado.tituloSugerido, importado.pastaRelativa, importado.duracao, [],
@@ -388,10 +392,10 @@ final class GravadorViewModel {
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
 
         if texto.contains("iphone") || texto.contains("locked") || texto.contains("bloqueado") {
-            return "Você precisa desbloquear seu iPhone antes de importar esse áudio."
+            return "Você precisa desbloquear seu iPhone antes de importar esse áudio.".localized
         }
         if nsError.domain == NSCocoaErrorDomain && [257, 260, 513].contains(nsError.code) {
-            return "Não consegui acessar esse áudio. Se ele estiver no iPhone, desbloqueie o aparelho e tente importar de novo."
+            return "Não consegui acessar esse áudio. Se ele estiver no iPhone, desbloqueie o aparelho e tente importar de novo.".localized
         }
         return "\(error)"
     }
@@ -470,8 +474,8 @@ final class CapturaDeDitado: @unchecked Sendable {
 
         var errorDescription: String? {
             switch self {
-            case .semEntradaDeAudio: "Nenhum microfone disponível."
-            case .reconhecimentoIndisponivel: "O reconhecimento de fala não está disponível agora."
+            case .semEntradaDeAudio: "Nenhum microfone disponível.".localized
+            case .reconhecimentoIndisponivel: "O reconhecimento de fala não está disponível agora.".localized
             }
         }
     }
@@ -510,11 +514,11 @@ final class DitadoDeNota {
         // Microfone primeiro: tocar no `inputNode` antes da permissão devolve
         // formato inválido, e formato inválido no tap aborta o processo.
         guard await autorizarMicrofone() else {
-            estado = .falhou("Autorize o microfone em Ajustes do Sistema › Privacidade › Microfone.")
+            estado = .falhou("Autorize o microfone em Ajustes do Sistema › Privacidade › Microfone.".localized)
             return
         }
         guard await autorizarFala() else {
-            estado = .falhou("Autorize o reconhecimento de fala em Ajustes do Sistema › Privacidade.")
+            estado = .falhou("Autorize o reconhecimento de fala em Ajustes do Sistema › Privacidade.".localized)
             return
         }
 

@@ -400,3 +400,58 @@ private actor TransporteDeConversasFake: TransporteDeConversasCloudKit {
     func ultimoArquivoSalvo() -> Data? { arquivoSalvo }
     func definirFalhaAoSalvar(_ falhar: Bool) { falharAoSalvar = falhar }
 }
+
+@Test("Consumidores concorrentes não reenviam operação; snapshot pula revisão substituída")
+func filaCloudKitSerializaConsumidoresERevalidaSnapshot() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let fila = FilaPersistenteCloudKit(url: raiz.appendingPathComponent("fila.json"))
+    let espaco = EspacoID()
+    let equipe = equipeCloudKitDeTeste(espaco: espaco)
+    let primeiro = Arquivo(titulo: "Primeiro", pastaRelativa: "", espaco: espaco)
+    var segundo = Arquivo(titulo: "Antigo", pastaRelativa: "", espaco: espaco)
+    let transporte = TransporteCloudKitSuspenso()
+    let sincronizador = SincronizadorDaBibliotecaCloudKit(transporte: transporte)
+    try await fila.agendarEnvio(primeiro, para: equipe)
+    try await fila.agendarEnvio(segundo, para: equipe)
+    let consumidorA = Task { try await fila.processar(com: sincronizador, ignorarBackoff: true) }
+    await transporte.aguardarPrimeiroEnvio()
+    let consumidorB = Task { try await fila.processar(com: sincronizador, ignorarBackoff: true) }
+    segundo.titulo = "Novo"
+    try await fila.agendarEnvio(segundo, para: equipe)
+    await transporte.liberar()
+    _ = try await consumidorA.value
+    _ = try await consumidorB.value
+    #expect(await transporte.idsEnviados == [primeiro.id.rawValue.uuidString, segundo.id.rawValue.uuidString])
+    #expect(try await fila.operacoesPendentes().isEmpty)
+}
+
+private actor TransporteCloudKitSuspenso: TransporteDeConversasCloudKit {
+    private(set) var idsEnviados: [String] = []
+    private var liberacao: CheckedContinuation<Void, Never>?
+    private var inicio: CheckedContinuation<Void, Never>?
+
+    func aguardarPrimeiroEnvio() async {
+        if !idsEnviados.isEmpty { return }
+        await withCheckedContinuation { inicio = $0 }
+    }
+
+    func liberar() { liberacao?.resume(); liberacao = nil }
+
+    func salvar(_ dados: Data, id: String, equipe: EquipeDisponivel) async throws {
+        idsEnviados.append(id)
+        if idsEnviados.count == 1 {
+            await withCheckedContinuation {
+                liberacao = $0
+                inicio?.resume()
+                inicio = nil
+            }
+        }
+    }
+
+    func pagina(da equipe: EquipeDisponivel, continuando cursor: CursorDeConversasCloudKit?) -> PaginaDeConversasCloudKit {
+        PaginaDeConversasCloudKit(registros: [], proxima: nil)
+    }
+
+    func remover(id: String, equipe: EquipeDisponivel) {}
+}

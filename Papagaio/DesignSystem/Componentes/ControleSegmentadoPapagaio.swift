@@ -38,7 +38,7 @@ struct ControleSegmentadoPapagaio<Opcao: Hashable>: View {
                 if let simbolo = simbolo(opcao) {
                     Image(systemName: simbolo)
                 }
-                Text(titulo(opcao))
+                Text(titulo(opcao).localized)
             }
             .font(.callout.weight(.semibold))
             .foregroundStyle(ativo ? PapagaioTema.textoSobrePrimario : PapagaioTema.textoSecundario)

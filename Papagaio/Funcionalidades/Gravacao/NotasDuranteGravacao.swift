@@ -1,5 +1,4 @@
 import PapagaioCore
-import AppKit
 import SwiftUI
 
 /// Editor de observações da conversa enquanto o áudio ainda está sendo
@@ -32,9 +31,9 @@ struct PainelDeNotasDuranteGravacao: View {
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
                     .frame(width: 52, alignment: .leading)
                     .padding(.top, 2)
-                    .accessibilityLabel("Tempo atual da gravação")
+                    .accessibilityLabel("Tempo atual da gravação".localized)
 
-                TextField("Escreva uma nota e pressione Enter…", text: $gravador.rascunhoDaNota, axis: .vertical)
+                TextField("Escreva uma nota e pressione Enter…".localized, text: $gravador.rascunhoDaNota, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(PapagaioTema.Tipo.corpo)
                     .lineLimit(4...14)
@@ -53,13 +52,13 @@ struct PainelDeNotasDuranteGravacao: View {
             }
 
             HStack {
-                Text("Enter salva · Enter vazio marca o instante")
+                Text("Enter salva · Enter vazio marca o instante".localized)
                     .font(.caption)
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
                 Spacer()
 
-                Text(quantidadeDeNotas == 1 ? "1 nota" : "\(quantidadeDeNotas) notas")
+                Text(quantidadeDeNotas == 1 ? "1 nota".localized : "\(quantidadeDeNotas) " + "notas".localized)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
@@ -97,80 +96,6 @@ struct PainelDeNotasDuranteGravacao: View {
         editorEstaFocado = true
     }
 
-    /// Continua a lista de tópicos ao apertar Enter; tópico vazio encerra.
-    static func continuandoTopico(de anterior: String, para novo: String) -> String {
-        guard novo.count == anterior.count + 1, novo.hasSuffix("\n") else { return novo }
-
-        let linhas = novo.components(separatedBy: "\n")
-        guard linhas.count >= 2 else { return novo }
-        let ultima = linhas[linhas.count - 2]
-
-        guard let marca = ["- ", "* "].first(where: { ultima.hasPrefix($0) }) else { return novo }
-
-        if ultima.trimmingCharacters(in: .whitespaces) == marca.trimmingCharacters(in: .whitespaces) {
-            var semUltima = linhas
-            semUltima[semUltima.count - 2] = ""
-            return semUltima.joined(separator: "\n")
-        }
-
-        return novo + marca
-    }
-
-}
-
-private struct EditorDeNotaAlinhado: NSViewRepresentable {
-    @Binding var texto: String
-
-    func makeCoordinator() -> Coordenador {
-        Coordenador(texto: $texto)
-    }
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView()
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.borderType = .noBorder
-
-        let editor = NSTextView()
-        editor.delegate = context.coordinator
-        editor.drawsBackground = false
-        editor.isRichText = false
-        editor.allowsUndo = true
-        editor.font = .systemFont(ofSize: NSFont.systemFontSize)
-        editor.textColor = NSColor(PapagaioTema.texto)
-        editor.textContainerInset = NSSize(width: 18, height: 14)
-        editor.textContainer?.lineFragmentPadding = 0
-        editor.string = texto
-        editor.minSize = NSSize(width: 0, height: 0)
-        editor.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        editor.isVerticallyResizable = true
-        editor.isHorizontallyResizable = false
-        editor.autoresizingMask = [.width]
-        editor.textContainer?.widthTracksTextView = true
-
-        scroll.documentView = editor
-        context.coordinator.editor = editor
-        return scroll
-    }
-
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let editor = context.coordinator.editor, editor.string != texto else { return }
-        editor.string = texto
-    }
-
-    final class Coordenador: NSObject, NSTextViewDelegate {
-        @Binding var texto: String
-        weak var editor: NSTextView?
-
-        init(texto: Binding<String>) {
-            _texto = texto
-        }
-
-        func textDidChange(_ notification: Notification) {
-            guard let editor = notification.object as? NSTextView else { return }
-            texto = editor.string
-        }
-    }
 }
 
 private struct LinhaDaNotaEmGravacao: View {
@@ -198,14 +123,14 @@ private struct LinhaDaNotaEmGravacao: View {
             if editando {
                 // Enter confirma, como no campo de escrever: o mesmo gesto
                 // fecha a nota nova e a correção.
-                TextField("Corrija a nota…", text: $rascunho, axis: .vertical)
+                TextField("Corrija a nota…".localized, text: $rascunho, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.callout)
                     .lineLimit(1...4)
                     .focused($focado)
                     .onSubmit { concluir() }
             } else {
-                Text(nota.texto.isEmpty ? "Marcador" : nota.texto)
+                Text(nota.texto.isEmpty ? "Marcador".localized : nota.texto)
                     .font(.callout)
                     .foregroundStyle(
                         nota.texto.isEmpty ? PapagaioTema.textoSecundario : PapagaioTema.texto
@@ -235,7 +160,7 @@ private struct LinhaDaNotaEmGravacao: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(editando ? "Concluir edição" : "Editar nota")
+            .help(editando ? "Concluir edição".localized : "Editar nota".localized)
 
             Button(action: aoRemover) {
                 Image(systemName: "trash")
@@ -245,7 +170,7 @@ private struct LinhaDaNotaEmGravacao: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Apagar nota")
+            .help("Apagar nota".localized)
         }
         .padding(PapagaioTema.Espaco.medio)
         .background(PapagaioTema.superficieSuave.opacity(0.68), in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))

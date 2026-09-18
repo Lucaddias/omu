@@ -23,9 +23,9 @@ struct CartaoReuniaoPendente: View {
 
     private var dataFormatada: String {
         let formatador = DateFormatter()
-        formatador.locale = Locale(identifier: "pt_BR")
-        formatador.dateFormat = "EEEE, d 'de' MMMM"
-        return formatador.string(from: pendente.dataHora).capitalized
+        formatador.locale = LocalizacaoDoApp.localeAtual
+        formatador.setLocalizedDateFormatFromTemplate("EEEE MMMM d")
+        return formatador.string(from: pendente.dataHora)
     }
 
     var body: some View {
@@ -42,6 +42,7 @@ struct CartaoReuniaoPendente: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.85)
 
                     HStack(spacing: 4) {
                         Text(dataFormatada)
@@ -52,17 +53,21 @@ struct CartaoReuniaoPendente: View {
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
                     if status == .emAndamento {
-                        Text("AO VIVO")
+                        Text("AO VIVO".localized)
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6).padding(.vertical, 1)
                             .background(PapagaioTema.sucesso, in: Capsule())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     } else if status == .pendenteExpirada {
-                        Text("pendente")
+                        Text("pendente".localized)
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6).padding(.vertical, 1)
                             .background(PapagaioTema.perigo, in: Capsule())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
                 }
 
@@ -78,17 +83,17 @@ struct CartaoReuniaoPendente: View {
                 BotaoCircularReuniao(
                     simbolo: "mic.fill",
                     preenchido: true,
-                    ajuda: "Gravar",
+                    ajuda: "Gravar".localized,
                     acao: aoGravar
                 )
                 BotaoCircularReuniao(
                     simbolo: "arrow.down.doc",
-                    ajuda: "Importar",
+                    ajuda: "Importar".localized,
                     acao: aoImportar
                 )
                 BotaoCircularReuniao(
                     simbolo: "trash",
-                    ajuda: "Ignorar",
+                    ajuda: "Ignorar".localized,
                     acao: aoIgnorar
                 )
                 Spacer(minLength: 0)

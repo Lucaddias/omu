@@ -21,12 +21,12 @@ enum EstadoDoArquivo: Equatable {
 
     var descricao: String {
         switch self {
-        case .prontoParaTranscrever: "pronto para transcrever"
-        case let .naFila(posicao): "na fila (posição \(posicao))"
-        case let .processando(fase): fase.descricao
-        case .transcrito: "transcrito"
-        case .transcritoEResumido: "transcrito e resumido"
-        case let .falhou(motivo): motivo
+        case .prontoParaTranscrever: "pronto para transcrever".localized
+        case let .naFila(posicao): "na fila (posição %d)".localized(posicao)
+        case let .processando(fase): fase.descricao.localized
+        case .transcrito: "transcrito".localized
+        case .transcritoEResumido: "transcrito e resumido".localized
+        case let .falhou(motivo): motivo.localized
         }
     }
 

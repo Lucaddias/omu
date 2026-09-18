@@ -8,7 +8,7 @@ struct SegurancaDoPerfil: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.secao) {
-            TituloDeSecaoDoPerfil(simbolo: "shield", titulo: "Segurança")
+            TituloDeSecaoDoPerfil(simbolo: "shield", titulo: "Segurança".localized)
 
             SeparadorPapagaio()
 
@@ -41,20 +41,20 @@ struct SegurancaDoPerfil: View {
     private var conteudoDaSessao: some View {
         Group {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Senha")
+                    Text("Senha".localized)
                         .font(.headline)
                         .foregroundStyle(PapagaioTema.texto)
-                    Text("Gerenciada pelo ID Apple")
+                    Text("Gerenciada pelo ID Apple".localized)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
 
                 Spacer()
 
-                Button("Alterar Senha", action: aoAlterarSenha)
+                Button("Alterar Senha".localized, action: aoAlterarSenha)
                     .buttonStyle(BotaoDeContornoPapagaio())
 
-                Button("Sair", role: .destructive, action: aoSair)
+                Button("Sair".localized, role: .destructive, action: aoSair)
                     .buttonStyle(BotaoDeContornoPapagaio())
         }
     }
@@ -62,10 +62,10 @@ struct SegurancaDoPerfil: View {
     private var conteudoDeExclusao: some View {
         Group {
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                Text("Excluir perfil")
+                Text("Excluir perfil".localized)
                     .font(.headline)
                     .foregroundStyle(PapagaioTema.perigo)
-                Text("Remove deste Mac o perfil e seus dados pessoais, sem apagar os espaços de equipe nem as preferências do app.")
+                Text("Remove deste Mac o perfil e seus dados pessoais, sem apagar os espaços de equipe nem as preferências do app.".localized)
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
@@ -73,7 +73,7 @@ struct SegurancaDoPerfil: View {
             Spacer()
 
             Button(role: .destructive, action: aoExcluirConta) {
-                Label(excluindoConta ? "Excluindo..." : "Excluir perfil", systemImage: "trash")
+                Label(excluindoConta ? "Excluindo...".localized : "Excluir perfil".localized, systemImage: "trash")
             }
             .buttonStyle(BotaoDeContornoPapagaio())
             .disabled(excluindoConta)

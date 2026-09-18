@@ -170,7 +170,7 @@ actor ServicoDeEquipesCloudKit {
         let nomes = Self.nomes(no: registro)
         return ParticipanteDaEquipe(
             id: idAtual,
-            nome: nomes[idAtual] ?? Self.nomeLimpo(nomePadrao, fallback: "Meu perfil"),
+            nome: nomes[idAtual] ?? Self.nomeLimpo(nomePadrao, fallback: "Meu perfil".localized),
             eProprietario: false,
             eAtual: true,
             permissao: .escrita
@@ -455,7 +455,7 @@ actor ServicoDeEquipesCloudKit {
             nome: nomeDoParticipante(
                 compartilhamento.owner,
                 nomes: nomes,
-                fallback: "Proprietário"
+                fallback: "Proprietário".localized
             ),
             eProprietario: true,
             eAtual: idDoParticipante(compartilhamento.owner) == idAtual,
@@ -469,7 +469,7 @@ actor ServicoDeEquipesCloudKit {
                   idDoParticipante(participante) != dono.id else { return nil }
             return ParticipanteDaEquipe(
                 id: idDoParticipante(participante),
-                nome: nomeDoParticipante(participante, nomes: nomes, fallback: "Membro da equipe"),
+                nome: nomeDoParticipante(participante, nomes: nomes, fallback: "Membro da equipe".localized),
                 eProprietario: false,
                 eAtual: idDoParticipante(participante) == idAtual,
                 permissao: participante.permission == .readOnly ? .leitura : .escrita
@@ -572,33 +572,33 @@ enum ErroDeEquipeCloudKit: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .contaICloudIndisponivel:
-            "Entre no iCloud neste Mac para usar equipes compartilhadas."
+            "Entre no iCloud neste Mac para usar equipes compartilhadas.".localized
         case .equipeAindaLocal:
-            "Esta equipe ainda não foi publicada no CloudKit."
+            "Esta equipe ainda não foi publicada no CloudKit.".localized
         case .registroDaEquipeInvalido:
-            "O convite não contém uma equipe válida do Ōmu."
+            "O convite não contém uma equipe válida do Ōmu.".localized
         case .zonaCompartilhadaIndisponivel:
-            "Não encontrei a zona compartilhada desta equipe no iCloud. Entre novamente com o código da equipe."
+            "Não encontrei a zona compartilhada desta equipe no iCloud. Entre novamente com o código da equipe.".localized
         case .codigoInvalido:
-            "Não encontramos uma equipe com esse código."
+            "Não encontramos uma equipe com esse código.".localized
         case .conviteIndisponivel:
-            "Não foi possível preparar o convite desta equipe."
+            "Não foi possível preparar o convite desta equipe.".localized
         case .apenasAdministrador:
-            "Somente quem criou a equipe pode alterar estas configurações."
+            "Somente quem criou a equipe pode alterar estas configurações.".localized
         case .compartilhamentoInvalido:
-            "O compartilhamento desta equipe não é válido."
+            "O compartilhamento desta equipe não é válido.".localized
         case .cursorInvalido:
-            "Não foi possível continuar a paginação do espaço compartilhado."
+            "Não foi possível continuar a paginação do espaço compartilhado.".localized
         case .membroNaoEncontrado:
-            "Esse membro não faz mais parte do compartilhamento."
+            "Esse membro não faz mais parte do compartilhamento.".localized
         case .proprietarioNaoPodeSerAlterado:
-            "A permissão do proprietário da equipe não pode ser alterada."
+            "A permissão do proprietário da equipe não pode ser alterada.".localized
         case .proprietarioNaoPodeSerRemovido:
-            "O proprietário da equipe não pode ser removido."
+            "O proprietário da equipe não pode ser removido.".localized
         case .nomeInvalido:
-            "Informe um nome para mostrar na equipe."
+            "Informe um nome para mostrar na equipe.".localized
         case .apenasProprioNome:
-            "Você só pode alterar o próprio nome nesta equipe."
+            "Você só pode alterar o próprio nome nesta equipe.".localized
         }
     }
 }

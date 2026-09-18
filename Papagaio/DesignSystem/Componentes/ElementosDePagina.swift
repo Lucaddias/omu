@@ -32,13 +32,13 @@ struct CabecalhoDePagina<Acoes: View>: View {
 
     private var texto: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-            Text(titulo)
+            Text(titulo.localized)
                 .font(PapagaioTema.Tipo.tituloDePagina)
                 .foregroundStyle(PapagaioTema.texto)
                 .lineLimit(2)
                 .minimumScaleFactor(0.82)
             if let subtitulo {
-                Text(subtitulo)
+                Text(subtitulo.localized)
                     .font(.title3)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -59,13 +59,16 @@ struct CartaoDeEstadoVazio: View {
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
                 .frame(width: 64, height: 64)
                 .background(PapagaioTema.destaqueSuave, in: Circle())
-            Text(titulo)
+            Text(titulo.localized)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(PapagaioTema.texto)
-            Text(mensagem)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+            Text(mensagem.localized)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .frame(maxWidth: 420)
+                .minimumScaleFactor(0.85)
         }
         .padding(PapagaioTema.Espaco.pagina)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

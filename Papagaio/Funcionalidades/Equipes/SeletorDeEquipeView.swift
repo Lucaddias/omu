@@ -9,7 +9,7 @@ struct SeletorDeEquipeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
             HStack {
-                Text("Mudar Equipe")
+                Text("Mudar Equipe".localized)
                     .font(.title2.weight(.bold))
                     .foregroundStyle(PapagaioTema.texto)
 
@@ -19,12 +19,12 @@ struct SeletorDeEquipeView: View {
                     Image(systemName: "xmark")
                 }
                 .buttonStyle(.plain)
-                .help("Fechar")
+                .help("Fechar".localized)
             }
 
             Text(equipes.isEmpty
-                 ? "Você ainda não faz parte de nenhuma equipe."
-                 : "Escolha em qual equipe você quer trabalhar agora.")
+                 ? "Você ainda não faz parte de nenhuma equipe.".localized
+                 : "Escolha em qual equipe você quer trabalhar agora.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
 
@@ -44,7 +44,7 @@ struct SeletorDeEquipeView: View {
                                 Text(equipe.nome)
                                     .font(.headline)
                                     .foregroundStyle(PapagaioTema.texto)
-                                Text("\(equipe.papel) • \(equipe.resumoDeMembros)")
+                                Text("\(equipe.papel.localized) • \(equipe.resumoDeMembros.localized)")
                                     .font(.caption)
                                     .foregroundStyle(PapagaioTema.textoSecundario)
                             }

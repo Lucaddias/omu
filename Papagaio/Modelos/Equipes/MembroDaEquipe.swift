@@ -20,7 +20,7 @@ struct ParticipanteDaEquipe: Identifiable, Hashable, Sendable {
     let permissao: Permissao
 
     var descricaoDaPermissao: String {
-        eProprietario ? "Proprietário" : permissao.rawValue
+        eProprietario ? "Proprietário".localized : permissao.rawValue.localized
     }
 }
 
@@ -31,6 +31,14 @@ enum StatusDaEquipe: String, CaseIterable, Identifiable, Codable, Sendable {
     case aguardando = "Convite pendente"
 
     var id: Self { self }
+    var titulo: String {
+        switch self {
+        case .ativo: "Ativo".localized
+        case .offline: "Offline".localized
+        case .ocupado: "Ocupado".localized
+        case .aguardando: "Convite pendente".localized
+        }
+    }
     var cor: Color {
         switch self {
         case .ativo: PapagaioTema.sucesso
@@ -45,6 +53,12 @@ enum PermissaoDoMembroDaEquipe: String, CaseIterable, Identifiable, Codable, Sen
     case escrita = "Leitura e escrita"
 
     var id: Self { self }
+    var titulo: String {
+        switch self {
+        case .leitura: "Somente leitura".localized
+        case .escrita: "Leitura e escrita".localized
+        }
+    }
 }
 
 struct MembroDaEquipe: Identifiable, Equatable, Codable, Sendable {

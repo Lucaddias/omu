@@ -88,7 +88,7 @@ struct BarraDeAudioDaConversa: View {
             BotaoCircularDoPlayer(simbolo: "gobackward.10", tamanho: 18, destaque: false) {
                 Task { await reprodutor.voltar(10) }
             }
-            .help("Voltar 10 segundos")
+            .help("Voltar 10 segundos".localized)
 
             BotaoCircularDoPlayer(
                 simbolo: reprodutor.tocando ? "pause.fill" : "play.fill",
@@ -97,13 +97,13 @@ struct BarraDeAudioDaConversa: View {
             ) {
                 reprodutor.alternar()
             }
-            .help(reprodutor.tocando ? "Pausar" : "Tocar")
-            .accessibilityLabel(reprodutor.tocando ? "Pausar" : "Tocar")
+            .help(reprodutor.tocando ? "Pausar".localized : "Reproduzir".localized)
+            .accessibilityLabel(reprodutor.tocando ? "Pausar".localized : "Reproduzir".localized)
 
             BotaoCircularDoPlayer(simbolo: "goforward.10", tamanho: 18, destaque: false) {
                 Task { await reprodutor.avancar(10) }
             }
-            .help("Avançar 10 segundos")
+            .help("Avançar 10 segundos".localized)
         }
     }
 
@@ -113,7 +113,10 @@ struct BarraDeAudioDaConversa: View {
                 .font(.system(.caption, design: .monospaced).weight(.medium))
                 .foregroundStyle(PapagaioTema.texto)
                 .monospacedDigit()
-                .frame(width: 48, alignment: .trailing)
+                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(minWidth: 48, alignment: .trailing)
 
             Slider(
                 value: posicao,
@@ -127,14 +130,17 @@ struct BarraDeAudioDaConversa: View {
                 }
             )
             .tint(PapagaioTema.destaque)
-            .accessibilityLabel("Posição do áudio")
-            .accessibilityValue("\(posicaoAtual.faladoPorExtenso) de \(reprodutor.duracao.faladoPorExtenso)")
+            .accessibilityLabel("Posição do áudio".localized)
+            .accessibilityValue("%@ de %@".localized(posicaoAtual.faladoPorExtenso, reprodutor.duracao.faladoPorExtenso))
 
             Text(reprodutor.duracao.comoRelogio)
                 .font(.system(.caption, design: .monospaced).weight(.medium))
                 .foregroundStyle(PapagaioTema.texto)
                 .monospacedDigit()
-                .frame(width: 48, alignment: .leading)
+                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(minWidth: 48, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
     }
@@ -159,7 +165,7 @@ struct BarraDeAudioDaConversa: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(reprodutor.volume == 0 ? "Reativar som" : "Silenciar")
+            .help(reprodutor.volume == 0 ? "Reativar som".localized : "Silenciar".localized)
             .onHover { ativo in
                 withAnimation(.easeOut(duration: 0.14)) { pairandoNoIcone = ativo }
             }
@@ -176,11 +182,14 @@ struct BarraDeAudioDaConversa: View {
                     Slider(value: volume, in: 0...1)
                         .tint(PapagaioTema.destaqueEscuro)
                         .frame(width: 90)
-                        .accessibilityLabel("Volume")
+                        .accessibilityLabel("Volume".localized)
 
                     Text("\(Int((reprodutor.volume * 100).rounded()))%")
                         .font(.caption.weight(.semibold))
                         .monospacedDigit()
+                        .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .frame(width: 36, alignment: .leading)
                 }
@@ -201,13 +210,16 @@ struct BarraDeAudioDaConversa: View {
                 Text(textoDaVelocidade)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, PapagaioTema.Espaco.curto)
                     .frame(height: PapagaioTema.Altura.compacta)
                     .background(PapagaioTema.superficieSuave, in: Capsule())
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
-            .help("Velocidade")
+            .help("Velocidade".localized)
         }
         // O hover é do alto-falante e da régua, e **não** da linha inteira:
         // pegando a linha toda, passar o mouse na velocidade — ou clicar nela,

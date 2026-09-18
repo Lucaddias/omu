@@ -152,8 +152,8 @@ baixar() {
 baixar_arquivo() {
     local nome="$1" url="$2" sha="$3" destino="$4"
 
-    if [ -f "$destino" ]; then
-        echo "==> $nome já presente em $destino — pulando"
+    if arquivo_confere "$destino" "$sha"; then
+        echo "==> $nome verificado em $destino — pulando"
         return
     fi
 
@@ -171,8 +171,23 @@ baixar_arquivo() {
     fi
 
     mkdir -p "$(dirname "$destino")"
-    cp "$TEMP/$nome" "$destino"
+    # O arquivo válido só substitui o anterior depois de download e checksum.
+    # Um encerramento durante a cópia não deixa um arquivo final truncado.
+    local preparado
+    preparado="$(mktemp "$(dirname "$destino")/.bootstrap.XXXXXX")"
+    if ! cp "$TEMP/$nome" "$preparado" || ! mv -f "$preparado" "$destino"; then
+        rm -f "$preparado"
+        return 1
+    fi
     echo "==> $destino pronto"
+}
+
+arquivo_confere() {
+    local caminho="$1" sha="$2"
+    [ -f "$caminho" ] || return 1
+    local obtido
+    obtido="$(shasum -a 256 "$caminho" | awk '{print $1}')"
+    [ "$obtido" = "$sha" ]
 }
 
 # O pod archive do ONNX Runtime não traz module map; sem ele, `import
@@ -206,23 +221,6 @@ patchear_module_map_do_onnx() {
     done
     echo "==> module map do onnxruntime.xcframework patcheado"
 }
-
-baixar "llama" \
-    "https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/llama-$LLAMA_TAG-xcframework.zip" \
-    "$LLAMA_SHA" "llama.xcframework"
-
-baixar "whisper" \
-    "https://github.com/ggml-org/whisper.cpp/releases/download/$WHISPER_TAG/whisper-$WHISPER_TAG-xcframework.zip" \
-    "$WHISPER_SHA" "whisper.xcframework"
-
-baixar "onnxruntime" \
-    "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-$ONNX_TAG.zip" \
-    "$ONNX_SHA" "onnxruntime.xcframework"
-patchear_module_map_do_onnx
-
-baixar_arquivo "silero_vad.onnx" \
-    "https://raw.githubusercontent.com/snakers4/silero-vad/76e3dc408eb2a5c655c34e230d2d5459b4439daa/src/silero_vad/data/silero_vad.onnx" \
-    "$SILERO_SHA" "$RECURSOS/silero_vad.onnx"
 
 # Diarização acústica offline: os quatro .mlmodelc + plda-parameters.json do
 # repo FluidInference/speaker-diarization-coreml, na árvore exata que o
@@ -266,33 +264,37 @@ plda-parameters.json|38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c
 "
 
 baixar_diarizacao() {
-    local baixou=0
     for linha in $DIARIZACAO_ARTEFATOS; do
-        local caminho sha destino obtido
+        local caminho sha destino
         caminho="${linha%%|*}"
         sha="${linha##*|}"
         destino="$DIARIZACAO_DESTINO/$caminho"
-        if [ -f "$destino" ]; then
-            continue
-        fi
-        baixou=1
-        echo "==> baixando diarização: $caminho"
-        mkdir -p "$TEMP/$(dirname "$caminho")"
-        curl -sSL --fail -o "$TEMP/$caminho" "$DIARIZACAO_BASE/$caminho"
-        obtido="$(shasum -a 256 "$TEMP/$caminho" | awk '{print $1}')"
-        if [ "$obtido" != "$sha" ]; then
-            echo "ERRO: checksum de $caminho não confere" >&2
-            echo "  esperado: $sha" >&2
-            echo "  obtido:   $obtido" >&2
-            exit 1
-        fi
-        mkdir -p "$(dirname "$destino")"
-        cp "$TEMP/$caminho" "$destino"
+        baixar_arquivo "$(basename "$caminho")" \
+            "$DIARIZACAO_BASE/$caminho" "$sha" "$destino"
     done
-    if [ "$baixou" = "1" ]; then
-        echo "==> $DIARIZACAO_DESTINO pronto"
-    fi
 }
+
+# Permite exercitar as funções com fixtures locais sem executar downloads reais.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    return 0
+fi
+
+baixar "llama" \
+    "https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/llama-$LLAMA_TAG-xcframework.zip" \
+    "$LLAMA_SHA" "llama.xcframework"
+
+baixar "whisper" \
+    "https://github.com/ggml-org/whisper.cpp/releases/download/$WHISPER_TAG/whisper-$WHISPER_TAG-xcframework.zip" \
+    "$WHISPER_SHA" "whisper.xcframework"
+
+baixar "onnxruntime" \
+    "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-$ONNX_TAG.zip" \
+    "$ONNX_SHA" "onnxruntime.xcframework"
+patchear_module_map_do_onnx
+
+baixar_arquivo "silero_vad.onnx" \
+    "https://raw.githubusercontent.com/snakers4/silero-vad/76e3dc408eb2a5c655c34e230d2d5459b4439daa/src/silero_vad/data/silero_vad.onnx" \
+    "$SILERO_SHA" "$RECURSOS/silero_vad.onnx"
 
 baixar_diarizacao
 

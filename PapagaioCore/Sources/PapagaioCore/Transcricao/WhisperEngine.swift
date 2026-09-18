@@ -26,6 +26,7 @@ private actor AcumuladorDeTrechos {
                 texto: segmento.texto,
                 speaker: speaker,
                 palavras: palavras,
+                confianca: Trecho.confiancaMedia(palavras) ?? segmento.confianca,
                 noSpeechProb: segmento.noSpeechProb
             )
         })
@@ -75,6 +76,7 @@ public struct WhisperEngine: TranscriptionEngine {
     public func transcribe(
         _ url: URL,
         speaker: String?,
+        idioma: String? = nil,
         initialPrompt: String? = nil
     ) async throws -> [Trecho] {
         let sessao = DetectorDeAtividadeDeVoz.SessaoEmFluxo()
@@ -85,6 +87,7 @@ public struct WhisperEngine: TranscriptionEngine {
                 try Task.checkCancellation()
                 let segmentosBrutos = try await contexto.transcrever(
                     amostras: janela.amostras,
+                    idioma: idioma,
                     initialPrompt: initialPrompt
                 )
                 // Remove palavras que são puramente emoji (alucinação do

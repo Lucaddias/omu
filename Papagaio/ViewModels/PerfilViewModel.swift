@@ -107,7 +107,7 @@ final class PerfilViewModel: NSObject {
             avatarURL = resolverBookmarkDeAvatar()
         } catch {
             avatarURL = url
-            self.erro = "Não foi possível guardar a foto do perfil: \(error.localizedDescription)"
+            self.erro = "Não foi possível guardar a foto do perfil: %@".localized(error.localizedDescription)
         }
     }
 
@@ -127,7 +127,7 @@ final class PerfilViewModel: NSObject {
                 case .revoked, .notFound, .transferred:
                     self.removerCredencial()
                 @unknown default:
-                    self.erro = erro?.localizedDescription ?? "Não foi possível validar a credencial da Apple."
+                    self.erro = erro?.localizedDescription ?? "Não foi possível validar a credencial da Apple.".localized
                 }
             }
         }
@@ -198,7 +198,7 @@ final class PerfilViewModel: NSObject {
     private struct ErroKeychain: LocalizedError {
         let status: OSStatus
         var errorDescription: String? {
-            SecCopyErrorMessageString(status, nil) as String? ?? "Erro do Keychain (\(status))."
+            SecCopyErrorMessageString(status, nil) as String? ?? "Erro do Keychain (%d).".localized(Int(status))
         }
     }
 }
@@ -223,7 +223,7 @@ extension PerfilViewModel: ASAuthorizationControllerDelegate {
                     email: credencial.email ?? self.email
                 )
             } catch {
-                self.erro = "Não foi possível guardar sua sessão: \(error.localizedDescription)"
+                self.erro = "Não foi possível guardar sua sessão: %@".localized(error.localizedDescription)
             }
         }
     }

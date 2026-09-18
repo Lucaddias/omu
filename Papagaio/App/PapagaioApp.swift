@@ -1,6 +1,10 @@
 import AppKit
 import SwiftUI
 
+extension Notification.Name {
+    static let abrirGravacaoNoApp = Notification.Name("abrirGravacaoNoApp")
+}
+
 /// Escolhe o host antes de construir qualquer estado ou cena de produção.
 @main
 enum InicializacaoDoPapagaio {
@@ -62,7 +66,18 @@ struct PapagaioApp: App {
                 .onChange(of: gravador.gravando) { _, gravando in
                     if gravando, painelHabilitado {
                         painelFlutuante.exibir(gravador: gravador) {
+                            // "Abrir no app" precisa fazer mais que ativar:
+                            // a principal pode estar minimizada, em outro
+                            // Space ou em outra tela (Tarefas/Mídias/Config).
+                            // Sem desminimizar + ordenar à frente + navegar
+                            // à captura, o clique parecia não fazer nada.
                             NSApp.activate(ignoringOtherApps: true)
+                            for window in NSApp.windows {
+                                if let painel = window as? NSPanel, painel.level == .floating { continue }
+                                if window.isMiniaturized { window.deminiaturize(nil) }
+                                window.makeKeyAndOrderFront(nil)
+                            }
+                            NotificationCenter.default.post(name: .abrirGravacaoNoApp, object: nil)
                         }
                     } else {
                         painelFlutuante.esconder(origem: gravador.origemDoPainelNaTela)
@@ -84,12 +99,12 @@ struct PapagaioApp: App {
         // outra janela ou minimizado. Some quando não há gravação — item de
         // menu permanente vira ruído.
         MenuBarExtra(isInserted: .constant(gravador.gravando)) {
-            Text(gravador.pausado ? "Gravação pausada" : "Gravando agora")
+            Text(gravador.pausado ? "Gravação pausada".localized : "Gravando agora".localized)
             Text(gravador.tempoDeGravacao.comoCronometro)
 
             Divider()
 
-            Button(gravador.pausado ? "Continuar" : "Pausar") {
+            Button(gravador.pausado ? "Continuar".localized : "Pausar".localized) {
                 Task {
                     if gravador.pausado {
                         await gravador.continuar()
@@ -99,11 +114,11 @@ struct PapagaioApp: App {
                 }
             }
 
-            Button("Finalizar gravação") {
+            Button("Finalizar gravação".localized) {
                 Task { await gravador.alternarGravacao() }
             }
 
-            Button("Cancelar gravação") {
+            Button("Cancelar gravação".localized) {
                 Task { await gravador.cancelar() }
             }
         } label: {

@@ -46,10 +46,15 @@ final class GoogleCalendarViewModel {
     /// Reconexão automática só é legítima quando já houve consentimento e há
     /// uma credencial persistida. Ter Client ID no build apenas habilita o
     /// botão de conexão; não autoriza rede nem abertura de navegador.
+    ///
+    /// UMA única leitura de Keychain, só de atributos (sem `kSecReturnData`):
+    /// checar existência não decifra o segredo, então o launch não dispara
+    /// prompt. O sinal canônico é o `refresh_token` (longa duração); o
+    /// `access_token` (curto, rotativo) só é lido no uso/refresh, dentro de
+    /// `SessaoOAuthGoogle.tokenDeAcesso`. Antes, dois `carregar` (refresh +
+    /// access) disparavam dois prompts logo na abertura.
     var temAutorizacaoPersistida: Bool {
-        let refresh = cofre.carregar(conta: "refresh_token")
-        let acesso = cofre.carregar(conta: "access_token")
-        return refresh?.isEmpty == false || acesso?.isEmpty == false
+        !cofre.contasExistentes(entre: ["refresh_token"]).isEmpty
     }
 
     func conectar(biblioteca: Biblioteca) async {

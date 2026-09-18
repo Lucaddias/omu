@@ -93,9 +93,9 @@ enum FonteGranolaErro: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .respostaInesperada:
-            "O Granola respondeu algo que o Ōmu não reconheceu."
+            "O Granola respondeu algo que o Ōmu não reconheceu.".localized
         case let .reuniaoNaoEncontrada(id):
-            "A reunião \(id) não foi encontrada no Granola."
+            "A reunião %@ não foi encontrada no Granola.".localized(id)
         }
     }
 }
@@ -129,7 +129,7 @@ private enum FonteGranolaXML {
         return marcacoes.compactMap { marcacao in
             let atributos = atributosDo(bloco: marcacao, no: documento)
             guard let id = atributos["id"], !id.isEmpty else { return nil }
-            let titulo = atributos["title"] ?? "Reunião"
+            let titulo = atributos["title"] ?? "Reunião".localized
 
             var participantes: [ParticipanteDaReuniao] = []
             var resumo: String?

@@ -105,13 +105,14 @@ enum DiagnosticoTap {
                     }
                 }
                 guard status == noErr else { log("\(nome): CreateIOProcID \(status)"); return }
+                defer {
+                    if let procID { AudioDeviceDestroyIOProcID(agg.id, procID) }
+                }
                 guard AudioDeviceStart(agg.id, procID) == noErr else {
                     log("\(nome): AudioDeviceStart falhou"); return
                 }
                 Thread.sleep(forTimeInterval: 4)
                 AudioDeviceStop(agg.id, procID)
-                if let procID { AudioDeviceDestroyIOProcID(agg.id, procID) }
-
                 let veredito = contador.pico > 0.0001 ? "<<<< TEM SINAL" : "silêncio"
                 log("\(nome.padding(toLength: 26, withPad: " ", startingAt: 0)) "
                     + "callbacks=\(contador.chamadas) buffers=\(contador.buffers) "
@@ -195,13 +196,14 @@ enum DiagnosticoTap {
                     }
                 }) == noErr else { log("\(nome): CreateIOProcID falhou"); return }
 
+                defer {
+                    if let procID { AudioDeviceDestroyIOProcID(agg.id, procID) }
+                }
                 guard AudioDeviceStart(agg.id, procID) == noErr else {
                     log("\(nome): Start falhou"); return
                 }
                 Thread.sleep(forTimeInterval: 4)
                 AudioDeviceStop(agg.id, procID)
-                if let procID { AudioDeviceDestroyIOProcID(agg.id, procID) }
-
                 let veredito = contador.pico > 0.0001 ? "<<<< TEM SINAL" : "silêncio"
                 log("\(nome.padding(toLength: 26, withPad: " ", startingAt: 0)) "
                     + "callbacks=\(contador.chamadas) quadros=\(contador.quadros) "

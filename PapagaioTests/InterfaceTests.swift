@@ -61,7 +61,22 @@ func estadosOcupados() {
 
 @Test("A posição na fila aparece na descrição")
 func descricaoDaFila() {
-    #expect(EstadoDoArquivo.naFila(posicao: 2).descricao == "na fila (posição 2)")
+    #expect(EstadoDoArquivo.naFila(posicao: 2).descricao == "na fila (posição %d)".localized(2))
+}
+
+@Test("Os estados de processamento usam as chaves localizáveis do card")
+func descricoesDasFasesDeProcessamento() {
+    #expect(EstadoDoArquivo.processando(.transcrevendo).descricao == "transcrevendo…".localized)
+    #expect(EstadoDoArquivo.processando(.diarizando).descricao == "distinguindo falantes…".localized)
+    #expect(EstadoDoArquivo.processando(.resolvendoFalantes).descricao == "resolvendo falantes pelo contexto…".localized)
+    #expect(EstadoDoArquivo.processando(.traduzindo).descricao == "traduzindo…".localized)
+    #expect(EstadoDoArquivo.processando(.resumindo).descricao == "resumindo…".localized)
+    #expect(EstadoDoArquivo.processando(.salvando).descricao == "salvando…".localized)
+}
+
+@Test("O editor sugere um e-mail pessoal válido para membros da equipe")
+func emailSugeridoNoEditorDeInformacoes() {
+    #expect(EditorDeInformacoesDoCard.emailSugeridoDaEquipe == "joao.santos@email.com")
 }
 
 // MARK: - Formatação de tempo
@@ -105,17 +120,17 @@ func identidadeDaFalaPreservaCanal() {
         trechoIds: []
     )
 
-    #expect(LinhaDeFala.rotuloDoCanal(Speaker.eu) == "Eu · microfone")
+    #expect(LinhaDeFala.rotuloDoCanal(Speaker.eu) == "Eu · microfone".localized)
     #expect(
         LinhaDeFala.rotuloDoCanal(Speaker.interlocutor)
-            == "Interlocutor · áudio do sistema"
+            == "Interlocutor · áudio do sistema".localized
     )
     #expect(
         LinhaDeFala.identidadeAcessivel(
             fala,
             falantePreservado: nil,
             nomesDeVoz: ["S1": "Luca"]
-        ) == "Eu · microfone, Luca"
+        ) == "\(LinhaDeFala.rotuloDoCanal(Speaker.eu)), Luca"
     )
 }
 
@@ -169,4 +184,28 @@ func contrasteInverte() throws {
     // No claro: texto escuro sobre fundo claro. No escuro: o inverso.
     #expect(luminancia(PapagaioTema.texto, claro) < luminancia(PapagaioTema.fundo, claro))
     #expect(luminancia(PapagaioTema.texto, escuro) > luminancia(PapagaioTema.fundo, escuro))
+}
+
+@Test("Tempos finitos fora de Int não derrubam o app e minutos grandes não truncam")
+func tempoExtremo() {
+    for valor in [Double.greatestFiniteMagnitude, Double(Int.max)] {
+        #expect(valor.comoRelogio == "0:00")
+        #expect(valor.comoCronometro == "00:00")
+        #expect(valor.faladoPorExtenso == "0 s")
+        #expect(valor.comoDuracaoPorExtenso == "%d segundos".localized(0))
+    }
+    let minutos = Double(Int32.max) + 1
+    #expect((minutos * 60).comoRelogio == "2147483648:00")
+    #expect((minutos * 60).comoCronometro == "2147483648:00")
+}
+
+@Test("Duração digitada recusa infinito, overflow e valor negativo")
+func leituraDeDuracaoValida() {
+    #expect(TimeInterval.lendo("1h 15min") == 4_500)
+    #expect(TimeInterval.lendo("1,5") == 90)
+    #expect(TimeInterval.lendo("0") == 0)
+    #expect(TimeInterval.lendo("-2") == nil)
+    #expect(TimeInterval.lendo("inf") == nil)
+    #expect(TimeInterval.lendo("1e308") == nil)
+    #expect(TimeInterval.lendo(String(repeating: "9", count: 400) + "h") == nil)
 }

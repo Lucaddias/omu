@@ -135,8 +135,8 @@ struct MidiasView: View {
                 if midiasPorConversa.isEmpty && naLixeiraGeral.isEmpty {
                     CartaoDeEstadoVazio(
                         simbolo: "photo.on.rectangle",
-                        titulo: "Nenhuma mídia ainda",
-                        mensagem: "Fotos, vídeos, áudios e outros anexos salvos em qualquer conversa aparecerão reunidos aqui."
+                        titulo: "Nenhuma mídia ainda".localized,
+                        mensagem: "Fotos, vídeos, áudios e outros anexos salvos em qualquer conversa aparecerão reunidos aqui.".localized
                     )
                     .frame(maxWidth: .infinity, minHeight: 300)
                     .cartaoPapagaio()
@@ -149,16 +149,16 @@ struct MidiasView: View {
             .padding(.vertical, PapagaioTema.espacamentoDePagina)
         }
         .background(PapagaioTema.fundo)
-        .alert("Atenção", isPresented: Binding(get: { erro != nil }, set: { if !$0 { erro = nil } })) {
-            Button("OK") { erro = nil }
+        .alert("Atenção".localized, isPresented: Binding(get: { erro != nil }, set: { if !$0 { erro = nil } })) {
+            Button("OK".localized) { erro = nil }
         } message: {
-            Text(erro ?? "")
+            Text((erro ?? "").localized)
         }
     }
 
     private var cabecalhoDaPagina: some View {
         HStack(alignment: .center, spacing: PapagaioTema.Espaco.curto) {
-            Text("Painel de Mídias")
+            Text("Painel de Mídias".localized)
                 .font(PapagaioTema.Tipo.tituloDePagina)
                 .foregroundStyle(PapagaioTema.texto)
 
@@ -168,8 +168,8 @@ struct MidiasView: View {
             // acima do centro óptico da letra bold de 30pt mesmo com
             // `alignment: .center`.
             BotaoDeAjudaPapagaio(
-                texto: "Fotos, vídeos, áudios e outros anexos de todas as conversas, reunidos num só lugar.",
-                ajuda: "Sobre a página de mídias",
+                texto: "Fotos, vídeos, áudios e outros anexos de todas as conversas, reunidos num só lugar.".localized,
+                ajuda: "Sobre a página de mídias".localized,
                 largura: 280
             )
             .offset(y: 3)
@@ -192,12 +192,12 @@ struct MidiasView: View {
     private var seletorDeConversas: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             HStack {
-                Text("Todas as conversas")
+                Text("Todas as conversas".localized)
                     .font(.caption.weight(.bold))
                     .textCase(.uppercase)
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
-                Text("\(midiasPorConversa.count) \(midiasPorConversa.count == 1 ? "Conversa" : "Conversas")")
+                Text("\(midiasPorConversa.count) \(midiasPorConversa.count == 1 ? "Conversa".localized : "Conversas".localized)")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .padding(.horizontal, PapagaioTema.Espaco.curto)
@@ -205,7 +205,7 @@ struct MidiasView: View {
                     .background(PapagaioTema.superficieSuave, in: Capsule())
 
                 if !conversasSelecionadas.isEmpty {
-                    Button("Limpar seleção") {
+                    Button("Limpar seleção".localized) {
                         withAnimation(.snappy(duration: 0.18)) {
                             conversasSelecionadas.removeAll()
                         }
@@ -240,8 +240,8 @@ struct MidiasView: View {
             if midiasVisiveis.isEmpty && naLixeiraVisivel.isEmpty {
                 CartaoDeEstadoVazio(
                     simbolo: "magnifyingglass",
-                    titulo: "Nenhuma mídia encontrada",
-                    mensagem: "Tente limpar a seleção, trocar o tipo de arquivo ou buscar por outra conversa."
+                    titulo: "Nenhuma mídia encontrada".localized,
+                    mensagem: "Tente limpar a seleção, trocar o tipo de arquivo ou buscar por outra conversa.".localized
                 )
                 .frame(maxWidth: .infinity, minHeight: 240)
                 .cartaoPapagaio()
@@ -279,7 +279,7 @@ struct MidiasView: View {
                 .foregroundStyle(PapagaioTema.texto)
                 .layoutPriority(1)
 
-            Text("\(midiasVisiveis.count) \(midiasVisiveis.count == 1 ? "Arquivo" : "Arquivos")")
+            Text("\(midiasVisiveis.count) \(midiasVisiveis.count == 1 ? "Arquivo".localized : "Arquivos".localized)")
                 .font(.callout.weight(.bold))
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -290,13 +290,13 @@ struct MidiasView: View {
             Spacer(minLength: PapagaioTema.Espaco.medio)
 
             Menu {
-                Button("Todos os tipos") { tipoSelecionado = nil }
+                Button("Todos os tipos".localized) { tipoSelecionado = nil }
                 Divider()
                 ForEach(Self.tipos, id: \.nome) { tipo in
-                    Button(tipo.nome, systemImage: tipo.simbolo) { tipoSelecionado = tipo.nome }
+                    Button(tipo.nome.localized, systemImage: tipo.simbolo) { tipoSelecionado = tipo.nome }
                 }
             } label: {
-                Label(tipoSelecionado ?? "Tipo de arquivo", systemImage: "line.3.horizontal.decrease")
+                Label(tipoSelecionado?.localized ?? "Tipo de arquivo".localized, systemImage: "line.3.horizontal.decrease")
             }
             .buttonStyle(BotaoDeFiltroDeTarefaGeral(ativo: tipoSelecionado != nil))
         }
@@ -306,7 +306,7 @@ struct MidiasView: View {
         if conversasSelecionadas.count == 1, let selecionada = conversasVisiveis.first {
             return selecionada.titulo
         }
-        return conversasSelecionadas.isEmpty ? "Todas as mídias" : "\(conversasSelecionadas.count) conversas selecionadas"
+        return conversasSelecionadas.isEmpty ? "Todas as mídias".localized : "%d conversas selecionadas".localized(conversasSelecionadas.count)
     }
 
     private func alternarSelecao(_ id: ArquivoID) {
@@ -342,7 +342,7 @@ struct MidiasView: View {
             try MidiasDaConversa.salvar(atualizados, para: conversa.id)
             versaoDasMidias += 1
         } catch {
-            self.erro = "Não foi possível remover \"\(anexo.nome)\": \(error.localizedDescription)"
+            self.erro = "Não foi possível remover \"%@\": %@".localized(anexo.nome, error.localizedDescription)
         }
     }
 
@@ -351,7 +351,7 @@ struct MidiasView: View {
     /// de uma conversa específica.
     private func restaurarItem(_ item: MidiaNaLixeira) {
         if !LixeiraDeMidia.restaurar(item) {
-            erro = "Não foi possível restaurar \"\(item.nome)\"."
+            erro = "Não foi possível restaurar \"%@\".".localized(item.nome)
         }
         versaoDasMidias += 1
     }
@@ -361,7 +361,7 @@ struct MidiasView: View {
             try LixeiraDeMidia.remover(item)
             versaoDasMidias += 1
         } catch {
-            erro = "Não foi possível apagar definitivamente \"\(item.nome)\": \(error.localizedDescription)"
+            erro = "Não foi possível apagar definitivamente \"%@\": %@".localized(item.nome, error.localizedDescription)
         }
     }
 }

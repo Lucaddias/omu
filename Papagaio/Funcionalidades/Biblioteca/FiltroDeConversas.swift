@@ -6,6 +6,10 @@ enum FiltroDaBiblioteca: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    var titulo: String {
+        rawValue.localized
+    }
+
     var simbolo: String {
         switch self {
         case .todas: "tray.full"
@@ -53,9 +57,9 @@ struct FiltroDeConversas: View {
                         aoLimparAtalhoVisual()
                     }
                 }
-                .help(filtro.rawValue)
+                .help(filtro.titulo)
                 .accessibilityAddTraits(.isButton)
-                .accessibilityLabel("Mostrar \(filtro.rawValue.localizedLowercase)")
+                .accessibilityLabel("Mostrar %@".localized(filtro.titulo.localizedLowercase))
                 .accessibilityAddTraits(selecionado == filtro ? [.isSelected] : [])
             }
         }
@@ -133,7 +137,9 @@ private struct PastilhaDeFiltro: View {
         if somenteIcone {
             Image(systemName: filtro.simbolo)
         } else {
-            Label(filtro.rawValue, systemImage: filtro.simbolo)
+            Label(filtro.titulo, systemImage: filtro.simbolo)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
     }
 

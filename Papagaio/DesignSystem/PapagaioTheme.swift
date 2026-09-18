@@ -243,14 +243,39 @@ extension View {
 /// Aceita o que a pessoa costuma escrever: 15/08/2026, 15-08-2026, 15082026,
 /// 15/08/26 e 15/08 (assume o ano corrente).
 enum DataDigitada {
-    private static let formatos = ["dd/MM/yyyy", "dd-MM-yyyy", "ddMMyyyy", "dd/MM/yy", "dd/MM"]
+    private static var mesVemAntesDoDia: Bool {
+        let formato = DateFormatter.dateFormat(
+            fromTemplate: "yMd",
+            options: 0,
+            locale: LocalizacaoDoApp.localeAtual
+        ) ?? "dd/MM/yyyy"
+        let indiceDoMes = formato.firstIndex(of: "M") ?? formato.endIndex
+        let indiceDoDia = formato.firstIndex(of: "d") ?? formato.endIndex
+        return indiceDoMes < indiceDoDia
+    }
+
+    private static var formatos: [(padrao: String, semAno: Bool)] {
+        let prefixo = mesVemAntesDoDia ? "MM/dd" : "dd/MM"
+        let compactado = mesVemAntesDoDia ? "MMddyyyy" : "ddMMyyyy"
+        return [
+            ("\(prefixo)/yyyy", false),
+            (prefixo.replacingOccurrences(of: "/", with: "-") + "-yyyy", false),
+            (compactado, false),
+            ("\(prefixo)/yy", false),
+            (prefixo, true),
+        ]
+    }
+
+    static var exemploDeFormato: String {
+        mesVemAntesDoDia ? "mm/dd/yyyy" : "dd/mm/yyyy"
+    }
 
     /// Um formatador só, reconfigurado a cada leitura. Antes cada chamada
     /// criava um `DateFormatter` novo — e ele é notoriamente caro de construir.
     private static let formatador: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "pt_BR")
-        f.calendar = Calendar.current
+        f.locale = LocalizacaoDoApp.localeAtual
+        f.calendar = .autoupdatingCurrent
         return f
     }()
 
@@ -259,16 +284,19 @@ enum DataDigitada {
         guard !limpo.isEmpty else { return nil }
 
         for formato in formatos {
-            formatador.dateFormat = formato
+            formatador.locale = LocalizacaoDoApp.localeAtual
+            formatador.calendar = .autoupdatingCurrent
+            formatador.dateFormat = formato.padrao
             guard let lida = formatador.date(from: limpo) else { continue }
 
-            // "dd/MM" cai no ano de referência do formatador; joga para o ano
-            // corrente, que é o que a pessoa quis dizer ao omitir o ano.
-            if formato == "dd/MM" {
-                let anoAtual = Calendar.current.component(.year, from: Date())
-                var partes = Calendar.current.dateComponents([.day, .month], from: lida)
+            // Uma data sem ano cai no ano de referência do formatador; joga
+            // para o ano corrente, preservando a ordem que a região usa.
+            if formato.semAno {
+                let calendario = Calendar.autoupdatingCurrent
+                let anoAtual = calendario.component(.year, from: Date())
+                var partes = calendario.dateComponents([.day, .month], from: lida)
                 partes.year = anoAtual
-                return Calendar.current.date(from: partes)
+                return calendario.date(from: partes)
             }
 
             return lida
@@ -281,12 +309,12 @@ enum DataDigitada {
         data.formatted(.dateTime.day(.twoDigits).month(.twoDigits).year())
     }
 
-    /// Data e hora da conversa: `13/08/2026, 14:32`.
+    /// Data e hora da conversa na ordem e no relógio da região do sistema.
     ///
     /// Numérico, e não "13 de agosto de 2026", pelo mesmo motivo que a leitura
-    /// acima aceita `15/08/2026`: é a forma que a pessoa escreve e lê no resto
-    /// do app. Mês por extenso ocupava três vezes mais largura, empurrava o
-    /// rodapé do cartão para uma segunda linha e desalinhava a fileira.
+    /// acima: é a forma que a pessoa escreve e lê no resto do app. Mês por
+    /// extenso ocupava três vezes mais largura, empurrava o rodapé do cartão
+    /// para uma segunda linha e desalinhava a fileira.
     static func textoComHora(de data: Date) -> String {
         data.formatted(.dateTime.day(.twoDigits).month(.twoDigits).year().hour().minute())
     }
@@ -367,7 +395,7 @@ struct BotaoCircularPapagaio: View {
 /// de tudo em volta — por isso o controle é montado aqui.
 struct CampoDeDataPapagaio: View {
     @Binding var data: Date
-    var rotuloAcessivel: String = "Data"
+    var rotuloAcessivel: String = "Data".localized
 
     @State private var mostrandoCalendario = false
     @State private var textoDigitado = ""
@@ -385,6 +413,7 @@ struct CampoDeDataPapagaio: View {
                 Image(systemName: "calendar")
                 Text(dataPorExtenso)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Spacer()
                 Image(systemName: "chevron.down")
                     .font(.caption.weight(.bold))
@@ -398,12 +427,12 @@ struct CampoDeDataPapagaio: View {
         .accessibilityValue(dataPorExtenso)
         .popover(isPresented: $mostrandoCalendario, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                Text("Digite a data")
+                Text("Digite a data".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
                 HStack(spacing: PapagaioTema.Espaco.curto) {
-                    TextField("dd/mm/aaaa", text: $textoDigitado)
+                    TextField(DataDigitada.exemploDeFormato, text: $textoDigitado)
                         .textFieldStyle(.plain)
                         .font(.body)
                         .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -416,12 +445,12 @@ struct CampoDeDataPapagaio: View {
                         .onSubmit(aplicarTextoDigitado)
                         .onChange(of: textoDigitado) { _, _ in textoInvalido = false }
 
-                    Button("Usar", action: aplicarTextoDigitado)
+                    Button("Usar".localized, action: aplicarTextoDigitado)
                         .buttonStyle(BotaoDeContornoPapagaio())
                 }
 
                 if textoInvalido {
-                    Text("Data não reconhecida. Use dd/mm/aaaa.")
+                    Text("Data não reconhecida. Use %@.".localized(DataDigitada.exemploDeFormato))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(PapagaioTema.perigo)
                 }
@@ -535,10 +564,11 @@ struct SeloDeStatus: View {
     var compacto: Bool = false
 
     var body: some View {
-        Label(texto, systemImage: simbolo)
+        Label(texto.localized, systemImage: simbolo)
             .font(compacto ? .caption2.weight(.semibold) : PapagaioTema.Tipo.rotulo)
             .foregroundStyle(estilo.cor)
             .lineLimit(1)
+            .minimumScaleFactor(0.85)
             // Sem isto o selo era espremido pelo irmão ao lado e virava
             // "transcrito e resu…" — o estado do arquivo é justamente o que o
             // cartão precisa comunicar.

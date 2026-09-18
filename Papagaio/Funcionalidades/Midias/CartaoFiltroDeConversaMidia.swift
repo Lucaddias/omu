@@ -43,10 +43,16 @@ struct CartaoFiltroDeConversaMidia: View {
 
                     VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
                         Label(
-                            "\(conversa.anexos.count) \(conversa.anexos.count == 1 ? "Arquivo" : "Arquivos")",
+                            "\(conversa.anexos.count) \(conversa.anexos.count == 1 ? "Arquivo".localized : "Arquivos".localized)",
                             systemImage: "photo.on.rectangle"
                         )
+                        .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: true, vertical: false)
                         Label(formatoDeBytes(tamanhoTotal), systemImage: "externaldrive")
+                            .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .font(.callout.weight(.medium))
                     .foregroundStyle(PapagaioTema.textoSecundario)
@@ -69,7 +75,7 @@ struct CartaoFiltroDeConversaMidia: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(selecionado ? "Desmarcar \(conversa.titulo)" : "Marcar \(conversa.titulo)")
+        .accessibilityLabel(selecionado ? "Desmarcar %@".localized(conversa.titulo) : "Marcar %@".localized(conversa.titulo))
     }
 
     private var simbolo: String {

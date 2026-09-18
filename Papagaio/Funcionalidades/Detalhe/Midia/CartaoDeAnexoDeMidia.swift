@@ -34,13 +34,14 @@ struct CartaoDeAnexoDeMidia: View {
                             .font(.callout)
                             .foregroundStyle(PapagaioTema.textoSecundario)
                             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                             .truncationMode(.tail)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .buttonStyle(.plain)
-            .help("Mostrar \(anexo.nome) no Finder")
+            .help("Mostrar %@ no Finder".localized(anexo.nome))
 
             // Fora do botão: dentro dele, passar o mouse por cima dos selos
             // (só informativos, não abrem nada) mostrava a mesma dica
@@ -48,7 +49,7 @@ struct CartaoDeAnexoDeMidia: View {
             // pessoa estava tentando ler — o selo de tamanho ("4,1 MB")
             // sumia atrás da bolha da dica.
             HStack(spacing: PapagaioTema.Espaco.minimo) {
-                SeloDeMidia(texto: anexo.tipoVisual, simbolo: anexo.simbolo)
+                SeloDeMidia(texto: anexo.tipoVisual.localized, simbolo: anexo.simbolo)
                 SeloDeMidia(texto: anexo.extensaoVisual, simbolo: "doc.text")
                 SeloDeMidia(texto: formatoDeBytes(anexo.tamanho), simbolo: "externaldrive")
             }
@@ -65,8 +66,11 @@ struct CartaoDeAnexoDeMidia: View {
 
                 Spacer()
 
-                Button("Remover", systemImage: "trash", role: .destructive, action: aoRemover)
+                Button("Remover".localized, systemImage: "trash", role: .destructive, action: aoRemover)
                     .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: true, vertical: false)
                     .buttonStyle(.plain)
                     .foregroundStyle(PapagaioTema.perigo)
             }
