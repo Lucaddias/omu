@@ -16,9 +16,9 @@ enum AparenciaDoApp: String, CaseIterable, Identifiable {
 
     var titulo: String {
         switch self {
-        case .sistema: "Sistema"
-        case .claro: "Claro"
-        case .escuro: "Escuro"
+        case .sistema: "Sistema".localized
+        case .claro: "Claro".localized
+        case .escuro: "Escuro".localized
         }
     }
 
@@ -32,9 +32,9 @@ enum AparenciaDoApp: String, CaseIterable, Identifiable {
 
     var descricao: String {
         switch self {
-        case .sistema: "Acompanha o ajuste de aparência do seu Mac."
-        case .claro: "Mantém o app claro, mesmo com o Mac no escuro."
-        case .escuro: "Mantém o app escuro, mesmo com o Mac no claro."
+        case .sistema: "Acompanha o ajuste de aparência do seu Mac.".localized
+        case .claro: "Mantém o app claro, mesmo com o Mac no escuro.".localized
+        case .escuro: "Mantém o app escuro, mesmo com o Mac no claro.".localized
         }
     }
 

@@ -13,7 +13,7 @@ enum PastasDaBiblioteca {
         case pastaVazia
 
         var errorDescription: String? {
-            "Esta pasta não contém conversas para exportar."
+            "Esta pasta não contém conversas para exportar.".localized
         }
     }
 

@@ -233,9 +233,11 @@ struct ArquivoDetalheView: View {
     }
     private var textoContagemBusca: String {
         let total = ocorrenciasDaBusca.count
-        guard !termoDeBuscaTranscricao.isEmpty else { return "\(total) ocorrências" }
-        if total == 0 { return "Nenhum resultado" }
-        return "\(indiceOcorrenciaBusca + 1) de \(total)"
+        guard !termoDeBuscaTranscricao.isEmpty else {
+            return total == 1 ? "1 ocorrência".localized : "%d ocorrências".localized(total)
+        }
+        if total == 0 { return "Nenhum resultado".localized }
+        return "%d de %d".localized(indiceOcorrenciaBusca + 1, total)
     }
     private func irParaOcorrencia(_ indice: Int) {
         guard !ocorrenciasDaBusca.isEmpty else { return }
@@ -260,7 +262,7 @@ struct ArquivoDetalheView: View {
         HStack(spacing: PapagaioTema.Espaco.curto) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(PapagaioTema.textoSecundario)
-            TextField("Buscar", text: $buscaTranscricao)
+            TextField("Buscar".localized, text: $buscaTranscricao)
                 .textFieldStyle(.plain)
                 .font(.callout)
                 .focused($focoBuscaTranscricao)
@@ -280,7 +282,7 @@ struct ArquivoDetalheView: View {
             }
             .buttonStyle(.plain)
             .disabled(ocorrenciasDaBusca.isEmpty)
-            .help("Ocorrência anterior (Shift+Enter)")
+            .help("Ocorrência anterior (Shift+Enter)".localized)
             Button {
                 irParaOcorrencia(indiceOcorrenciaBusca + 1)
             } label: {
@@ -291,7 +293,7 @@ struct ArquivoDetalheView: View {
             }
             .buttonStyle(.plain)
             .disabled(ocorrenciasDaBusca.isEmpty)
-            .help("Próxima ocorrência (Enter)")
+            .help("Próxima ocorrência (Enter)".localized)
             Button {
                 fecharBuscaTranscricao()
             } label: {
@@ -300,7 +302,7 @@ struct ArquivoDetalheView: View {
                     .frame(width: 26, height: 26)
             }
             .buttonStyle(.plain)
-            .help("Fechar (Esc)")
+            .help("Fechar (Esc)".localized)
             .keyboardShortcut(.escape, modifiers: [])
         }
         .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -325,7 +327,7 @@ struct ArquivoDetalheView: View {
     private var dicaBuscaTranscricao: some View {
         HStack {
             Spacer()
-            Text("Pesquisar na transcrição: Cmd + F")
+            Text("Pesquisar na transcrição: Cmd + F".localized)
                 .font(.caption)
                 .foregroundStyle(PapagaioTema.textoSecundario)
         }
@@ -525,11 +527,11 @@ struct ArquivoDetalheView: View {
             contentType: DocumentoMarkdown.tipo,
             defaultFilename: DossieDaConversa.nomeDeArquivo(para: arquivo)
         ) { _ in }
-        .alert("Não foi possível adicionar a mídia", isPresented: Binding(
+        .alert("Não foi possível adicionar a mídia".localized, isPresented: Binding(
             get: { midiasDaConversaVM.erro != nil },
             set: { if !$0 { midiasDaConversaVM.erro = nil } }
         )) {
-            Button("OK", role: .cancel) { midiasDaConversaVM.erro = nil }
+            Button("OK".localized, role: .cancel) { midiasDaConversaVM.erro = nil }
         } message: {
             Text(midiasDaConversaVM.erro ?? "")
         }
@@ -635,7 +637,7 @@ struct ArquivoDetalheView: View {
         HStack(spacing: PapagaioTema.Espaco.curto) {
             BotaoCircularPapagaio(
                 simbolo: "chevron.backward",
-                ajuda: "Voltar para a biblioteca",
+                ajuda: "Voltar para a biblioteca".localized,
                 legendaAtiva: $legendaDaBarra
             ) {
                 fechar()
@@ -646,8 +648,8 @@ struct ArquivoDetalheView: View {
             BotaoCircularPapagaio(
                 simbolo: "square.and.arrow.up",
                 ajuda: arquivo.resumo == nil
-                    ? "Disponível depois que o resumo estiver pronto"
-                    : "Compartilhar conversa",
+                    ? "Disponível depois que o resumo estiver pronto".localized
+                    : "Compartilhar conversa".localized,
                 legendaAtiva: $legendaDaBarra
             ) {
                 compartilhar()
@@ -688,7 +690,7 @@ struct ArquivoDetalheView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Editar título e descrição")
+            .help("Editar título e descrição".localized)
             .onHover { pairandoNoTitulo = $0 }
             .animation(.easeOut(duration: 0.14), value: pairandoNoTitulo)
 
@@ -727,10 +729,11 @@ struct ArquivoDetalheView: View {
             // Pastilha, e não aba: fora da barra de seções, o filete de 3pt
             // não teria com o que se alinhar. Mesma forma dos filtros da
             // biblioteca, que é a linguagem do app para "isto se clica".
-            Label("Ficha", systemImage: "person.text.rectangle")
+            Label("Ficha".localized, systemImage: "person.text.rectangle")
                 .labelStyle(.titleAndIcon)
                 .font(PapagaioTema.Tipo.apoio.weight(.semibold))
                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(
                     mostrandoFicha || pairandoNaFicha
@@ -754,8 +757,8 @@ struct ArquivoDetalheView: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("Ficha da conversa")
-        .accessibilityLabel("Ficha da conversa")
+        .help("Ficha da conversa".localized)
+        .accessibilityLabel("Ficha da conversa".localized)
         .onHover { pairandoNaFicha = $0 }
         .animation(.easeOut(duration: 0.14), value: pairandoNaFicha)
         .popover(isPresented: $mostrandoFicha, arrowEdge: .bottom) {
@@ -776,17 +779,17 @@ struct ArquivoDetalheView: View {
             // "Entrevistado: Ana, João" lia errado duas vezes — como se fosse
             // uma pessoa só, e como se essa pessoa fosse homem.
             linhaDaFicha(
-                rotuloDeEntrevistadores(nomesDePessoas(entrevistadoresDaFicha)),
+                rotuloDeEntrevistadores(nomesDePessoas(entrevistadoresDaFicha)).localized,
                 valor: entrevistadoresDaFicha,
                 simbolo: "person.crop.circle.badge.checkmark"
             )
             linhaDaFicha(
-                rotuloDeEntrevistados(nomesDePessoas(entrevistadoDaFicha)),
+                rotuloDeEntrevistados(nomesDePessoas(entrevistadoDaFicha)).localized,
                 valor: entrevistadoDaFicha,
                 simbolo: "person"
             )
             linhaDaFicha(
-                "Modalidade",
+                "Modalidade".localized,
                 valor: formatoDaFicha,
                 simbolo: simboloDaModalidade(formatoDaFicha)
             )
@@ -822,9 +825,9 @@ struct ArquivoDetalheView: View {
     /// tem como corrigir, já que o número é calculado.
     private var textoDeParticipantes: String {
         switch participantesDaFicha {
-        case 0: "Participantes não informados"
-        case 1: "1 participante"
-        default: "\(participantesDaFicha) participantes"
+        case 0: "Participantes não informados".localized
+        case 1: "1 participante".localized
+        default: "%d participantes".localized(participantesDaFicha)
         }
     }
 
@@ -860,7 +863,7 @@ struct ArquivoDetalheView: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
                     .textCase(.uppercase)
-                Text(limpo.isEmpty ? "Não informado" : limpo)
+                Text(limpo.isEmpty ? "Não informado".localized : limpo.localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(limpo.isEmpty ? PapagaioTema.textoSecundario : PapagaioTema.texto)
                     .fixedSize(horizontal: false, vertical: true)
@@ -876,22 +879,22 @@ struct ArquivoDetalheView: View {
             // sumir dava a impressão de que a ficha nem existia.
             metadadoDoCabecalho(
                 entrevistado.isEmpty
-                    ? "Entrevistado não informado"
-                    : "\(rotuloDeEntrevistados(nomesDePessoas(entrevistado))): \(entrevistado)",
+                    ? "Entrevistado não informado".localized
+                    : "\(rotuloDeEntrevistados(nomesDePessoas(entrevistado)).localized): \(entrevistado)",
                 simbolo: "person"
             )
             metadadoDoCabecalho(
                 entrevistadores.isEmpty
-                    ? "Entrevistador não informado"
-                    : "\(rotuloDeEntrevistadores(nomesDePessoas(entrevistadores))): \(entrevistadores)",
+                    ? "Entrevistador não informado".localized
+                    : "\(rotuloDeEntrevistadores(nomesDePessoas(entrevistadores)).localized): \(entrevistadores)",
                 simbolo: "person.crop.circle.badge.checkmark"
             )
             metadadoDoCabecalho(
-                metadados.formato.isEmpty ? "Modalidade não informada" : metadados.formato,
+                metadados.formato.isEmpty ? "Modalidade não informada".localized : metadados.formato.localized,
                 simbolo: simboloDaModalidade(metadados.formato)
             )
             metadadoDoCabecalho(
-                participantes == 1 ? "1 participante" : "\(participantes) participantes",
+                participantes == 1 ? "1 participante".localized : "%d participantes".localized(participantes),
                 simbolo: participantes == 1 ? "person" : "person.2"
             )
             metadadoDoCabecalho(
@@ -963,6 +966,7 @@ struct ArquivoDetalheView: View {
             .font(PapagaioTema.Tipo.apoio)
             .foregroundStyle(PapagaioTema.textoSecundario)
             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             // `LayoutDeFluxo` mede cada item pelo tamanho natural; sem isto o
             // rótulo comprido tentaria ocupar a linha toda.
             .fixedSize(horizontal: true, vertical: false)
@@ -984,15 +988,16 @@ struct ArquivoDetalheView: View {
                 Spacer(minLength: PapagaioTema.Espaco.medio)
                 if secaoSelecionada == .transcricao && !trechos.isEmpty && !mostrandoBuscaTranscricao {
                     HStack(spacing: PapagaioTema.Espaco.medio) {
-                        Toggle("Mostrar confiança", isOn: $mostrarConfianca)
+                        Toggle("Mostrar confiança".localized, isOn: $mostrarConfianca)
                             .font(.caption)
                             .toggleStyle(.switch)
                             .tint(PapagaioTema.destaque)
                             .fixedSize()
-                        Text("Pesquisar na transcrição: Cmd + F")
+                        Text("Pesquisar na transcrição: Cmd + F".localized)
                             .font(.caption2)
                             .foregroundStyle(PapagaioTema.textoSecundario)
                             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                             .fixedSize()
                     }
                 }
@@ -1026,7 +1031,7 @@ struct ArquivoDetalheView: View {
             // Atalho para quem quer tudo: selecionar a conversa inteira à mão
             // dá trabalho, e é o caso mais comum depois de copiar uma frase.
             .contextMenu {
-                Button("Copiar conversa inteira", systemImage: "doc.on.doc") {
+                Button("Copiar conversa inteira".localized, systemImage: "doc.on.doc") {
                     let texto = DossieDaConversa.gerar(arquivo: arquivo)
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(texto, forType: .string)
@@ -1062,7 +1067,7 @@ struct ArquivoDetalheView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if !resumo.temas.isEmpty {
-                    secao("Temas") {
+                    secao("Temas".localized) {
                         // Grade adaptativa: numa janela estreita vira uma coluna,
                         // numa tela larga os temas ocupam a faixa toda em vez de
                         // formarem uma lista fina no canto esquerdo.
@@ -1096,17 +1101,17 @@ struct ArquivoDetalheView: View {
                     if processando || naFila {
                         HStack(spacing: PapagaioTema.Espaco.curto) {
                             ProgressView().controlSize(.small)
-                            Text("Gerando novo resumo…")
+                            Text("Gerando novo resumo…".localized)
                                 .font(.callout)
                                 .foregroundStyle(PapagaioTema.textoSecundario)
                         }
                     } else {
                         Button(action: aoGerarNovoResumo) {
-                            Label("Gerar novo resumo", systemImage: "arrow.triangle.2.circlepath")
+                            Label("Gerar novo resumo".localized, systemImage: "arrow.triangle.2.circlepath")
                         }
                         .buttonStyle(BotaoDeContornoPapagaio())
                         .disabled(arquivo.trechos.isEmpty)
-                        .help("Gera um novo resumo a partir da transcrição atual, sem re-transcrever")
+                        .help("Reprocessa a conversa inteira: transcrição, resumo e próximos passos".localized)
                     }
                 }
 
@@ -1120,8 +1125,8 @@ struct ArquivoDetalheView: View {
         } else {
             CartaoDeEstadoVazio(
                 simbolo: "text.alignleft",
-                titulo: "Resumo indisponível",
-                mensagem: "O resumo aparecerá depois do processamento."
+                titulo: "Resumo indisponível".localized,
+                mensagem: "O resumo aparecerá depois do processamento.".localized
             )
         }
     }
@@ -1260,11 +1265,11 @@ struct ArquivoDetalheView: View {
                 .background(PapagaioTema.aviso.opacity(0.12), in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                Text("Não foi possível abrir o áudio desta conversa")
+                Text("Não foi possível abrir o áudio desta conversa".localized)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
 
-                Text("A transcrição, as notas e o resumo continuam aqui. Restaure o áudio pela Lixeira do app — assim ele volta com o nome que a reprodução espera.")
+                Text("A transcrição, as notas e o resumo continuam aqui. Restaure o áudio pela Lixeira do app — assim ele volta com o nome que a reprodução espera.".localized)
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1403,8 +1408,8 @@ struct ArquivoDetalheView: View {
             } else {
                 CartaoDeEstadoVazio(
                     simbolo: "text.quote",
-                    titulo: "Transcrição em preparação",
-                    mensagem: "A transcrição aparecerá depois do processamento."
+                    titulo: "Transcrição em preparação".localized,
+                    mensagem: "A transcrição aparecerá depois do processamento.".localized
                 )
             }
         } else if let reprodutor {
@@ -1492,7 +1497,7 @@ struct ArquivoDetalheView: View {
                 }
             }
             .onChange(of: reprodutor.indiceAtivo) { _, novo in
-                guard let novo, novo < trechos.count else { return }
+                guard let novo, trechos.indices.contains(novo) else { return }
                 let trechoAtivo = trechos[novo]
                 guard let fala = falas.first(where: { $0.trechoIds.contains(trechoAtivo.id) }) else {
                     return
@@ -1581,7 +1586,7 @@ struct ArquivoDetalheView: View {
                 }
             }
             .onChange(of: reprodutor.indiceAtivo) { _, novo in
-                guard let novo, novo < trechos.count else { return }
+                guard let novo, trechos.indices.contains(novo) else { return }
                 withAnimation(animacaoDeInterface) {
                     rolagem.scrollTo(trechos[novo].id, anchor: .center)
                 }
@@ -1622,7 +1627,7 @@ struct ArquivoDetalheView: View {
 
         // Preserva o falante para não virar "voz desconhecida", mas mantém
         // o trecho distinto (palavras vazias) para não fundir com a seguinte
-        let falante = trecho.falanteAcusticoDominante ?? trecho.palavras.first?.falanteAcustico
+        let falante = falanteExibidoParaTrecho(trecho)
         let novo = Trecho(
             id: trecho.id,
             start: trecho.start,
@@ -1657,8 +1662,7 @@ struct ArquivoDetalheView: View {
         guard !limpo.isEmpty, limpo != fala.texto else { return }
 
         let idsDaFala = Set(fala.trechoIds)
-        guard let primeiro = trechos.first(where: { idsDaFala.contains($0.id) }),
-              let ultimo = trechos.last(where: { idsDaFala.contains($0.id) })
+        guard let primeiro = trechos.first(where: { idsDaFala.contains($0.id) })
         else { return }
 
         let fundidoId = UUID()
@@ -1737,19 +1741,19 @@ struct ArquivoDetalheView: View {
                 .frame(width: 64, height: 64)
                 .background(PapagaioTema.destaqueSuave, in: Circle())
 
-            Text("Pronto para transcrever")
+            Text("Pronto para transcrever".localized)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(PapagaioTema.texto)
 
-            Text("Inicie a transcrição quando quiser. O resumo será gerado em seguida, respeitando a fila de processamento.")
+            Text("Inicie a transcrição quando quiser. O resumo será gerado em seguida, respeitando a fila de processamento.".localized)
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .frame(maxWidth: 420)
 
-            Button("Transcrever", systemImage: "text.badge.plus", action: aoTranscrever)
+            Button("Transcrever".localized, systemImage: "text.badge.plus", action: aoTranscrever)
                 .buttonStyle(BotaoPrincipalPapagaio())
-                .accessibilityHint("Adiciona esta conversa à fila. O resumo será feito após a transcrição.")
+                .accessibilityHint("Adiciona esta conversa à fila. O resumo será feito após a transcrição.".localized)
         }
         .padding(PapagaioTema.Espaco.pagina)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

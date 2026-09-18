@@ -32,7 +32,7 @@ struct EditorDeAparenciaDoCartao: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-            secao("Cor")
+            secao("Cor".localized)
 
             LazyVGrid(columns: colunas, spacing: PapagaioTema.Espaco.curto) {
                 BotaoSemCor(ativo: semCor, acao: aplicarSemCor)
@@ -84,14 +84,14 @@ struct EditorDeAparenciaDoCartao: View {
             if mostrarImagem {
                 SeparadorPapagaio()
 
-                secao("Imagem")
+                secao("Imagem".localized)
 
                 HStack(spacing: PapagaioTema.Espaco.curto) {
-                    Button(banner == nil ? "Escolher imagem…" : "Trocar imagem…", action: escolherImagem)
+                    Button((banner == nil ? "Escolher imagem…" : "Trocar imagem…").localized, action: escolherImagem)
                         .buttonStyle(BotaoDeContornoPapagaio())
 
                     if banner != nil {
-                        Button("Remover", systemImage: "trash") {
+                        Button("Remover".localized, systemImage: "trash") {
                             AparenciaDoCartao.removerBanner(arquivoID)
                             banner = nil
                         }
@@ -111,7 +111,7 @@ struct EditorDeAparenciaDoCartao: View {
                     ))
                 }
 
-                Text("A imagem cobre a cor. O texto do cartão ganha um véu escuro por cima dela para continuar legível.")
+                Text("A imagem cobre a cor. O texto do cartão ganha um véu escuro por cima dela para continuar legível.".localized)
                     .font(.caption)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -161,8 +161,8 @@ struct EditorDeAparenciaDoCartao: View {
 
     private func escolherImagem() {
         let painel = NSOpenPanel()
-        painel.title = "Escolha uma imagem para a faixa"
-        painel.prompt = "Usar imagem"
+        painel.title = "Escolha uma imagem para a faixa".localized
+        painel.prompt = "Usar imagem".localized
         painel.canChooseFiles = true
         painel.canChooseDirectories = false
         painel.allowsMultipleSelection = false
@@ -209,6 +209,6 @@ struct BotaoSemCor: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help("Sem cor")
+        .help("Sem cor".localized)
     }
 }

@@ -25,21 +25,21 @@ enum ErroOAuth: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .autorizacaoNegada:
-            "Autorização cancelada ou recusada no navegador."
+            "Autorização cancelada ou recusada no navegador.".localized
         case .semCodigoDeAutorizacao:
-            "O navegador voltou sem o código de autorização. Tente de novo."
+            "O navegador voltou sem o código de autorização. Tente de novo.".localized
         case .registroFalhou:
-            "Não foi possível registrar o Ōmu no servidor do Granola."
+            "Não foi possível registrar o Ōmu no servidor do Granola.".localized
         case .respostaInvalida:
-            "O servidor de autorização respondeu de forma inesperada."
+            "O servidor de autorização respondeu de forma inesperada.".localized
         case let .servidor(mensagem):
-            "O servidor respondeu: \(mensagem)."
+            "O servidor respondeu: %@.".localized(mensagem)
         case .semRefreshToken:
-            "A sessão expirou e o Ōmu não tem como renová-la. Conecte de novo."
+            "A sessão expirou e o Ōmu não tem como renová-la. Conecte de novo.".localized
         case .navegadorNaoAbriu:
-            "O navegador não abriu — confira se o Ōmu pode abrir janelas e tente de novo."
+            "O navegador não abriu — confira se o Ōmu pode abrir janelas e tente de novo.".localized
         case .tempoEsgotado:
-            "Tempo esgotado esperando sua autorização — volte ao navegador e tente de novo."
+            "Tempo esgotado esperando sua autorização — volte ao navegador e tente de novo.".localized
         }
     }
 }

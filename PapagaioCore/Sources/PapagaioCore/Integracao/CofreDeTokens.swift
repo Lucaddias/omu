@@ -43,6 +43,27 @@ public struct CofreDeTokens: Sendable {
         return dados
     }
 
+    /// Quais destas contas têm item guardado — sem ler o segredo.
+    ///
+    /// Pede só atributos, nunca `kSecReturnData`: o macOS só pede a senha do
+    /// Keychain quando precisa decifrar o valor. Uma checagem de "tem
+    /// credencial?" no launch não deve disparar prompt nenhum.
+    public func contasExistentes(entre contas: Set<String>) -> Set<String> {
+        let consulta: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: servico,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+        var resultado: CFTypeRef?
+        let status = SecItemCopyMatching(consulta as CFDictionary, &resultado)
+        guard status == errSecSuccess,
+              let itens = resultado as? [[String: Any]]
+        else { return [] }
+        let existentes = itens.compactMap { $0[kSecAttrAccount as String] as? String }
+        return contas.intersection(existentes)
+    }
+
     public func apagar(conta: String) {
         let atributos: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

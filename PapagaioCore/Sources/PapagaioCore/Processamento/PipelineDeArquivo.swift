@@ -16,6 +16,7 @@ public struct PipelineDeArquivo: Sendable {
         case transcrevendo
         case diarizando
         case resolvendoFalantes
+        case traduzindo
         case resumindo
         case salvando
 
@@ -24,6 +25,7 @@ public struct PipelineDeArquivo: Sendable {
             case .transcrevendo: "transcrevendo…"
             case .diarizando: "distinguindo falantes…"
             case .resolvendoFalantes: "resolvendo falantes pelo contexto…"
+            case .traduzindo: "traduzindo…"
             case .resumindo: "resumindo…"
             case .salvando: "salvando…"
             }
@@ -32,6 +34,13 @@ public struct PipelineDeArquivo: Sendable {
 
     public typealias Transcrever = @Sendable (URL, String?) async throws -> [Trecho]
     public typealias Resumir = @Sendable ([Trecho]) async throws -> Resumo
+    /// Variante que permite ao runtime pedir ao resumidor o idioma de saída.
+    /// Mantemos `Resumir` para preservar os testes e os chamadores legados.
+    public typealias ResumirNoIdioma = @Sendable ([Trecho], IdiomaDeProcessamento?) async throws -> Resumo
+    /// Traduz a transcrição sem mudar a sua linha do tempo. A implementação
+    /// local deve remover palavras do ASR, pois elas deixam de corresponder ao
+    /// texto traduzido mostrado na interface.
+    public typealias Traduzir = @Sendable ([Trecho], IdiomaDeProcessamento) async throws -> [Trecho]
     /// Diariza **um canal** de áudio e devolve quem falou quando.
     public typealias Diarizar = @Sendable (URL) async throws -> [SegmentoDeFalante]
 
@@ -45,6 +54,9 @@ public struct PipelineDeArquivo: Sendable {
     private let armazenamento: Armazenamento
     private let transcrever: Transcrever
     private let resumir: Resumir
+    private let resumirNoIdioma: ResumirNoIdioma?
+    private let traducaoAutomatica: ConfiguracaoDeTraducaoAutomatica
+    private let traduzir: Traduzir?
     private let diarizar: Diarizar?
     private let resolverFalantes: ResolverFalantes?
     private let repositorio: any ArquivoRepository
@@ -58,6 +70,12 @@ public struct PipelineDeArquivo: Sendable {
         idResumo: String,
         transcrever: @escaping Transcrever,
         resumir: @escaping Resumir,
+        resumirNoIdioma: ResumirNoIdioma? = nil,
+        traducaoAutomatica: ConfiguracaoDeTraducaoAutomatica = .init(
+            habilitada: false,
+            idiomaPadrao: .portugues
+        ),
+        traduzir: Traduzir? = nil,
         diarizar: Diarizar? = nil,
         resolverFalantes: ResolverFalantes? = nil
     ) {
@@ -67,6 +85,9 @@ public struct PipelineDeArquivo: Sendable {
         self.idResumo = idResumo
         self.transcrever = transcrever
         self.resumir = resumir
+        self.resumirNoIdioma = resumirNoIdioma
+        self.traducaoAutomatica = traducaoAutomatica
+        self.traduzir = traduzir
         self.diarizar = diarizar
         self.resolverFalantes = resolverFalantes
     }
@@ -116,6 +137,27 @@ public struct PipelineDeArquivo: Sendable {
             atualizado = (try? await resolverFalantes(atualizado)) ?? atualizado
         }
 
+        try Task.checkCancellation()
+
+        // A transcrição não é forçada ao idioma do sistema: o Whisper a
+        // reconhece automaticamente. Só depois de detectar uma divergência é
+        // que a preferência explícita pode pedir uma tradução local.
+        let idiomaDetectado = DetectorDeIdiomaDaTranscricao.detectar(em: atualizado.trechos)
+        let deveTraduzir = DetectorDeIdiomaDaTranscricao.deveTraduzir(
+            idiomaDetectado: idiomaDetectado,
+            configuracao: traducaoAutomatica
+        )
+        var traduziuComSucesso = false
+        if deveTraduzir, let traduzir {
+            aoProgredir(.traduzindo)
+            atualizado.trechos = try await traduzir(
+                atualizado.trechos,
+                traducaoAutomatica.idiomaPadrao
+            )
+            traduziuComSucesso = true
+        }
+
+        try Task.checkCancellation()
         aoProgredir(.salvando)
         try await repositorio.salvar(atualizado)
 
@@ -126,9 +168,23 @@ public struct PipelineDeArquivo: Sendable {
         try Task.checkCancellation()
 
         aoProgredir(.resumindo)
-        atualizado.resumo = try await resumir(atualizado.trechos)
+        let idiomaDoResumo: IdiomaDeProcessamento? =
+            traducaoAutomatica.habilitada && (
+                traduziuComSucesso || DetectorDeIdiomaDaTranscricao.correspondeAoIdiomaPadrao(
+                    idiomaDetectado: idiomaDetectado,
+                    configuracao: traducaoAutomatica
+                )
+            )
+            ? traducaoAutomatica.idiomaPadrao
+            : nil
+        if let resumirNoIdioma {
+            atualizado.resumo = try await resumirNoIdioma(atualizado.trechos, idiomaDoResumo)
+        } else {
+            atualizado.resumo = try await resumir(atualizado.trechos)
+        }
         atualizado.engineResumo = idResumo
 
+        try Task.checkCancellation()
         aoProgredir(.salvando)
         try await repositorio.salvar(atualizado)
         return atualizado
@@ -270,30 +326,8 @@ public struct PipelineDeArquivo: Sendable {
                 AlinhamentoDeFalantes.atribuir(palavras: trecho.palavras, a: segmentos)
             )
         }
-        let diarizado = Arquivo(
-            id: arquivo.id,
-            titulo: arquivo.titulo,
-            criadoEm: arquivo.criadoEm,
-            duracao: arquivo.duracao,
-            pastaRelativa: arquivo.pastaRelativa,
-            espaco: arquivo.espaco,
-            trechos: trechos,
-            notas: arquivo.notas,
-            resumo: arquivo.resumo,
-            engineTranscricao: arquivo.engineTranscricao,
-            engineResumo: arquivo.engineResumo,
-            apagadoEm: arquivo.apagadoEm,
-            idExterno: arquivo.idExterno,
-            // Faltando aqui, todo arquivo importado perdia essa marca assim
-            // que a diarização rodava: a reconstrução usava o inicializador
-            // completo sem passar este campo, que por padrão volta a `nil`
-            // — e com ele sumido, `entradaNaBiblioteca` caía de volta para
-            // `criadoEm` (a data real da gravação, possivelmente antiga).
-            // O cartão não desaparecia de verdade, só ia parar longe do
-            // topo da grade, ordenado pela data errada.
-            importadoEm: arquivo.importadoEm,
-            usavaFones: arquivo.usavaFones
-        )
+        var diarizado = arquivo
+        diarizado.trechos = trechos
         // Costura de vozes iguais: fala duvidosa entre dois pedaços da MESMA
         // voz recebe o rótulo dela sem custo de modelo — é a leitura acústica
         // mais provável, e sem ela o "Voz desconhecida" aparecia entre dois
@@ -373,18 +407,10 @@ public struct PipelineDeArquivo: Sendable {
         let sisAmostras = try await DecodificadorDeAudio.amostras(de: sistemaURL)
 
         let cancelador = CanceladorDeEco(tamanhoBloco: 512, comprimentoFiltro: 4096)
-        let bloco = cancelador.tamanhoBloco
-        let total = min(micAmostras.count, sisAmostras.count)
-        var limpa = [Float](repeating: 0, count: total)
-
-        var offset = 0
-        while offset + bloco <= total {
-            let micBloco = Array(micAmostras[offset..<(offset + bloco)])
-            let sisBloco = Array(sisAmostras[offset..<(offset + bloco)])
-            let resultado = cancelador.processar(blocoMicrofone: micBloco, blocoSistema: sisBloco)
-            for i in 0..<bloco { limpa[offset + i] = resultado[i] }
-            offset += bloco
-        }
+        // Mantém a duração do microfone mesmo quando o tap termina antes.
+        // O bloco final é completado só para o filtro; o padding não vai ao áudio.
+        let limpa = cancelador.processar(microfone: micAmostras, sistema: sisAmostras)
+        try Task.checkCancellation()
 
         let urlLimpa = pasta.appendingPathComponent("microfone_aec.pcm")
         let dados = limpa.withUnsafeBytes { Data($0) }

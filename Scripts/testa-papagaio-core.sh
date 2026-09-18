@@ -9,6 +9,21 @@ trap 'rm -f "$LOG_FILE"' EXIT
 
 cd "$PACKAGE_DIR"
 
+# A recuperação só pode tocar os produtos gerados pela execução atual.
+# Preserve o caminho informado pelo chamador, inclusive quando contém espaços.
+BUILD_DIR="$PACKAGE_DIR/.build"
+ARGUMENTOS=("$@")
+for ((i = 0; i < ${#ARGUMENTOS[@]}; i++)); do
+    case "${ARGUMENTOS[$i]}" in
+        --scratch-path)
+            if ((i + 1 < ${#ARGUMENTOS[@]})); then
+                BUILD_DIR="${ARGUMENTOS[$((i + 1))]}"
+            fi
+            ;;
+        --scratch-path=*) BUILD_DIR="${ARGUMENTOS[$i]#--scratch-path=}" ;;
+    esac
+done
+
 # Em pastas sincronizadas pelo File Provider, recursos .mlmodelc podem receber
 # FinderInfo. O SwiftPM copia esse atributo para o bundle de testes e o
 # codesign rejeita o bundle já compilado. Primeiro executamos o caminho normal:
@@ -22,22 +37,16 @@ if ! grep -Fq "$ERRO_DE_ATRIBUTOS" "$LOG_FILE"; then
     exit 1
 fi
 
-BUNDLE='.build/out/Products/Debug/PapagaioCoreTests.xctest'
-ENTITLEMENTS='.build/out/Intermediates.noindex/PapagaioCore.build/Debug/PapagaioCoreTests-p.build/PapagaioCoreTests.xctest.xcent'
-
-if [[ ! -d "$BUNDLE" || ! -f "$ENTITLEMENTS" ]]; then
+PRODUTOS="$BUILD_DIR/out/Products"
+if [[ ! -d "$PRODUTOS" ]]; then
     echo 'O SwiftPM reportou atributos inválidos, mas os artefatos esperados não existem.' >&2
     exit 1
 fi
 
-echo 'Removendo atributos estendidos somente do bundle de testes gerado e reassinando...'
-xattr -cr "$BUNDLE"
-codesign \
-    --force \
-    --sign - \
-    --entitlements "$ENTITLEMENTS" \
-    --timestamp=none \
-    --generate-entitlement-der \
-    "$BUNDLE"
+echo 'Removendo atributos estendidos dos produtos gerados e repetindo a compilação...'
+xattr -cr "$PRODUTOS"
 
-swift test --skip-build --no-parallel "$@"
+# Nunca use --skip-build como recuperação: a falha pode ocorrer no bundle de
+# recursos antes de recompilar os testes. Executar o .xctest antigo nesse caso
+# produz um falso sucesso. A nova tentativa precisa compilar e assinar tudo.
+swift test --no-parallel "$@"

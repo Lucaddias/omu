@@ -93,22 +93,22 @@ enum DiagnosticoDaSincronizacaoCloudKit {
         let normalizado = texto.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
         if normalizado.contains("cannot create new type conversa in production schema")
             || normalizado.contains("did not find record type: conversa") {
-            return "A equipe foi aceita, mas o tipo de registro “Conversa” ainda não está publicado no CloudKit de produção. Peça ao proprietário da equipe para publicar o esquema no CloudKit Dashboard; suas alterações continuam neste Mac até isso acontecer."
+            return "A equipe foi aceita, mas o tipo de registro “Conversa” ainda não está publicado no CloudKit de produção. Peça ao proprietário da equipe para publicar o esquema no CloudKit Dashboard; suas alterações continuam neste Mac até isso acontecer.".localized
         }
         if normalizado.contains("cannot create new type equipeexcluida in production schema")
             || normalizado.contains("did not find record type: equipeexcluida") {
-            return "A exclusão ainda não pode ser concluída porque o tipo público “EquipeExcluida” não está publicado no CloudKit de produção. No CloudKit Dashboard, publique esse tipo e os campos equipeID, excluidaEm e estadoDaExclusao; nenhum dado foi apagado."
+            return "A exclusão ainda não pode ser concluída porque o tipo público “EquipeExcluida” não está publicado no CloudKit de produção. No CloudKit Dashboard, publique esse tipo e os campos equipeID, excluidaEm e estadoDaExclusao; nenhum dado foi apagado.".localized
         }
         if normalizado.contains("nomesdosparticipantes")
             && (normalizado.contains("production schema") || normalizado.contains("field")) {
-            return "Para salvar nomes da equipe, publique o campo “nomesDosParticipantes” (Bytes) no tipo Equipe do CloudKit Dashboard. O nome atual continua preservado neste Mac."
+            return "Para salvar nomes da equipe, publique o campo “nomesDosParticipantes” (Bytes) no tipo Equipe do CloudKit Dashboard. O nome atual continua preservado neste Mac.".localized
         }
         if normalizado.contains("zone does not exist") {
-            return "A zona compartilhada desta equipe ainda não está disponível nesta Apple Account. Peça ao proprietário para confirmar o compartilhamento e entre novamente com o código da equipe."
+            return "A zona compartilhada desta equipe ainda não está disponível nesta Apple Account. Peça ao proprietário para confirmar o compartilhamento e entre novamente com o código da equipe.".localized
         }
         if normalizado.contains("type is not marked indexable")
             && normalizado.contains("conversa") {
-            return "A versão instalada ainda tenta consultar o tipo de registro “Conversa”, mas ele não está indexado no CloudKit. Atualize o Ōmu para a versão que sincroniza diretamente a zona compartilhada; suas alterações locais permanecem neste Mac."
+            return "A versão instalada ainda tenta consultar o tipo de registro “Conversa”, mas ele não está indexado no CloudKit. Atualize o Ōmu para a versão que sincroniza diretamente a zona compartilhada; suas alterações locais permanecem neste Mac.".localized
         }
         return texto
     }

@@ -9,14 +9,14 @@ struct ListaDeNotificacoesDoApp: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             HStack {
-                Text("Notificações")
+                Text("Notificações".localized)
                     .font(.headline)
                     .foregroundStyle(PapagaioTema.texto)
 
                 Spacer()
 
 
-                Button("Limpar", systemImage: "trash", action: aoLimpar)
+                Button("Limpar".localized, systemImage: "trash", action: aoLimpar)
                     .font(.caption.weight(.semibold))
                     .buttonStyle(.plain)
                     .foregroundStyle(PapagaioTema.textoSecundario)
@@ -29,23 +29,23 @@ struct ListaDeNotificacoesDoApp: View {
                     if gravando {
                         LinhaDeNotificacaoTemporaria(
                             simbolo: "mic.fill",
-                            titulo: "Gravação ativa",
-                            mensagem: "Ao finalizar, a conversa será salva na biblioteca."
+                            titulo: "Gravação ativa".localized,
+                            mensagem: "Ao finalizar, a conversa será salva na biblioteca.".localized
                         )
                     }
 
                     if processandoBiblioteca {
                         LinhaDeNotificacaoTemporaria(
                             simbolo: "waveform.badge.magnifyingglass",
-                            titulo: "Processando conversa",
-                            mensagem: "Você será avisado quando a transcrição terminar."
+                            titulo: "Processando conversa".localized,
+                            mensagem: "Você será avisado quando a transcrição terminar.".localized
                         )
                     }
                 }
             }
 
             if notificacoes.isEmpty {
-                Text("Nenhum aviso ainda.")
+                Text("Nenhum aviso ainda.".localized)
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
@@ -77,15 +77,17 @@ struct LinhaDeNotificacaoDoApp: View {
                 .frame(width: 24, height: 24)
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                Text(notificacao.titulo)
+                Text(notificacao.titulo.localized)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.85)
 
-                Text(notificacao.mensagem)
+                Text(notificacao.mensagem.localized)
                     .font(.caption)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(3)
+                    .minimumScaleFactor(0.85)
 
                 Text(notificacao.data.formatted(.dateTime.hour().minute()))
                     .font(.caption2.weight(.semibold))
@@ -127,12 +129,16 @@ struct LinhaDeNotificacaoTemporaria: View {
                 .frame(width: 24, height: 24)
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                Text(titulo)
+                Text(titulo.localized)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
-                Text(mensagem)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                Text(mensagem.localized)
                     .font(.caption)
                     .foregroundStyle(PapagaioTema.textoSecundario)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.85)
             }
         }
         .padding(PapagaioTema.Espaco.curto)

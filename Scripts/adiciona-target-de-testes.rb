@@ -2,6 +2,9 @@
 # Uso: ruby Scripts/adiciona-target-de-testes.rb
 require "xcodeproj"
 
+# Funciona também quando chamado fora da raiz do checkout.
+Dir.chdir(File.expand_path("..", __dir__))
+
 PROJ = "Loro.xcodeproj"
 proj = Xcodeproj::Project.open(PROJ)
 
@@ -61,7 +64,13 @@ tests.build_configurations.each do |cfg|
   s["PRODUCT_BUNDLE_IDENTIFIER"] = "com.papagaio.tests"
   s["PRODUCT_NAME"] = "$(TARGET_NAME)"
   s["GENERATE_INFOPLIST_FILE"] = "YES"
-  s["TEST_HOST"] = "$(BUILT_PRODUCTS_DIR)/Ōmu.app/Contents/MacOS/Ōmu"
+  # O nome visível do bundle pode diferir do executável (Ōmu.app / Omu).
+  # Leia ambos do host para o script não restaurar um caminho inválido.
+  abort("configuração #{cfg.name} ausente no host Loro") unless app_cfg
+  host_settings = app_cfg.build_settings
+  produto = host_settings.fetch("PRODUCT_NAME", app.name)
+  executavel = host_settings.fetch("EXECUTABLE_NAME", produto)
+  s["TEST_HOST"] = "$(BUILT_PRODUCTS_DIR)/#{produto}.app/Contents/MacOS/#{executavel}"
   s["SWIFT_VERSION"] = "6.0"
   s["MACOSX_DEPLOYMENT_TARGET"] = "26.0"
   s["CODE_SIGN_STYLE"] = "Automatic"
@@ -84,8 +93,11 @@ end
 
 # Liga no Test action do scheme Loro.
 scheme_path = File.join(PROJ, "xcshareddata/xcschemes/Loro.xcscheme")
-if target_novo
-  scheme = Xcodeproj::XCScheme.new(scheme_path)
+scheme = Xcodeproj::XCScheme.new(scheme_path)
+incluido = scheme.test_action.testables.any? do |testable|
+  testable.buildable_references.any? { |ref| ref.target_uuid == tests.uuid }
+end
+unless incluido
   scheme.add_test_target(tests)
   scheme.save!
 end

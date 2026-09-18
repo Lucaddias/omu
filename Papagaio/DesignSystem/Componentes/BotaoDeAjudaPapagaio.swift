@@ -25,7 +25,7 @@ import SwiftUI
 /// se procura primeiro.
 struct BotaoDeAjudaPapagaio: View {
     let texto: String
-    var ajuda: String = "Sobre esta tela"
+    var ajuda: String = "Sobre esta tela".localized
     /// Largura da caixa de texto. Frases curtas pedem menos.
     var largura: CGFloat = 300
 
@@ -41,7 +41,7 @@ struct BotaoDeAjudaPapagaio: View {
             .contentShape(Circle())
             .onHover { pairando = $0 }
             .popover(isPresented: $pairando, arrowEdge: .bottom) {
-                Text(texto)
+                Text(texto.localized)
                     .font(PapagaioTema.Tipo.apoio)
                     .foregroundStyle(PapagaioTema.texto)
                     .fixedSize(horizontal: false, vertical: true)
@@ -49,8 +49,8 @@ struct BotaoDeAjudaPapagaio: View {
                     .frame(width: largura, alignment: .leading)
                     .padding(PapagaioTema.Espaco.largo)
             }
-            .accessibilityLabel(ajuda)
-            .accessibilityHint(texto)
-            .help(texto)
+            .accessibilityLabel(ajuda.localized)
+            .accessibilityHint(texto.localized)
+            .help(texto.localized)
     }
 }

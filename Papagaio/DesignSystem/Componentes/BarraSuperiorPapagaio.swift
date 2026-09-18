@@ -51,21 +51,26 @@ struct BarraSuperiorPapagaioView: View {
     /// uma funcionalidade que já existia.
     private var exibindoBusca: Bool { !gravando && !configuracoesSelecionada }
 
+    /// Os atalhos não seguem a busca: em Configurações eles eram escondidos
+    /// junto com o campo, e a tela ficava sem nenhum caminho de volta para a
+    /// Biblioteca. Só a gravação os esconde.
+    private var exibindoAtalhos: Bool { !gravando }
+
     /// "Buscar conversas…" não servia em nenhuma das outras duas telas com
     /// busca: no painel de tarefas o termo casa o nome da tarefa, e na
     /// lixeira ele também alcança mídia e tarefas apagadas — dizer só
     /// "conversas" ali prometia menos do que a busca de fato cobre.
     private var placeholderDeBusca: String {
-        if tarefasSelecionada { return "Buscar tarefas…" }
-        if midiasSelecionada { return "Buscar mídias…" }
-        if lixeiraSelecionada { return "Buscar na lixeira…" }
-        return "Buscar conversas…"
+        if tarefasSelecionada { return "Buscar tarefas…".localized }
+        if midiasSelecionada { return "Buscar mídias…".localized }
+        if lixeiraSelecionada { return "Buscar na lixeira…".localized }
+        return "Buscar conversas…".localized
     }
 
     /// Só centraliza quando sobra largura para os três blocos conviverem: a
     /// busca no meio, o voltar à esquerda e conta mais ações à direita.
     private var exibindoBuscaCentralizada: Bool {
-        exibindoBusca && larguraDaBarra >= 1_040
+        exibindoAtalhos && larguraDaBarra >= 1_040
     }
 
     var body: some View {
@@ -77,7 +82,7 @@ struct BarraSuperiorPapagaioView: View {
             if exibindoBotaoVoltar || gravando {
                 BotaoCircularPapagaio(
                     simbolo: "chevron.backward",
-                    ajuda: "Voltar para a biblioteca",
+                    ajuda: "Voltar para a biblioteca".localized,
                     legendaAtiva: $legendaAtiva,
                     acao: aoVoltar
                 )
@@ -85,8 +90,8 @@ struct BarraSuperiorPapagaioView: View {
 
             // Sem espaço para centralizar, busca e atalhos voltam para a linha,
             // logo depois do voltar, e encolhem junto com ela.
-            if exibindoBusca, !exibindoBuscaCentralizada {
-                campoDeBusca
+            if exibindoAtalhos, !exibindoBuscaCentralizada {
+                if exibindoBusca { campoDeBusca }
                 atalhos
             }
 
@@ -126,7 +131,7 @@ struct BarraSuperiorPapagaioView: View {
         .overlay {
             if exibindoBuscaCentralizada {
                 HStack(spacing: PapagaioTema.Espaco.medio) {
-                    campoDeBusca
+                    if exibindoBusca { campoDeBusca }
                     atalhos
                 }
                 .fixedSize()
@@ -158,14 +163,14 @@ struct BarraSuperiorPapagaioView: View {
             } label: {
                 BotaoDeIconeDaBarra(
                     simbolo: "bell",
-                    legenda: "Notificações",
+                    legenda: "Notificações".localized,
                     legendaAtiva: $legendaAtiva,
                     selecionado: exibindoNotificacoes,
                     mostraIndicador: quantidadeDeAvisos > 0
                 )
             }
             .buttonStyle(.plain)
-            .help("Notificações")
+            .help("Notificações".localized)
             .popover(isPresented: $exibindoNotificacoes, arrowEdge: .top) {
                 ListaDeNotificacoesDoApp(
                     notificacoes: notificacoes,
@@ -178,24 +183,24 @@ struct BarraSuperiorPapagaioView: View {
             Button(action: aoAbrirLixeira) {
                 BotaoDeIconeDaBarra(
                     simbolo: "trash",
-                    legenda: "Lixeira",
+                    legenda: "Lixeira".localized,
                     legendaAtiva: $legendaAtiva,
                     selecionado: lixeiraSelecionada
                 )
             }
             .buttonStyle(.plain)
-            .help("Lixeira")
+            .help("Lixeira".localized)
 
             Button(action: aoAbrirConfiguracoes) {
                 BotaoDeIconeDaBarra(
                     simbolo: "gearshape",
-                    legenda: "Configurações",
+                    legenda: "Configurações".localized,
                     legendaAtiva: $legendaAtiva,
                     selecionado: configuracoesSelecionada
                 )
             }
             .buttonStyle(.plain)
-            .help("Configurações")
+            .help("Configurações".localized)
         }
         // Sem cápsula em volta: eram dois contornos concêntricos para a mesma
         // coisa. Cada ícone já se anuncia como botão pelo próprio círculo, e
@@ -208,9 +213,9 @@ struct BarraSuperiorPapagaioView: View {
     /// ícones ofereciam. Nada fica inacessível quando a janela aperta.
     private var menuDeAcoesCompacto: some View {
         Menu {
-            Button("Biblioteca de conversas", systemImage: "folder", action: aoAbrirBiblioteca)
-            Button("Tarefas", systemImage: "list.clipboard", action: aoAbrirTarefas)
-            Button("Mídias", systemImage: "photo.on.rectangle", action: aoAbrirMidias)
+            Button("Biblioteca de conversas".localized, systemImage: "folder", action: aoAbrirBiblioteca)
+            Button("Tarefas".localized, systemImage: "list.clipboard", action: aoAbrirTarefas)
+            Button("Mídias".localized, systemImage: "photo.on.rectangle", action: aoAbrirMidias)
 
             Divider()
 
@@ -219,12 +224,12 @@ struct BarraSuperiorPapagaioView: View {
                 aoMarcarNotificacoesComoLidas()
             }) {
                 Label(
-                    quantidadeDeAvisos > 0 ? "Notificações (\(quantidadeDeAvisos))" : "Notificações",
+                    quantidadeDeAvisos > 0 ? "Notificações (%d)".localized(quantidadeDeAvisos) : "Notificações".localized,
                     systemImage: "bell"
                 )
             }
-            Button("Lixeira", systemImage: "trash", action: aoAbrirLixeira)
-            Button("Configurações", systemImage: "gearshape", action: aoAbrirConfiguracoes)
+            Button("Lixeira".localized, systemImage: "trash", action: aoAbrirLixeira)
+            Button("Configurações".localized, systemImage: "gearshape", action: aoAbrirConfiguracoes)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 15, weight: .semibold))
@@ -246,8 +251,8 @@ struct BarraSuperiorPapagaioView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Mais ações")
-        .accessibilityLabel("Mais ações")
+        .help("Mais ações".localized)
+        .accessibilityLabel("Mais ações".localized)
         .popover(isPresented: $exibindoNotificacoes, arrowEdge: .top) {
             ListaDeNotificacoesDoApp(
                 notificacoes: notificacoes,
@@ -266,8 +271,8 @@ struct BarraSuperiorPapagaioView: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .help(perfilConectado ? tituloDaContaAtiva : "Perfil")
-        .accessibilityLabel(perfilConectado ? "Conta ativa: \(tituloDaContaAtiva)" : "Perfil")
+        .help(perfilConectado ? tituloDaContaAtiva : "Perfil".localized)
+        .accessibilityLabel(perfilConectado ? "Conta ativa: %@".localized(tituloDaContaAtiva) : "Perfil".localized)
         .popover(isPresented: $exibindoMenuDePerfil, arrowEdge: .top) {
             menuDePerfil
         }
@@ -286,6 +291,7 @@ struct BarraSuperiorPapagaioView: View {
                     .font(PapagaioTema.Tipo.apoio.weight(.semibold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                     .fixedSize(horizontal: true, vertical: false)
 
                 Image(systemName: "chevron.down")
@@ -307,12 +313,14 @@ struct BarraSuperiorPapagaioView: View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             if perfilConectado {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Conta ativa")
+                    Text("Conta ativa".localized)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(PapagaioTema.textoSecundario)
                     Text(tituloDaContaAtiva)
                         .font(.headline)
                         .foregroundStyle(PapagaioTema.texto)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
 
                 SeletorDeContextoDaConta(
@@ -331,22 +339,22 @@ struct BarraSuperiorPapagaioView: View {
 
                 Divider()
 
-                Button("Gerenciar perfil", systemImage: "person.crop.circle") {
+                Button("Gerenciar perfil".localized, systemImage: "person.crop.circle") {
                     exibindoMenuDePerfil = false
                     aoGerenciarPerfil()
                 }
 
-                Button("Gerenciar equipe", systemImage: "person.3.sequence") {
+                Button("Gerenciar equipe".localized, systemImage: "person.3.sequence") {
                     exibindoMenuDePerfil = false
                     aoGerenciarEquipe()
                 }
 
-                Button("Sair", role: .destructive) {
+                Button("Sair".localized, role: .destructive) {
                     exibindoMenuDePerfil = false
                     aoSair()
                 }
             } else {
-                Button("Entrar com Apple") {
+                Button("Entrar com Apple".localized) {
                     exibindoMenuDePerfil = false
                     aoEntrar()
                 }
@@ -393,38 +401,38 @@ struct BarraSuperiorPapagaioView: View {
             Button(action: aoAbrirBiblioteca) {
                 BotaoDeAtalhoDaBarra(
                     simbolo: "folder",
-                    legenda: "Biblioteca de conversas",
+                    legenda: "Biblioteca de conversas".localized,
                     legendaAtiva: $legendaAtiva,
                     selecionado: bibliotecaSelecionada
                 )
             }
             .buttonStyle(.plain)
-            .help("Biblioteca de conversas")
-            .accessibilityLabel("Biblioteca de conversas")
+            .help("Biblioteca de conversas".localized)
+            .accessibilityLabel("Biblioteca de conversas".localized)
 
             Button(action: aoAbrirTarefas) {
                 BotaoDeAtalhoDaBarra(
                     simbolo: "list.clipboard",
-                    legenda: "Tarefas",
+                    legenda: "Tarefas".localized,
                     legendaAtiva: $legendaAtiva,
                     selecionado: tarefasSelecionada
                 )
             }
             .buttonStyle(.plain)
-            .help("Tarefas")
-            .accessibilityLabel("Tarefas")
+            .help("Tarefas".localized)
+            .accessibilityLabel("Tarefas".localized)
 
             Button(action: aoAbrirMidias) {
                 BotaoDeAtalhoDaBarra(
                     simbolo: "photo.on.rectangle",
-                    legenda: "Mídias",
+                    legenda: "Mídias".localized,
                     legendaAtiva: $legendaAtiva,
                     selecionado: midiasSelecionada
                 )
             }
             .buttonStyle(.plain)
-            .help("Mídias")
-            .accessibilityLabel("Mídias")
+            .help("Mídias".localized)
+            .accessibilityLabel("Mídias".localized)
         }
         .padding(.horizontal, PapagaioTema.Espaco.minimo)
         .frame(height: PapagaioTema.Altura.padrao)
@@ -439,6 +447,6 @@ struct BarraSuperiorPapagaioView: View {
     }
 
     private var tituloDaContaAtiva: String {
-        contextoDaConta == .perfil ? "Perfil pessoal" : (equipeAtiva?.nome ?? "Nenhuma equipe ainda")
+        contextoDaConta == .perfil ? "Perfil pessoal".localized : (equipeAtiva?.nome ?? "Nenhuma equipe ainda".localized)
     }
 }

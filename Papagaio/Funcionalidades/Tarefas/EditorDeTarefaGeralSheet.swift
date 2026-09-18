@@ -38,10 +38,10 @@ struct EditorDeTarefaGeralSheet: View {
                     .background(PapagaioTema.destaqueSuave, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
 
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text(modo == .criacao ? "Nova tarefa" : "Editar tarefa")
+                    Text(modo == .criacao ? "Nova tarefa".localized : "Editar tarefa".localized)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(PapagaioTema.texto)
-                    Text("Escolha a conversa, descreva a tarefa e defina prioridade, responsável e data limite.")
+                    Text("Escolha a conversa, descreva a tarefa e defina prioridade, responsável e data limite.".localized)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
@@ -49,7 +49,7 @@ struct EditorDeTarefaGeralSheet: View {
                 Spacer()
             }
 
-            campo("Conversa") {
+            campo("Conversa".localized) {
                 Menu {
                     ForEach(conversas) { conversa in
                         Button(conversa.resumo?.titulo ?? conversa.titulo) {
@@ -59,8 +59,9 @@ struct EditorDeTarefaGeralSheet: View {
                 } label: {
                     HStack {
                         Image(systemName: "bubble.left")
-                        Text(conversaAtual.map { $0.resumo?.titulo ?? $0.titulo } ?? "Escolher conversa")
+                        Text(conversaAtual.map { $0.resumo?.titulo ?? $0.titulo } ?? "Escolher conversa".localized)
                             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                         Spacer()
                         Image(systemName: "chevron.down")
                             .font(.caption.weight(.bold))
@@ -79,8 +80,8 @@ struct EditorDeTarefaGeralSheet: View {
                 .buttonStyle(.plain)
             }
 
-            campo("Título") {
-                TextField("Ex.: Revisar documentação", text: $titulo)
+            campo("Título".localized) {
+                TextField("Ex.: Revisar documentação".localized, text: $titulo)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -92,7 +93,7 @@ struct EditorDeTarefaGeralSheet: View {
                     }
             }
 
-            campo("Descrição") {
+            campo("Descrição".localized) {
                 // Fundo e borda no próprio `TextEditor`, e não num `ZStack` ao
                 // redor — mesmo padrão do editor de trecho corrigido, na tela
                 // de detalhe. Com a caixa aplicada a um irmão, o recuo interno
@@ -109,7 +110,7 @@ struct EditorDeTarefaGeralSheet: View {
                     .background(PapagaioTema.superficie, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
                     .overlay(alignment: .topLeading) {
                         if descricao.isEmpty {
-                            Text("Detalhes, contexto ou o que precisa ser feito")
+                            Text("Detalhes, contexto ou o que precisa ser feito".localized)
                                 .font(.body)
                                 .foregroundStyle(PapagaioTema.textoSecundario.opacity(0.7))
                                 .padding(.horizontal, PapagaioTema.Espaco.curto + 5)
@@ -123,8 +124,8 @@ struct EditorDeTarefaGeralSheet: View {
                     }
             }
 
-            campo("Responsável") {
-                TextField("Nome, e-mail ou login", text: $responsavel)
+            campo("Responsável".localized) {
+                TextField("Nome, e-mail ou login".localized, text: $responsavel)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -136,26 +137,26 @@ struct EditorDeTarefaGeralSheet: View {
                     }
             }
 
-            campo("Prioridade") {
+            campo("Prioridade".localized) {
                 ControleSegmentadoPapagaio(
                     opcoes: PrioridadeDaTarefa.allCases,
                     selecionado: $prioridade,
-                    titulo: { $0.rawValue },
+                    titulo: { $0.titulo },
                     simbolo: { _ in nil }
                 )
             }
 
-            campo("Data limite") {
-                CampoDeDataPapagaio(data: $prazo, rotuloAcessivel: "Data limite")
+            campo("Data limite".localized) {
+                CampoDeDataPapagaio(data: $prazo, rotuloAcessivel: "Data limite".localized)
             }
 
             HStack(spacing: PapagaioTema.Espaco.medio) {
-                Button("Cancelar", action: aoCancelar)
+                Button("Cancelar".localized, action: aoCancelar)
                     .buttonStyle(BotaoDeContornoPapagaio())
 
                 Spacer()
 
-                Button(modo == .criacao ? "Adicionar tarefa" : "Salvar alterações", systemImage: modo == .criacao ? "plus" : "checkmark") {
+                Button(modo == .criacao ? "Adicionar tarefa".localized : "Salvar alterações".localized, systemImage: modo == .criacao ? "plus" : "checkmark") {
                     aoSalvar()
                 }
                 .buttonStyle(BotaoPrincipalPapagaio())

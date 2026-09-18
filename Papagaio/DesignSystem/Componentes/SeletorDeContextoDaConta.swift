@@ -23,21 +23,21 @@ struct SeletorDeContextoDaConta: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-            Text("Pessoal")
+            Text("Pessoal".localized)
                 .font(.caption.weight(.bold))
                 .textCase(.uppercase)
                 .foregroundStyle(PapagaioTema.textoSecundario)
 
             BotaoDeContextoDaConta(
-                titulo: "Perfil pessoal",
-                subtitulo: "Conta pessoal",
+                titulo: "Perfil pessoal".localized,
+                subtitulo: "Conta pessoal".localized,
                 simbolo: "person.crop.circle",
                 selecionado: contexto == .perfil,
                 acao: aoUsarPerfil
             )
 
             if !equipes.isEmpty {
-                Text("Equipe")
+                Text("Equipe".localized)
                     .font(.caption.weight(.bold))
                     .textCase(.uppercase)
                     .foregroundStyle(PapagaioTema.textoSecundario)
@@ -62,14 +62,18 @@ struct SeletorDeContextoDaConta: View {
                     .frame(width: 28, height: 28)
 
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text(equipeAtiva?.nome ?? "Selecionar equipe")
+                    Text(equipeAtiva?.nome ?? "Selecionar equipe".localized)
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     if let ativa = equipeAtiva {
-                        Text("\(ativa.papel) • \(ativa.quantidadeDeMembros) membros")
+                        let membrosTexto = ativa.quantidadeDeMembros == 1 ? "1 membro".localized : "%d membros".localized(ativa.quantidadeDeMembros)
+                        Text("\(ativa.papel.localized) • \(membrosTexto)")
                             .font(.caption)
                             .foregroundStyle(PapagaioTema.textoSecundario)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
                 }
 
@@ -116,9 +120,10 @@ struct SeletorDeContextoDaConta: View {
     private var conteudoDaLista: some View {
         VStack(spacing: PapagaioTema.Espaco.minimo) {
             ForEach(equipes) { equipe in
+                let membrosTexto = equipe.quantidadeDeMembros == 1 ? "1 membro".localized : "%d membros".localized(equipe.quantidadeDeMembros)
                 BotaoDeContextoDaConta(
                     titulo: equipe.nome,
-                    subtitulo: "\(equipe.papel) • \(equipe.quantidadeDeMembros) membros",
+                    subtitulo: "\(equipe.papel.localized) • \(membrosTexto)",
                     simbolo: "person.3",
                     selecionado: contexto == .equipe && equipe.id == equipeAtiva?.id,
                     acao: {
@@ -147,13 +152,16 @@ struct BotaoDeContextoDaConta: View {
                     .frame(width: 28, height: 28)
 
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text(titulo)
+                    Text(titulo.localized)
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
-                    Text(subtitulo)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Text(subtitulo.localized)
                         .font(.caption)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
 
                 Spacer()

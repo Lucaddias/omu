@@ -15,6 +15,8 @@ public struct ProgressoDownload: Sendable, Equatable {
 public enum ErroDownload: Error, CustomStringConvertible {
     case checksumInvalido(esperado: String, obtido: String)
     case respostaInvalida(Int)
+    case tamanhoInvalido(esperado: Int64, obtido: Int64)
+    case intervaloInvalido
     case interrompido
 
     public var description: String {
@@ -24,6 +26,10 @@ public enum ErroDownload: Error, CustomStringConvertible {
                 + "obtido \(obtido.prefix(12))…). Ele foi descartado."
         case let .respostaInvalida(codigo):
             "O servidor respondeu \(codigo)."
+        case let .tamanhoInvalido(esperado, obtido):
+            "O modelo tem \(obtido) bytes; eram esperados \(esperado)."
+        case .intervaloInvalido:
+            "O servidor respondeu com um intervalo incompatível com a retomada."
         case .interrompido:
             "Download interrompido."
         }
@@ -37,6 +43,8 @@ public enum ErroDownload: Error, CustomStringConvertible {
 /// É o que mantém o app dentro da guideline 2.5.2 da App Store (R-6) e o que
 /// permite um `.app` de tamanho normal para modelos grandes.
 public actor DownloadDeModelos {
+    // Compartilhada entre instâncias: dois baixadores podem apontar à mesma pasta.
+    private static let fila = FilaEstrita()
     private let pastaDeModelos: URL
     private let sessao: URLSession
 
@@ -55,8 +63,26 @@ public actor DownloadDeModelos {
         _ peso: PesoDeModelo,
         aoProgredir: @escaping @Sendable (ProgressoDownload) -> Void = { _ in }
     ) async throws -> URL {
+        await Self.fila.entrar()
+        do {
+            try Task.checkCancellation()
+            let resultado = try await baixarSemFila(peso, aoProgredir: aoProgredir)
+            await Self.fila.sair()
+            return resultado
+        } catch {
+            await Self.fila.sair()
+            throw error
+        }
+    }
+
+    private func baixarSemFila(
+        _ peso: PesoDeModelo,
+        aoProgredir: @escaping @Sendable (ProgressoDownload) -> Void
+    ) async throws -> URL {
         let destino = pastaDeModelos.appendingPathComponent(peso.nomeArquivo)
         if FileManager.default.fileExists(atPath: destino.path) {
+            try validar(destino, peso: peso)
+            aoProgredir(ProgressoDownload(peso: peso, bytesRecebidos: peso.bytes, bytesTotais: peso.bytes))
             return destino
         }
 
@@ -65,7 +91,24 @@ public actor DownloadDeModelos {
         )
 
         let parcial = destino.appendingPathExtension("parcial")
-        let jaBaixado = Self.tamanhoEmDisco(parcial)
+        var jaBaixado = Self.tamanhoEmDisco(parcial)
+        // Uma transferência concluída antes de encerrar o app pode estar apenas
+        // aguardando a promoção. Evita pedir Range além do fim (HTTP 416).
+        if jaBaixado >= peso.bytes, jaBaixado > 0 {
+            do {
+                try validar(parcial, peso: peso)
+                try FileManager.default.moveItem(at: parcial, to: destino)
+                aoProgredir(ProgressoDownload(peso: peso, bytesRecebidos: peso.bytes, bytesTotais: peso.bytes))
+                return destino
+            } catch let erro as ErroDownload {
+                switch erro {
+                case .checksumInvalido, .tamanhoInvalido:
+                    try FileManager.default.removeItem(at: parcial)
+                    jaBaixado = 0
+                default: throw erro
+                }
+            }
+        }
 
         var requisicao = URLRequest(url: peso.url)
         if jaBaixado > 0 {
@@ -82,8 +125,16 @@ public actor DownloadDeModelos {
         }
 
         let retomando = http.statusCode == 206
+        if retomando {
+            guard Self.intervaloValido(
+                http.value(forHTTPHeaderField: "Content-Range"),
+                inicio: jaBaixado, total: peso.bytes
+            ) else { throw ErroDownload.intervaloInvalido }
+        }
         let inicio: Int64 = retomando ? jaBaixado : 0
-        if !retomando { try? FileManager.default.removeItem(at: parcial) }
+        if !retomando, FileManager.default.fileExists(atPath: parcial.path) {
+            try FileManager.default.removeItem(at: parcial)
+        }
 
         if !FileManager.default.fileExists(atPath: parcial.path) {
             FileManager.default.createFile(atPath: parcial.path, contents: nil)
@@ -114,12 +165,13 @@ public actor DownloadDeModelos {
         }
         try escritor.close()
 
-        // Verificação antes de promover: um peso corrompido que vira "ativo" é
-        // pior que um download perdido — o modelo carrega e produz lixo.
-        let hash = try Preflight.sha256(de: parcial)
-        guard peso.sha256.isEmpty || hash == peso.sha256 else {
-            try? FileManager.default.removeItem(at: parcial)
-            throw ErroDownload.checksumInvalido(esperado: peso.sha256, obtido: hash)
+        try Task.checkCancellation()
+        do {
+            try validar(parcial, peso: peso)
+        } catch let erro as ErroDownload {
+            // Corpo incompleto continua retomável; conteúdo completo corrompido não.
+            if case .checksumInvalido = erro { try? FileManager.default.removeItem(at: parcial) }
+            throw erro
         }
 
         try FileManager.default.moveItem(at: parcial, to: destino)
@@ -127,6 +179,30 @@ public actor DownloadDeModelos {
             peso: peso, bytesRecebidos: peso.bytes, bytesTotais: peso.bytes
         ))
         return destino
+    }
+
+    private func validar(_ url: URL, peso: PesoDeModelo) throws {
+        let tamanho = Self.tamanhoEmDisco(url)
+        guard tamanho == peso.bytes else {
+            throw ErroDownload.tamanhoInvalido(esperado: peso.bytes, obtido: tamanho)
+        }
+        if !peso.sha256.isEmpty {
+            let hash = try Preflight.sha256(de: url)
+            guard hash == peso.sha256 else {
+                throw ErroDownload.checksumInvalido(esperado: peso.sha256, obtido: hash)
+            }
+        }
+    }
+
+    static func intervaloValido(_ valor: String?, inicio: Int64, total: Int64) -> Bool {
+        guard let valor, valor.hasPrefix("bytes ") else { return false }
+        let partes = valor.dropFirst(6).split(separator: "/")
+        guard partes.count == 2, Int64(partes[1]) == total else { return false }
+        let limites = partes[0].split(separator: "-")
+        guard limites.count == 2,
+              let primeiro = Int64(limites[0]), let ultimo = Int64(limites[1])
+        else { return false }
+        return primeiro == inicio && ultimo >= primeiro && ultimo < total
     }
 
     /// Quanto já existe em disco de um peso ainda incompleto.

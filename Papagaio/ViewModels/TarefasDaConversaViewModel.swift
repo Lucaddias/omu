@@ -210,10 +210,10 @@ final class TarefasDaConversaViewModel {
 
     private func notificarPrazoSeNecessario(_ tarefa: TarefaDaConversa) {
         guard tarefa.status != .concluida, RegraDePrazoDaTarefa.prazoEstaPerto(tarefa.prazo) else { return }
-        let data = tarefa.prazo?.formatted(.dateTime.day().month().year()) ?? "em breve"
+        let data = tarefa.prazo?.formatted(.dateTime.day().month().year()) ?? "em breve".localized
         aoNotificar?(
-            "Prazo perto",
-            "\(tarefa.titulo) vence \(data) e foi marcada como prioridade alta."
+            "Prazo perto".localized,
+            "%@ vence %@ e foi marcada como prioridade alta.".localized(tarefa.titulo, data)
         )
     }
 

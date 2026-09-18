@@ -13,11 +13,11 @@ enum ErroMCP: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .protocolo(_, mensagem):
-            "O Granola respondeu: \(mensagem)."
+            "O Granola respondeu: %@.".localized(mensagem)
         case .respostaInvalida:
-            "O Granola respondeu de forma inesperada."
+            "O Granola respondeu de forma inesperada.".localized
         case let .rede(mensagem):
-            "Sem conexão com o Granola: \(mensagem)."
+            "Sem conexão com o Granola: %@.".localized(mensagem)
         }
     }
 }
@@ -31,25 +31,28 @@ enum ErroMCP: LocalizedError {
 /// chamadas seguintes.
 final class ClienteMCP: @unchecked Sendable {
     private var inicializado = false
+    private var inicializacao: Task<Void, Error>?
     private var idSessao: String?
     private var proximoIDInterno = 1
-    private let travaDeIDs = NSLock()
+    private let trava = NSLock()
 
     /// Ids curtas e crescentes: alguns servidores rejeitam inteiros de 64
     /// bits fora do alcance de int32 com "Parse error".
     private func proximoID() -> Int {
-        travaDeIDs.lock(); defer { travaDeIDs.unlock() }
+        trava.lock(); defer { trava.unlock() }
         let atual = proximoIDInterno
         proximoIDInterno = atual >= 1_000_000_000 ? 1 : atual + 1
         return atual
     }
 
     let url: URL
-    private let obterToken: (Bool) async throws -> String
+    private let obterToken: @Sendable (Bool) async throws -> String
+    private let sessao: URLSession
 
-    init(url: URL, token: @escaping (Bool) async throws -> String) {
+    init(url: URL, sessao: URLSession = .shared, token: @escaping @Sendable (Bool) async throws -> String) {
         self.url = url
         self.obterToken = token
+        self.sessao = sessao
     }
 
     /// Chama uma ferramenta e devolve o conteúdo que o servidor mandou no
@@ -72,10 +75,34 @@ final class ClienteMCP: @unchecked Sendable {
     // MARK: - Ciclo de vida
 
     private func garantirInicializacao() async throws {
-        guard !inicializado else { return }
+        let tarefa: Task<Void, Error>? = trava.withLock {
+            guard !inicializado else { return nil }
+            if let inicializacao { return inicializacao }
+            let nova = Task { try await self.inicializar() }
+            inicializacao = nova
+            return nova
+        }
+        try await tarefa?.value
+        try Task.checkCancellation()
+    }
+
+    private func inicializar() async throws {
+        do {
+            try await executarInicializacao()
+            trava.withLock {
+                inicializado = true
+                inicializacao = nil
+            }
+        } catch {
+            trava.withLock { inicializacao = nil }
+            throw error
+        }
+    }
+
+    private func executarInicializacao() async throws {
         let corpo: [String: Any] = [
             "jsonrpc": "2.0",
-            "id": 1,
+            "id": proximoID(),
             "method": "initialize",
             "params": [
                 "protocolVersion": "2025-03-26",
@@ -86,15 +113,15 @@ final class ClienteMCP: @unchecked Sendable {
                 ],
             ],
         ]
-        _ = try await postar(corpo, contexto: "initialize")
-        inicializado = true
+        let resposta = try await postar(corpo, contexto: "initialize")
+        _ = try extrairResultado(resposta)
 
         // Sinal de "estou pronto": notificação sem id, não espera resposta.
         let notificacao: [String: Any] = [
             "jsonrpc": "2.0",
             "method": "notifications/initialized",
         ]
-        _ = try? await postar(notificacao, contexto: "notifications/initialized")
+        _ = try await postar(notificacao, contexto: "notifications/initialized")
     }
 
     // MARK: - HTTP
@@ -107,28 +134,25 @@ final class ClienteMCP: @unchecked Sendable {
         pedido.timeoutInterval = 60
         let token = try await obterToken(false)
         pedido.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        if let idSessao {
+        if let idSessao = trava.withLock({ idSessao }) {
             pedido.setValue(idSessao, forHTTPHeaderField: "Mcp-Session-Id")
         }
         pedido.httpBody = try JSONSerialization.data(withJSONObject: mensagem)
 
         let dados: Data
         do {
-            let (corpo, resposta) = try await URLSession.shared.data(for: pedido)
+            let (corpo, resposta) = try await sessao.data(for: pedido)
             let status = (resposta as? HTTPURLResponse)?.statusCode
             if let http = resposta as? HTTPURLResponse {
                 if let sessao = http.value(forHTTPHeaderField: "Mcp-Session-Id") {
-                    idSessao = sessao
+                    trava.withLock { idSessao = sessao }
                 }
             }
             // 200 para respostas; 202 é o aceite das notificações (`initialized`),
             // que vêm com corpo `null` — não há o que parsear.
             guard status == 200 || status == 202 else {
-                let prefixo = String(data: corpo, encoding: .utf8)?
-                    .prefix(300)
-                    .replacingOccurrences(of: "\n", with: " ⏎ ") ?? "(sem corpo)"
                 Logger(subsystem: "Papagaio", category: "Granola").error(
-                    "MCP-\(contexto, privacy: .public): status=\(status ?? 0) corpo=\(prefixo, privacy: .public)"
+                    "MCP-\(contexto, privacy: .public): status=\(status ?? 0)"
                 )
                 throw ErroMCP.protocolo(codigo: status ?? 0, mensagem: HTTPURLResponse.localizedString(forStatusCode: status ?? 0))
             }
@@ -169,10 +193,8 @@ final class ClienteMCP: @unchecked Sendable {
         do {
             return try JSONSerialization.jsonObject(with: dados) as? [String: Any]
         } catch {
-            let texto = String(data: dados.prefix(200), encoding: .utf8)
-            let bruto = dados.prefix(80).map { String(format: "%02x", $0) }.joined()
             Logger(subsystem: "Papagaio", category: "Granola").error(
-                "MCP: \(contexto, privacy: .public) não é JSON — texto=\(texto ?? "(sem texto)", privacy: .public) bruto=\(bruto, privacy: .public)"
+                "MCP: \(contexto, privacy: .public) não contém JSON válido (\(dados.count) bytes)"
             )
             throw ErroMCP.respostaInvalida
         }

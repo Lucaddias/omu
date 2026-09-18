@@ -197,8 +197,8 @@ struct TarefasView: View {
                     if tarefasPorConversa.isEmpty {
                         CartaoDeEstadoVazio(
                             simbolo: "list.clipboard",
-                            titulo: "Nenhuma tarefa ainda",
-                            mensagem: "Quando uma conversa tiver próximos passos ou tarefas criadas, elas ficarão reunidas nesta página."
+                            titulo: "Nenhuma tarefa ainda".localized,
+                            mensagem: "Quando uma conversa tiver próximos passos ou tarefas criadas, elas ficarão reunidas nesta página.".localized
                         )
                         .frame(maxWidth: .infinity, minHeight: 300)
                         .cartaoPapagaio()
@@ -259,7 +259,7 @@ struct TarefasView: View {
             }
             .buttonStyle(.plain)
             .padding(PapagaioTema.Espaco.pagina)
-            .help("Adicionar tarefa")
+            .help("Adicionar tarefa".localized)
             .disabled(conversas.isEmpty)
         }
         .sheet(isPresented: $exibindoEditor) {
@@ -286,7 +286,7 @@ struct TarefasView: View {
         // Biblioteca já usa: a explicação aparece ao passar o mouse, e não
         // ocupa uma linha inteira que só se lê uma vez.
         HStack(alignment: .center, spacing: PapagaioTema.Espaco.curto) {
-            Text("Painel de Tarefas")
+            Text("Painel de Tarefas".localized)
                 .font(PapagaioTema.Tipo.tituloDePagina)
                 .foregroundStyle(PapagaioTema.texto)
 
@@ -295,8 +295,8 @@ struct TarefasView: View {
             // de 30pt (ver o mesmo ajuste e comentário em
             // `BibliotecaHomeView.cabecalhoDaBiblioteca`).
             BotaoDeAjudaPapagaio(
-                texto: "Gerencie as tarefas geradas a partir das suas conversas.",
-                ajuda: "Sobre o painel de tarefas",
+                texto: "Gerencie as tarefas geradas a partir das suas conversas.".localized,
+                ajuda: "Sobre o painel de tarefas".localized,
                 largura: 280
             )
             .offset(y: 3)
@@ -319,7 +319,7 @@ struct TarefasView: View {
     private var seletorDeConversas: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             HStack {
-                Text("Todas as conversas")
+                Text("Todas as conversas".localized)
                     .font(.caption.weight(.bold))
                     .textCase(.uppercase)
                     .foregroundStyle(PapagaioTema.textoSecundario)
@@ -327,7 +327,7 @@ struct TarefasView: View {
                 // Mesmo tratamento da contagem na tag de cada coluna do
                 // quadro logo abaixo — uma pastilha ao lado do rótulo, não
                 // outro texto solto competindo com ele.
-                Text("\(tarefasPorConversa.count) \(tarefasPorConversa.count == 1 ? "Conversa" : "Conversas")")
+                Text("\(tarefasPorConversa.count) \(tarefasPorConversa.count == 1 ? "Conversa".localized : "Conversas".localized)")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .padding(.horizontal, PapagaioTema.Espaco.curto)
@@ -335,7 +335,7 @@ struct TarefasView: View {
                     .background(PapagaioTema.superficieSuave, in: Capsule())
 
                 if !conversasSelecionadas.isEmpty {
-                    Button("Limpar seleção") {
+                    Button("Limpar seleção".localized) {
                         withAnimation(.snappy(duration: 0.18)) {
                             conversasSelecionadas.removeAll()
                         }
@@ -376,8 +376,8 @@ struct TarefasView: View {
             if tarefasVisiveis.isEmpty {
                 CartaoDeEstadoVazio(
                     simbolo: "magnifyingglass",
-                    titulo: "Nenhuma tarefa encontrada",
-                    mensagem: "Tente limpar a seleção ou buscar por outra conversa."
+                    titulo: "Nenhuma tarefa encontrada".localized,
+                    mensagem: "Tente limpar a seleção ou buscar por outra conversa.".localized
                 )
                 .frame(maxWidth: .infinity, minHeight: 240)
                 .cartaoPapagaio()
@@ -391,21 +391,21 @@ struct TarefasView: View {
 
                 arranjo {
                     coluna(
-                        titulo: "Não iniciado",
+                        titulo: "Não iniciado".localized,
                         cor: StatusDaTarefa.naoIniciado.cor,
                         tarefas: tarefasNaoIniciadas,
                         destino: .naoIniciado,
                         oculta: $ocultarColunaNaoIniciado
                     )
                     coluna(
-                        titulo: "Em andamento",
+                        titulo: "Em andamento".localized,
                         cor: StatusDaTarefa.emAndamento.cor,
                         tarefas: tarefasEmAndamento,
                         destino: .emAndamento,
                         oculta: $ocultarColunaEmAndamento
                     )
                     coluna(
-                        titulo: "Concluídas",
+                        titulo: "Concluídas".localized,
                         cor: StatusDaTarefa.concluida.cor,
                         tarefas: tarefasConcluidas,
                         destino: .concluida,
@@ -419,7 +419,7 @@ struct TarefasView: View {
                     // prazo vencido só move ela pra "Não iniciado" mesmo —
                     // igual arrastar pra lá diretamente.
                     coluna(
-                        titulo: "Atrasada",
+                        titulo: "Atrasada".localized,
                         cor: PapagaioTema.perigo,
                         tarefas: tarefasAtrasadas,
                         destino: .naoIniciado,
@@ -465,7 +465,7 @@ struct TarefasView: View {
                 .foregroundStyle(PapagaioTema.texto)
                 .layoutPriority(1)
 
-            Text("\(tarefasVisiveis.count) \(tarefasVisiveis.count == 1 ? "Tarefa" : "Tarefas")")
+            Text("\(tarefasVisiveis.count) \(tarefasVisiveis.count == 1 ? "Tarefa".localized : "Tarefas".localized)")
                 .font(.callout.weight(.bold))
                 .foregroundStyle(PapagaioTema.textoSecundario)
                 .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -478,17 +478,17 @@ struct TarefasView: View {
     private var filtrosDoKanban: some View {
         HStack(spacing: PapagaioTema.Espaco.medio) {
             Menu {
-                Button("Todas") { prioridadeSelecionada = nil }
+                Button("Todas".localized) { prioridadeSelecionada = nil }
                 ForEach(PrioridadeDaTarefa.allCases, id: \.self) { prioridade in
-                    Button(prioridade.rawValue) { prioridadeSelecionada = prioridade }
+                    Button(prioridade.titulo) { prioridadeSelecionada = prioridade }
                 }
             } label: {
-                Label(prioridadeSelecionada?.rawValue ?? "Prioridade", systemImage: "line.3.horizontal.decrease")
+                Label(prioridadeSelecionada?.titulo ?? "Prioridade".localized, systemImage: "line.3.horizontal.decrease")
             }
             .buttonStyle(BotaoDeFiltroDeTarefaGeral(ativo: prioridadeSelecionada != nil))
 
             Menu {
-                Button("Todas") { filtroDeDeadline = .todas }
+                Button("Todas".localized) { filtroDeDeadline = .todas }
                 Divider()
                 ForEach(FiltroDeDeadlineTarefa.allCases.filter { $0 != .todas }, id: \.self) { filtro in
                     Button(filtro.titulo) { filtroDeDeadline = filtro }
@@ -507,12 +507,12 @@ struct TarefasView: View {
                     }
                 } label: {
                     Label(
-                        mostrarTarefasOcultas ? "\(tarefasOcultas.count) ocultas" : "Ocultas",
+                        mostrarTarefasOcultas ? "\(tarefasOcultas.count) \("ocultas".localized)" : "Ocultas".localized,
                         systemImage: mostrarTarefasOcultas ? "eye" : "eye.slash"
                     )
                 }
                 .buttonStyle(BotaoDeFiltroDeTarefaGeral(ativo: mostrarTarefasOcultas))
-                .help(mostrarTarefasOcultas ? "Esconder de novo as tarefas ocultas" : "Mostrar as tarefas ocultas")
+                .help(mostrarTarefasOcultas ? "Esconder de novo as tarefas ocultas".localized : "Mostrar as tarefas ocultas".localized)
             }
         }
         .fixedSize(horizontal: true, vertical: false)
@@ -567,7 +567,7 @@ struct TarefasView: View {
            let selecionada = conversasVisiveis.first {
             return selecionada.titulo
         }
-        return conversasSelecionadas.isEmpty ? "Todas as tarefas" : "\(conversasSelecionadas.count) conversas selecionadas"
+        return conversasSelecionadas.isEmpty ? "Todas as tarefas".localized : "\(conversasSelecionadas.count) \("conversas selecionadas".localized)"
     }
 
     private func coluna(

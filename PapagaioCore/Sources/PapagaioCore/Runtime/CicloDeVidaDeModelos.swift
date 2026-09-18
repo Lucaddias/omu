@@ -66,10 +66,13 @@ public actor CicloDeVidaDeModelos {
 
     /// Descarrega tudo. Chamado sob pressão crítica e disponível para a UI.
     public func descarregarTudo() async {
-        for (_, residente) in residentes {
+        // Retira apenas o lote atual antes de suspender. Registros feitos
+        // durante o unload pertencem à próxima geração e continuam monitorados.
+        let lote = residentes
+        residentes.removeAll()
+        for (_, residente) in lote {
             await residente.descarregar()
         }
-        residentes.removeAll()
         ultimoDescarte = Date()
     }
 

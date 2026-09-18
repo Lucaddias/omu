@@ -5,6 +5,12 @@ enum VisibilidadeDosArquivosDaEquipe: String, CaseIterable, Codable, Identifiabl
     case apenasAdministrador = "Somente administradores"
 
     var id: Self { self }
+    var titulo: String {
+        switch self {
+        case .todosOsMembros: "Todos os membros".localized
+        case .apenasAdministrador: "Somente administradores".localized
+        }
+    }
 }
 
 enum RecebimentoDeArquivosDaEquipe: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -12,6 +18,12 @@ enum RecebimentoDeArquivosDaEquipe: String, CaseIterable, Codable, Identifiable,
     case aguardarRevisao = "Aguardar revisão"
 
     var id: Self { self }
+    var titulo: String {
+        switch self {
+        case .automatico: "Entrar automaticamente".localized
+        case .aguardarRevisao: "Aguardar revisão".localized
+        }
+    }
 }
 
 struct ConfiguracoesDaEquipe: Codable, Hashable, Sendable {
@@ -58,9 +70,11 @@ struct EquipeDisponivel: Identifiable, Hashable, Codable, Sendable {
     /// "0 membros" nesse caso fazia parecer que o proprietário tinha sumido.
     var resumoDeMembros: String {
         guard quantidadeDeMembros > 0 else {
-            return "participantes ainda não carregados"
+            return "participantes ainda não carregados".localized
         }
-        return quantidadeDeMembros == 1 ? "1 membro" : "\(quantidadeDeMembros) membros"
+        return quantidadeDeMembros == 1
+            ? "1 membro".localized
+            : "%d membros".localized(quantidadeDeMembros)
     }
 
     private enum CodingKeys: String, CodingKey {

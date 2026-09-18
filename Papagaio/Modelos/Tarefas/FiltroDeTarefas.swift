@@ -10,5 +10,15 @@ enum FiltroDeTarefas: String, CaseIterable, Identifiable {
     // depois de "Concluídas".
     case atrasadas = "Atrasadas"
 
+    var titulo: String {
+        switch self {
+        case .tudo: "Tudo".localized
+        case .naoIniciado: "Não iniciado".localized
+        case .emAndamento: "Em andamento".localized
+        case .concluidas: "Concluídas".localized
+        case .atrasadas: "Atrasadas".localized
+        }
+    }
+
     var id: Self { self }
 }

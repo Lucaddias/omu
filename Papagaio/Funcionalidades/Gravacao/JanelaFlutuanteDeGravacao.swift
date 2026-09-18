@@ -20,6 +20,7 @@ import SwiftUI
 @MainActor
 final class JanelaFlutuanteDeGravacao {
     private var painel: NSPanel?
+    private var observadorAparencia: NSObjectProtocol?
 
     /// A moldura de antes de minimizar, para voltar exatamente ao mesmo
     /// lugar e tamanho ao restaurar.
@@ -40,10 +41,13 @@ final class JanelaFlutuanteDeGravacao {
             // A aparência pode ter mudado em Configurações desde a última
             // vez que o painel apareceu — sem atualizar aqui, ele ficava
             // preso na aparência de quando nasceu até o app reiniciar.
-            painel.appearance = aparenciaAtual.nsAppearance
+            observarAparenciaSeNecessario()
+            atualizarAparencia()
             painel.orderFrontRegardless()
             return
         }
+
+        observarAparenciaSeNecessario()
 
         quadroAntesDeMinimizar = nil
 
@@ -63,7 +67,7 @@ final class JanelaFlutuanteDeGravacao {
             backing: .buffered,
             defer: false
         )
-        novo.title = "Gravando"
+        novo.title = "Gravando".localized
         novo.titlebarAppearsTransparent = true
         novo.titleVisibility = .hidden
         novo.isMovableByWindowBackground = true
@@ -137,6 +141,29 @@ final class JanelaFlutuanteDeGravacao {
     private var aparenciaAtual: AparenciaDoApp {
         let bruta = UserDefaults.standard.string(forKey: "aparenciaDoApp") ?? AparenciaDoApp.sistema.rawValue
         return AparenciaDoApp(rawValue: bruta) ?? .sistema
+    }
+
+    /// Atualiza o painel ao vivo quando o tema muda em Configurações.
+    /// Só `window.appearance = nil` reconsulta `NSApp.effectiveAppearance`
+    /// num NSPanel nonactivating; `displayIfNeeded` evita esperar virar key.
+    /// Não recria o `NSHostingView` de propósito: recriar perderia o foco do
+    /// campo de nota no meio da gravação.
+    private func atualizarAparencia() {
+        guard let painel else { return }
+        painel.appearance = aparenciaAtual.nsAppearance
+        painel.viewsNeedDisplay = true
+        painel.contentView?.needsDisplay = true
+        painel.invalidateShadow()
+        painel.displayIfNeeded()
+    }
+
+    private func observarAparenciaSeNecessario() {
+        guard observadorAparencia == nil else { return }
+        observadorAparencia = NotificationCenter.default.addObserver(
+            forName: .aparenciaDoAppMudou, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.atualizarAparencia() }
+        }
     }
 
     /// Some com o painel. Quando `origem` aponta para um lugar válido da tela

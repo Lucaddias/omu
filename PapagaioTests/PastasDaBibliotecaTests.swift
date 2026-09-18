@@ -138,3 +138,28 @@ func restaurarTudoMantemOsVinculosDasPastas() async throws {
     let restantes = PreferenciasVisuaisDoArquivo.pastas().filter { $0 != nome }
     UserDefaults.standard.set(restantes, forKey: "pastasDaBiblioteca")
 }
+
+@MainActor
+@Test("Renomear e restaurar pasta preserva ajuste e invalida capa em cache")
+func aparenciaDaPastaPreservaEstadoCompleto() throws {
+    let origem = "Origem-\(UUID())"
+    let destino = "Destino-\(UUID())"
+    defer { AparenciaDasPastas.esquecer(origem); AparenciaDasPastas.esquecer(destino) }
+    UserDefaults.standard.set("ajustar", forKey: "ajusteDaCapaDaPasta." + origem)
+    AparenciaDasPastas.definirFavorita(true, para: origem)
+    let retrato = AparenciaDasPastas.estado(de: origem)
+    let dados = try JSONEncoder().encode(retrato)
+    let decodificado = try JSONDecoder().decode(AparenciaDasPastas.Estado.self, from: dados)
+
+    AparenciaDasPastas.renomear(de: origem, para: destino)
+    #expect(AparenciaDasPastas.estado(de: destino) == retrato)
+    #expect(UserDefaults.standard.object(forKey: "ajusteDaCapaDaPasta." + origem) == nil)
+    AparenciaDasPastas.esquecer(destino)
+    AparenciaDasPastas.restaurar(decodificado, para: destino)
+    #expect(AparenciaDasPastas.estado(de: destino) == retrato)
+
+    let legado = try JSONDecoder().decode(AparenciaDasPastas.Estado.self, from: Data(#"{"favorita":false}"#.utf8))
+    AparenciaDasPastas.restaurar(legado, para: destino)
+    #expect(!AparenciaDasPastas.favorita(destino))
+    #expect(UserDefaults.standard.object(forKey: "ajusteDaCapaDaPasta." + destino) == nil)
+}

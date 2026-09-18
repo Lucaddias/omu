@@ -15,8 +15,8 @@ enum AjusteDeImagem: String, CaseIterable, Identifiable, Sendable {
 
     var titulo: String {
         switch self {
-        case .preencher: "Preencher"
-        case .ajustar: "Ajustar"
+        case .preencher: "Preencher".localized
+        case .ajustar: "Ajustar".localized
         }
     }
 
@@ -82,6 +82,8 @@ struct SeletorDeAjusteDeImagem: View {
                         .foregroundStyle(
                             ajuste == opcao ? PapagaioTema.destaqueEscuro : PapagaioTema.textoSecundario
                         )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .padding(.horizontal, PapagaioTema.Espaco.curto)
                         .frame(height: PapagaioTema.Altura.compacta)
                         .background(

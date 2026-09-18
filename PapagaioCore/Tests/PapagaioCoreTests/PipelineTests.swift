@@ -491,3 +491,196 @@ func pipelineFalhaSemAudio() async throws {
         try await pipeline.processar(arquivo)
     }
 }
+
+@Test("Decisão de tradução respeita toggle, PT/EN e idioma já correspondente")
+func decisaoDeTraducaoAutomatica() {
+    let portugues = ConfiguracaoDeTraducaoAutomatica(habilitada: true, idiomaPadrao: .portugues)
+    let ingles = ConfiguracaoDeTraducaoAutomatica(habilitada: true, idiomaPadrao: .ingles)
+    let desligada = ConfiguracaoDeTraducaoAutomatica(habilitada: false, idiomaPadrao: .portugues)
+
+    #expect(DetectorDeIdiomaDaTranscricao.deveTraduzir(
+        idiomaDetectado: "en", configuracao: portugues
+    ))
+    #expect(DetectorDeIdiomaDaTranscricao.deveTraduzir(
+        idiomaDetectado: "pt-BR", configuracao: ingles
+    ))
+    #expect(!DetectorDeIdiomaDaTranscricao.deveTraduzir(
+        idiomaDetectado: "pt", configuracao: portugues
+    ))
+    #expect(!DetectorDeIdiomaDaTranscricao.deveTraduzir(
+        idiomaDetectado: "en-US", configuracao: ingles
+    ))
+    #expect(!DetectorDeIdiomaDaTranscricao.deveTraduzir(
+        idiomaDetectado: "en", configuracao: desligada
+    ))
+    #expect(!DetectorDeIdiomaDaTranscricao.deveTraduzir(
+        idiomaDetectado: nil, configuracao: portugues
+    ))
+}
+
+@Test("Pipeline traduz antes de salvar e resume no idioma de destino")
+func pipelineTraduzAntesDeSalvarEResumir() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: false, sistema: false, mixagem: true
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let traducoes = Mutex(0)
+    let idiomaDoResumo = Mutex<IdiomaDeProcessamento?>(nil)
+    let fases = Mutex<[PipelineDeArquivo.Fase]>([])
+    let idDoTrecho = UUID()
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            [Trecho(
+                id: idDoTrecho,
+                start: 2,
+                end: 5,
+                texto: "We need to approve the budget tomorrow.",
+                speaker: Speaker.eu,
+                palavras: [Palavra(start: 2, end: 3, texto: "We")]
+            )]
+        },
+        resumir: { _ in resumoDeMentira },
+        resumirNoIdioma: { _, idioma in
+            idiomaDoResumo.withLock { $0 = idioma }
+            return resumoDeMentira
+        },
+        traducaoAutomatica: .init(habilitada: true, idiomaPadrao: .portugues),
+        traduzir: { trechos, destino in
+            #expect(destino == .portugues)
+            #expect(trechos[0].id == idDoTrecho)
+            #expect(trechos[0].start == 2)
+            #expect(trechos[0].end == 5)
+            #expect(trechos[0].speaker == Speaker.eu)
+            traducoes.withLock { $0 += 1 }
+            return trechos.map {
+                Trecho(
+                    id: $0.id,
+                    start: $0.start,
+                    end: $0.end,
+                    texto: "Precisamos aprovar o orçamento amanhã.",
+                    speaker: $0.speaker,
+                    palavras: []
+                )
+            }
+        }
+    )
+
+    let final = try await pipeline.processar(arquivo) { fase in
+        fases.withLock { $0.append(fase) }
+    }
+
+    #expect(traducoes.withLock { $0 } == 1)
+    #expect(final.trechos[0].texto == "Precisamos aprovar o orçamento amanhã.")
+    #expect(final.trechos[0].palavras.isEmpty)
+    #expect(final.trechos[0].id == idDoTrecho)
+    #expect(final.trechos[0].start == 2)
+    #expect(final.trechos[0].end == 5)
+    #expect(final.trechos[0].speaker == Speaker.eu)
+    #expect(idiomaDoResumo.withLock { $0 } == .portugues)
+    let observadas = fases.withLock { $0 }
+    #expect(observadas.firstIndex(of: .traduzindo)! < observadas.firstIndex(of: .salvando)!)
+    #expect(observadas.firstIndex(of: .traduzindo)! < observadas.firstIndex(of: .resumindo)!)
+}
+
+@Test("Pipeline não traduz inglês para sistema em inglês")
+func pipelineMantemIdiomaQueJaEoPadrao() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: false, sistema: false, mixagem: true
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let chamouTraducao = Mutex(false)
+    let idiomaDoResumo = Mutex<IdiomaDeProcessamento?>(nil)
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            [Trecho(start: 0, end: 3, texto: "The team will review the roadmap on Friday.")]
+        },
+        resumir: { _ in resumoDeMentira },
+        resumirNoIdioma: { _, idioma in
+            idiomaDoResumo.withLock { $0 = idioma }
+            return resumoDeMentira
+        },
+        traducaoAutomatica: .init(habilitada: true, idiomaPadrao: .ingles),
+        traduzir: { trechos, _ in
+            chamouTraducao.withLock { $0 = true }
+            return trechos
+        }
+    )
+
+    let final = try await pipeline.processar(arquivo)
+    #expect(!chamouTraducao.withLock { $0 })
+    #expect(final.trechos[0].texto == "The team will review the roadmap on Friday.")
+    #expect(idiomaDoResumo.withLock { $0 } == .ingles)
+}
+
+@Test("Toggle desligado mantém a fonte e pede resumo sem idioma forçado")
+func pipelineComTraducaoDesligadaMantemFonte() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: false, sistema: false, mixagem: true
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let chamouTraducao = Mutex(false)
+    let idiomaDoResumo = Mutex<IdiomaDeProcessamento?>(.portugues)
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            [Trecho(start: 0, end: 2, texto: "The notes must remain in English.")]
+        },
+        resumir: { _ in resumoDeMentira },
+        resumirNoIdioma: { _, idioma in
+            idiomaDoResumo.withLock { $0 = idioma }
+            return resumoDeMentira
+        },
+        traducaoAutomatica: .init(habilitada: false, idiomaPadrao: .portugues),
+        traduzir: { trechos, _ in
+            chamouTraducao.withLock { $0 = true }
+            return trechos
+        }
+    )
+
+    let final = try await pipeline.processar(arquivo)
+    #expect(!chamouTraducao.withLock { $0 })
+    #expect(final.trechos[0].texto == "The notes must remain in English.")
+    #expect(idiomaDoResumo.withLock { $0 } == nil)
+}
+
+@Test("Pipeline traduz português para inglês quando o sistema usa inglês")
+func pipelineTraduzPortuguesParaIngles() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: false, sistema: false, mixagem: true
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let chamouTraducao = Mutex(false)
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            [Trecho(start: 0, end: 2, texto: "Vamos revisar o cronograma na sexta-feira.")]
+        },
+        resumir: { _ in resumoDeMentira },
+        traducaoAutomatica: .init(habilitada: true, idiomaPadrao: .ingles),
+        traduzir: { trechos, destino in
+            #expect(destino == .ingles)
+            chamouTraducao.withLock { $0 = true }
+            return trechos.map {
+                Trecho(id: $0.id, start: $0.start, end: $0.end, texto: "We will review the schedule on Friday.")
+            }
+        }
+    )
+
+    let final = try await pipeline.processar(arquivo)
+    #expect(chamouTraducao.withLock { $0 })
+    #expect(final.trechos[0].texto == "We will review the schedule on Friday.")
+}

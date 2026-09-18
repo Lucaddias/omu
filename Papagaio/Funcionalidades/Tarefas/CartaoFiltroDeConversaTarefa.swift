@@ -52,12 +52,12 @@ struct CartaoFiltroDeConversaTarefa: View {
                         .foregroundStyle(selecionado ? corDeIdentidade : PapagaioTema.texto)
 
                     VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                        Label("\(conversa.tarefas.count) \(conversa.tarefas.count == 1 ? "Tarefa" : "Tarefas")", systemImage: "list.clipboard")
+                        Label("\(conversa.tarefas.count) \(conversa.tarefas.count == 1 ? "Tarefa".localized : "Tarefas".localized)", systemImage: "list.clipboard")
 
                         if let vencimento {
                             Label(rotuloDoVencimento(vencimento), systemImage: "calendar")
                         } else {
-                            Label("Sem data", systemImage: "calendar.badge.clock")
+                            Label("Sem data".localized, systemImage: "calendar.badge.clock")
                         }
                     }
                     .font(.callout.weight(.medium))
@@ -93,7 +93,7 @@ struct CartaoFiltroDeConversaTarefa: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(selecionado ? "Desmarcar \(conversa.titulo)" : "Marcar \(conversa.titulo)")
+        .accessibilityLabel(selecionado ? "Desmarcar %@".localized(conversa.titulo) : "Marcar %@".localized(conversa.titulo))
     }
 
     // Balão de chat: este cartão representa a conversa (quem gerou as
@@ -102,9 +102,12 @@ struct CartaoFiltroDeConversaTarefa: View {
         selecionado ? "bubble.left.and.text.bubble.right.fill" : "bubble.left"
     }
 
+    /// Rótulo derivado: menor prazo entre as não-concluídas, não a data da
+    /// conversa. "Vence" deixa isso explícito — "Hoje" sozinho parecia que
+    /// mover no Kanban reescrevia a data.
     private func rotuloDoVencimento(_ data: Date) -> String {
-        if Calendar.current.isDateInToday(data) { return "Hoje" }
-        if Calendar.current.isDateInTomorrow(data) { return "Amanhã" }
+        if Calendar.current.isDateInToday(data) { return "Vence hoje".localized }
+        if Calendar.current.isDateInTomorrow(data) { return "Vence amanhã".localized }
         return data.formatted(.dateTime.day().month(.abbreviated))
     }
 }

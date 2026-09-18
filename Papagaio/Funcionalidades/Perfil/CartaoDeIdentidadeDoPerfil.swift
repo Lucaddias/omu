@@ -37,18 +37,20 @@ struct CartaoDeIdentidadeDoPerfil: View {
                         .shadow(color: .black.opacity(0.16), radius: 8, y: 4)
                 }
                 .buttonStyle(.plain)
-                .help("Trocar foto do perfil")
+                .help("Trocar foto do perfil".localized)
             }
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                Text(nome.isEmpty ? "Meu Perfil" : nome)
+                Text(nome.isEmpty ? "Meu Perfil".localized : nome)
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(PapagaioTema.texto)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(email.isEmpty ? "email@exemplo.com" : email)
                     .font(.title3)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

@@ -24,14 +24,14 @@ enum RotuloDeVoz {
         return falanteAcustico
     }
 
-    /// "S1" → "Voz 1". Nunca um nome de pessoa — é só o que aparece antes de
+    /// "S1" → "Falante 1" / "Speaker 1". Nunca um nome de pessoa — é só o que aparece antes de
     /// alguém dar um nome de verdade à voz.
     static func padrao(_ falanteAcustico: String) -> String {
         let puro = labelPuro(falanteAcustico)
         if puro.hasPrefix("S"), let numero = Int(puro.dropFirst()) {
-            return "Voz \(numero)"
+            return "Falante %@".localized("\(numero)")
         }
-        return "Voz \(puro)"
+        return "Falante %@".localized(puro)
     }
 
     /// O nome escolhido para esta voz, ou o rótulo padrão quando ainda não

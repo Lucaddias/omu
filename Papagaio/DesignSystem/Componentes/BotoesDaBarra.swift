@@ -15,6 +15,13 @@ struct AvatarDaContaNaBarra: View {
         return NSImage(contentsOf: url)
     }
 
+    /// Glifo sem anel próprio: o container já recorta em círculo + stroke
+    /// (abaixo), e `person.crop.circle*` desenhava um segundo anel dentro do
+    /// primeiro. O caminho com foto não é tocado.
+    private var simboloSemAnelProprio: String {
+        simbolo.contains("crop.circle") ? "person.fill" : simbolo
+    }
+
     var body: some View {
         ZStack {
             if let imagem {
@@ -22,7 +29,7 @@ struct AvatarDaContaNaBarra: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Image(systemName: simbolo)
+                Image(systemName: simboloSemAnelProprio)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(conectado ? PapagaioTema.destaqueEscuro : PapagaioTema.textoSecundario)
                     .frame(width: PapagaioTema.Altura.compacta, height: PapagaioTema.Altura.compacta)
@@ -158,8 +165,8 @@ struct BotaoDoSelo: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(ajuda)
-        .accessibilityLabel(ajuda)
+        .help(ajuda.localized)
+        .accessibilityLabel(ajuda.localized)
         .onHover { pairando = $0 }
         .animation(.easeOut(duration: 0.12), value: pairando)
     }

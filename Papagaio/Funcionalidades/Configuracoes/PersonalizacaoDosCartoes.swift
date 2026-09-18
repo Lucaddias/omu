@@ -55,11 +55,12 @@ private struct FileiraDeCampoDoCartao: View {
     var body: some View {
         HStack(alignment: .center, spacing: PapagaioTema.Espaco.medio) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(titulo)
+                Text(titulo.localized)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                Text(detalhe)
+                Text(detalhe.localized)
                     .font(.caption)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .fixedSize(horizontal: false, vertical: true)
@@ -117,7 +118,7 @@ struct SecaoDePersonalizacaoDosCartoes: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
-            Label("Cartões da biblioteca", systemImage: "rectangle.grid.2x2")
+            Label("Cartões da biblioteca".localized, systemImage: "rectangle.grid.2x2")
                 .font(PapagaioTema.Tipo.tituloDeSecao)
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
 
@@ -133,7 +134,7 @@ struct SecaoDePersonalizacaoDosCartoes: View {
             // visível, sempre, logo abaixo de cada modelo — os dois ao
             // mesmo tempo, não só o que está selecionado agora.
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
-                Text("Modelo do cartão")
+                Text("Modelo do cartão".localized)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PapagaioTema.texto)
 
@@ -228,14 +229,14 @@ struct PreviaDoCartaoDeConversa: View {
     /// real: só o título, a cor sobra para a tarja lateral.
     private var cabecalhoCompacto: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-            Text("Entrevista com Ana Silva")
+            Text("Entrevista com Ana Silva".localized)
                 .font(.system(size: 19, weight: .semibold))
                 .lineLimit(2)
                 .foregroundStyle(PapagaioTema.texto)
                 .frame(height: CartaoDeConversa.alturaDoTituloCompacto, alignment: .top)
 
             if campos.contains(.descricao) {
-                Text("Primeira rodada de testes do fluxo de cadastro.")
+                Text("Primeira rodada de testes do fluxo de cadastro.".localized)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(2)
@@ -253,15 +254,16 @@ struct PreviaDoCartaoDeConversa: View {
     /// e o exemplo ainda as mostrava em duas colunas que o cartão real não tem.
     private var faixa: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Entrevista com Ana Silva")
+            Text("Entrevista com Ana Silva".localized)
                 .font(.system(size: 20, weight: .regular))
                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 .truncationMode(.tail)
 
             Spacer(minLength: PapagaioTema.Espaco.curto)
 
             if campos.contains(.descricao) {
-                Text("Primeira rodada de testes do fluxo de cadastro.")
+                Text("Primeira rodada de testes do fluxo de cadastro.".localized)
                     .font(.callout.weight(.semibold))
                     .lineLimit(2)
             }
@@ -289,7 +291,7 @@ struct PreviaDoCartaoDeConversa: View {
             }
 
             if campos.contains(.duracao) {
-                linha("clock", "42 min")
+                linha("clock", "42 min".localized)
                 vao
             }
 
@@ -305,12 +307,12 @@ struct PreviaDoCartaoDeConversa: View {
                     }
                     .padding(.top, 5)
 
-                    PilhaDeParticipantes(nomes: ["João Santos", "Ana Silva"])
+                    PilhaDeParticipantes(nomes: ["João Santos".localized, "Ana Silva".localized])
                         .padding(.leading, PapagaioTema.Espaco.minimo)
                 }
                 .foregroundStyle(PapagaioTema.textoSecundario)
             } else if campos.contains(.lacunas) {
-                linha("person.badge.plus", "Participantes não informados")
+                linha("person.badge.plus", "Participantes não informados".localized)
             }
 
             Spacer(minLength: 0)
@@ -330,7 +332,7 @@ struct PreviaDoCartaoDeConversa: View {
 
             HStack(spacing: PapagaioTema.Espaco.medio) {
                 if campos.contains(.pasta) {
-                    SeloDaPastaDoCartao(nome: "Pesquisa")
+                    SeloDaPastaDoCartao(nome: "Pesquisa".localized)
                         .padding(.leading, PapagaioTema.Espaco.largo)
                 }
 
@@ -365,6 +367,7 @@ struct PreviaDoCartaoDeConversa: View {
             Text(texto)
                 .font(.system(size: 16))
                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
         }
         .foregroundStyle(PapagaioTema.textoSecundario)
     }
@@ -394,15 +397,17 @@ struct PreviaDaPasta: View {
     var body: some View {
         HStack(spacing: PapagaioTema.Espaco.medio) {
             VStack(alignment: .leading, spacing: 1) {
-                Text("Pesquisa")
+                Text("Pesquisa".localized)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(modelo == .comCapa ? corDoTexto : PapagaioTema.texto)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
-                Text("8 conversas")
+                Text("8 conversas".localized)
                     .font(.caption)
                     .foregroundStyle(modelo == .comCapa ? corDoTexto.opacity(0.8) : PapagaioTema.textoSecundario)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
 
             Spacer(minLength: 0)
@@ -455,7 +460,7 @@ private struct AmostraDeModeloDeCartao: View {
                     // Sem `.lineLimit` — mesma régua da tela inteira de
                     // Configurações: nada deve depender de truncar para
                     // caber, nem um rótulo curto e fixo como este.
-                    Label(opcao.titulo, systemImage: opcao.simbolo)
+                    Label(opcao.titulo.localized, systemImage: opcao.simbolo)
                         .font(PapagaioTema.Tipo.apoio.weight(selecionada ? .semibold : .regular))
                         .foregroundStyle(selecionada ? PapagaioTema.destaqueEscuro : PapagaioTema.textoSecundario)
                 }
@@ -469,9 +474,9 @@ private struct AmostraDeModeloDeCartao: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(opcao.descricao)
-        .accessibilityLabel("Modelo \(opcao.titulo)")
-        .accessibilityHint(opcao.descricao)
+        .help(opcao.descricao.localized)
+        .accessibilityLabel("Modelo %@".localized(opcao.titulo.localized))
+        .accessibilityHint(opcao.descricao.localized)
         .accessibilityAddTraits(selecionada ? [.isSelected] : [])
         .background(
             selecionada ? PapagaioTema.destaqueSuave.opacity(0.55) : Color.clear,

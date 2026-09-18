@@ -31,6 +31,8 @@ actor FilaPersistenteCloudKit {
     private let url: URL
     private let fm: FileManager
     private var estadoInicial: Result<[OperacaoPendenteCloudKit], any Error>
+    private var processando = false
+    private var esperas: [CheckedContinuation<Void, Never>] = []
     private var operacoesCarregadas: [OperacaoPendenteCloudKit]?
 
     init(url: URL, fm: FileManager = .default) {
@@ -103,6 +105,18 @@ actor FilaPersistenteCloudKit {
         agora: Date = Date(),
         ignorarBackoff: Bool = false
     ) async throws -> ResultadoDaFilaCloudKit {
+        // Actors são reentrantes durante a rede: serialize os consumidores,
+        // mas deixe agendar/descartar disponíveis enquanto um envio aguarda.
+        if processando {
+            await withCheckedContinuation { esperas.append($0) }
+        } else {
+            processando = true
+        }
+        defer {
+            if esperas.isEmpty { processando = false }
+            else { esperas.removeFirst().resume() }
+        }
+        try Task.checkCancellation()
         let elegiveis = try carregar().filter {
             ignorarBackoff || $0.proximaTentativa <= agora
         }
@@ -110,6 +124,10 @@ actor FilaPersistenteCloudKit {
         var erros: [String] = []
 
         for operacao in elegiveis {
+            try Task.checkCancellation()
+            // Outra edição pode ter substituído esta revisão durante o envio
+            // anterior; snapshots não dão autoridade para enviar dados antigos.
+            guard try carregar().contains(where: { $0.id == operacao.id }) else { continue }
             do {
                 switch operacao.acao {
                 case .enviar:
@@ -208,7 +226,7 @@ enum ErroDaFilaCloudKit: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .payloadAusente:
-            "Uma operação pendente do iCloud não contém a conversa esperada."
+            "Uma operação pendente do iCloud não contém a conversa esperada.".localized
         }
     }
 }

@@ -5,9 +5,8 @@ import SwiftUI
 /// Cor e imagem de cada pasta da biblioteca.
 ///
 /// Guardado por **nome** da pasta, que é o que a identifica no resto do app —
-/// não há um id próprio. A consequência é que renomear perde a aparência; é o
-/// mesmo comportamento de qualquer pasta do Finder e não vale um id novo só
-/// para isso.
+/// não há um id próprio. Renomear transfere o estado completo para a nova
+/// chave; a lixeira guarda esse mesmo estado para restaurá-lo.
 ///
 /// A cor existe por um motivo prático, não estético: quem organiza por cliente
 /// ou por projeto reconhece a pasta pela cor antes de ler o nome, e a grade de
@@ -51,6 +50,8 @@ enum AparenciaDasPastas {
         var criadaEm: Date?
         /// O bookmark cru da imagem, como está gravado.
         var capa: Data?
+        /// Opcional para compatibilidade com retratos antigos da lixeira.
+        var ajuste: String? = nil
     }
 
     @MainActor
@@ -62,13 +63,16 @@ enum AparenciaDasPastas {
             favorita: padroes.bool(forKey: prefixoFavorita + pasta),
             semCor: padroes.bool(forKey: prefixoSemCor + pasta),
             criadaEm: padroes.object(forKey: prefixoCriacao + pasta) as? Date,
-            capa: padroes.data(forKey: prefixoCapa + pasta)
+            capa: padroes.data(forKey: prefixoCapa + pasta),
+            ajuste: padroes.string(forKey: prefixoAjuste + pasta)
         )
     }
 
     @MainActor
     static func restaurar(_ estado: Estado, para pasta: String) {
+        esquecer(pasta)
         let padroes = UserDefaults.standard
+        if let ajuste = estado.ajuste { padroes.set(ajuste, forKey: prefixoAjuste + pasta) }
         if let preset = estado.preset { padroes.set(preset, forKey: prefixoCor + pasta) }
         if let corLivre = estado.corLivre { padroes.set(corLivre, forKey: prefixoCorLivre + pasta) }
         if estado.favorita { padroes.set(true, forKey: prefixoFavorita + pasta) }
@@ -92,7 +96,7 @@ enum AparenciaDasPastas {
     @MainActor
     static func esquecer(_ pasta: String) {
         removerCapa(de: pasta)
-        for prefixo in [prefixoCor, prefixoCorLivre, prefixoFavorita, prefixoCriacao, prefixoSemCor] {
+        for prefixo in [prefixoCor, prefixoCorLivre, prefixoFavorita, prefixoCriacao, prefixoSemCor, prefixoAjuste] {
             UserDefaults.standard.removeObject(forKey: prefixo + pasta)
         }
     }

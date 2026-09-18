@@ -20,7 +20,7 @@ struct AtalhosDaBiblioteca: View {
         HStack(spacing: compacto ? PapagaioTema.Espaco.curto : PapagaioTema.Espaco.largo) {
             Button(action: aoSelecionarRecentes) {
                 BotaoTextualDeAtalhoDaBiblioteca(
-                    titulo: "Recentes",
+                    titulo: "Recentes".localized,
                     simbolo: "clock.arrow.circlepath",
                     selecionado: selecionado == .recentes,
                     compacto: compacto,
@@ -28,11 +28,11 @@ struct AtalhosDaBiblioteca: View {
                 )
             }
             .buttonStyle(.plain)
-            .help("Recentes")
+            .help("Recentes".localized)
 
             Button(action: aoSelecionarFavoritos) {
                 BotaoTextualDeAtalhoDaBiblioteca(
-                    titulo: "Favoritos",
+                    titulo: "Favoritos".localized,
                     simbolo: selecionado == .favoritos ? "star.fill" : "star",
                     selecionado: selecionado == .favoritos,
                     compacto: compacto,
@@ -40,9 +40,9 @@ struct AtalhosDaBiblioteca: View {
                 )
             }
             .buttonStyle(.plain)
-            .help("Favoritos")
+            .help("Favoritos".localized)
         }
-        .accessibilityLabel("Atalhos da biblioteca")
+        .accessibilityLabel("Atalhos da biblioteca".localized)
     }
 }
 
@@ -100,6 +100,8 @@ struct BotaoTextualDeAtalhoDaBiblioteca: View {
             Image(systemName: simbolo)
         } else {
             Label(titulo, systemImage: simbolo)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
     }
 

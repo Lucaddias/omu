@@ -147,7 +147,8 @@ func restaurarAnexoDaLixeiraRecriaRegistroDaConversa() throws {
 
     #expect(FileManager.default.fileExists(atPath: origem.path))
     #expect(LixeiraDeMidia.itens(em: defaults).isEmpty)
-    #expect(MidiasDaConversa.carregar(arquivoID).map(\.url.standardizedFileURL) == [origem.standardizedFileURL])
+    #expect(MidiasDaConversa.carregar(arquivoID, em: defaults).map(\.url.standardizedFileURL) == [origem.standardizedFileURL])
+    #expect(MidiasDaConversa.carregar(arquivoID).isEmpty)
     MidiasDaConversa.remover(arquivoID)
 }
 

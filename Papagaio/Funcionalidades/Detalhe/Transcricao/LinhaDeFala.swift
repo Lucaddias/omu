@@ -42,47 +42,6 @@ struct LinhaDeFala: View {
     /// Callback ao cancelar edição inline
     var aoCancelarEdicao: () -> Void = {}
 
-    @FocusState private var focoEditor: Bool
-
-    @ViewBuilder
-    private var editorInline: some View {
-        VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-            TextEditor(text: $textoEditado)
-                .font(.body)
-                .foregroundStyle(PapagaioTema.texto)
-                .scrollContentBackground(.hidden)
-                .textEditorStyle(.plain)
-                .padding(PapagaioTema.Espaco.medio)
-                .frame(minHeight: 120)
-                .background(PapagaioTema.superficie, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous)
-                        .stroke(PapagaioTema.borda, lineWidth: 1)
-                }
-                .focused($focoEditor)
-
-            HStack(spacing: PapagaioTema.Espaco.curto) {
-                Spacer()
-                Button("Cancelar") {
-                    aoCancelarEdicao()
-                }
-                .buttonStyle(BotaoDeContornoPapagaio())
-
-                Button("Salvar") {
-                    aoSalvarEdicao()
-                }
-                .buttonStyle(BotaoPrincipalPapagaio())
-                .keyboardShortcut(.return, modifiers: [.command])
-            }
-            .onAppear {
-                focoEditor = true
-            }
-            .onDisappear {
-                focoEditor = false
-            }
-        }
-    }
-
     private var isBaixaConfiancaFala: Bool {
         guard mostrarConfianca, let c = fala.confianca else { return false }
         if let nsp = fala.palavras.first?.palavra.noSpeechProb, nsp > 0.6 { return false }
@@ -108,7 +67,11 @@ struct LinhaDeFala: View {
                     cabecalhoDaFala
 
                     if estaEditando {
-                        editorInline
+                        EditorInlineDaTranscricao(
+                            texto: $textoEditado,
+                            aoSalvar: aoSalvarEdicao,
+                            aoCancelar: aoCancelarEdicao
+                        )
                     } else {
                         corpoDaFala
                     }
@@ -143,7 +106,7 @@ struct LinhaDeFala: View {
         .accessibilityAction {
             aoTocarFala()
         }
-        .accessibilityHint("Inicia a reprodução a partir de \(fala.inicio.faladoPorExtenso).")
+        .accessibilityHint("Inicia a reprodução a partir de %@.".localized(fala.inicio.faladoPorExtenso))
         .accessibilityAddTraits(ativo ? [.isSelected] : [])
     }
 
@@ -153,10 +116,19 @@ struct LinhaDeFala: View {
     private var cabecalhoDaFala: some View {
         let exibido = fala.falanteAcustico ?? falantePreservado
         HStack(spacing: PapagaioTema.Espaco.minimo) {
+            Text(Self.rotuloDoCanal(fala.speaker))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(PapagaioTema.textoSecundario)
+                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: true, vertical: false)
             if let acustico = exibido {
                 Text(RotuloDeVoz.exibicao(acustico, nomes: nomesDeVoz))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, PapagaioTema.Espaco.minimo)
                     .padding(.vertical, 1)
                     .background(PapagaioTema.destaqueSuave, in: Capsule())
@@ -177,9 +149,9 @@ struct LinhaDeFala: View {
 
     static func rotuloDoCanal(_ speaker: String?) -> String {
         switch speaker {
-        case Speaker.eu: "Eu · microfone"
-        case Speaker.interlocutor: "Interlocutor · áudio do sistema"
-        default: "Canal misto ou desconhecido"
+        case Speaker.eu: "Eu · microfone".localized
+        case Speaker.interlocutor: "Interlocutor · áudio do sistema".localized
+        default: "Canal misto ou desconhecido".localized
         }
     }
 
@@ -207,8 +179,8 @@ struct LinhaDeFala: View {
                 }
         }
         .buttonStyle(.plain)
-        .help("Corrigir o texto desta fala")
-        .accessibilityLabel("Corrigir o texto desta fala")
+        .help("Corrigir o texto desta fala".localized)
+        .accessibilityLabel("Corrigir o texto desta fala".localized)
     }
 
     @ViewBuilder

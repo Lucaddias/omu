@@ -6,8 +6,8 @@ enum OrdenacaoDoPainelDeTarefas {
 
     var titulo: String {
         switch self {
-        case .deadline: "Data limite"
-        case .prioridade: "Prioridade"
+        case .deadline: "Data limite".localized
+        case .prioridade: "Prioridade".localized
         }
     }
 
@@ -28,11 +28,11 @@ enum FiltroDeDeadlineTarefa: CaseIterable, Hashable {
 
     var titulo: String {
         switch self {
-        case .todas: "Data limite"
-        case .atrasadas: "Atrasadas"
-        case .hoje: "Hoje"
-        case .proximosSeteDias: "Próximos 7 dias"
-        case .semData: "Sem data"
+        case .todas: "Data limite".localized
+        case .atrasadas: "Atrasadas".localized
+        case .hoje: "Hoje".localized
+        case .proximosSeteDias: "Próximos 7 dias".localized
+        case .semData: "Sem data".localized
         }
     }
 

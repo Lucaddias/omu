@@ -16,10 +16,10 @@ struct CartaoDeModelos: View {
                     .font(.title2)
                     .foregroundStyle(modelos.resultado?.bloqueia == true ? PapagaioTema.perigo : PapagaioTema.destaqueEscuro)
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Modelos locais")
+                    Text("Modelos locais".localized)
                         .font(.headline)
                         .foregroundStyle(PapagaioTema.texto)
-                    Text(modelos.resultado?.mensagem ?? "Verificando os modelos…")
+                    Text((modelos.resultado?.mensagem ?? "Verificando os modelos…").localized)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
@@ -31,7 +31,7 @@ struct CartaoDeModelos: View {
                         .font(.caption.weight(.medium))
                 } currentValueLabel: {
                     HStack {
-                        Text("\(gb(progresso.bytesRecebidos)) de \(gb(progresso.bytesTotais))")
+                        Text("%@ de %@".localized(gb(progresso.bytesRecebidos), gb(progresso.bytesTotais)))
 
                         if let restante = modelos.restanteDoDownload {
                             Spacer()
@@ -46,7 +46,7 @@ struct CartaoDeModelos: View {
             }
 
             if let erro = modelos.erro {
-                Label(erro, systemImage: "xmark.octagon.fill")
+                Label(erro.localized, systemImage: "xmark.octagon.fill")
                     .font(.caption)
                     .foregroundStyle(PapagaioTema.perigo)
             }
@@ -54,20 +54,20 @@ struct CartaoDeModelos: View {
             if modelos.resultado?.bloqueia == false, !modelos.faltando.isEmpty {
                 HStack(spacing: PapagaioTema.Espaco.curto) {
                     if modelos.baixando {
-                        Button("Cancelar", action: modelos.cancelar)
+                        Button("Cancelar".localized, action: modelos.cancelar)
                             .buttonStyle(BotaoDeContornoPapagaio())
-                        Text("O download continua de onde parou se a conexão cair.")
+                        Text("O download continua de onde parou se a conexão cair.".localized)
                             .font(.caption)
                             .foregroundStyle(PapagaioTema.textoSecundario)
                     } else {
                         if modelos.pastaEscolhida == nil {
-                            Button("Baixar modelos (\(gb(totalFaltando)))", action: modelos.baixar)
+                            Button("Baixar modelos (%@)".localized(gb(totalFaltando)), action: modelos.baixar)
                                 .buttonStyle(BotaoPrincipalPapagaio())
                         }
-                        Button("Escolher pasta…") { escolhendoPasta = true }
+                        Button("Escolher pasta…".localized) { escolhendoPasta = true }
                             .buttonStyle(BotaoDeContornoPapagaio())
                         if modelos.pastaEscolhida != nil {
-                            Button("Usar pasta do app", action: aoUsarPastaDoApp)
+                            Button("Usar pasta do app".localized, action: aoUsarPastaDoApp)
                                 .buttonStyle(BotaoDeContornoPapagaio())
                         }
                     }
@@ -77,6 +77,7 @@ struct CartaoDeModelos: View {
                     .font(.caption)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                     .truncationMode(.middle)
             }
         }
@@ -100,19 +101,19 @@ struct CartaoDeModelos: View {
 
     private var descricaoDaPasta: String {
         if let escolhida = modelos.pastaEscolhida {
-            return "Pasta ativa: \(escolhida.path)"
+            return "Pasta ativa: %@".localized(escolhida.path)
         }
-        return "Você também pode apontar uma pasta que já tenha os modelos GGUF."
+        return "Você também pode apontar uma pasta que já tenha os modelos GGUF.".localized
     }
 
     /// Arredonda para a unidade que a pessoa consegue usar: ninguém planeja a
     /// tarde com base em "faltam 2.847 segundos".
     private func tempoRestante(_ segundos: TimeInterval) -> String {
-        if segundos < 60 { return "menos de 1 min" }
+        if segundos < 60 { return "menos de 1 min".localized }
         let minutos = Int((segundos / 60).rounded())
-        if minutos < 60 { return "cerca de \(minutos) min" }
+        if minutos < 60 { return "cerca de %d min".localized(minutos) }
         let horas = segundos / 3600
-        return String(format: "cerca de %.1f h", horas)
+        return "cerca de %.1f h".localized(horas)
     }
 
     private func gb(_ bytes: Int64) -> String {

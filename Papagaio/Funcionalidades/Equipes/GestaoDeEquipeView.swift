@@ -77,8 +77,8 @@ struct GestaoDeEquipeView: View {
             } else {
                 CartaoDeEstadoVazio(
                     simbolo: "person.3",
-                    titulo: "Nenhuma equipe ainda",
-                    mensagem: "Crie uma equipe ou entre com um código no seu perfil."
+                    titulo: "Nenhuma equipe ainda".localized,
+                    mensagem: "Crie uma equipe ou entre com um código no seu perfil.".localized
                 )
                 .padding(.vertical, PapagaioTema.espacamentoDePagina)
             }
@@ -102,43 +102,43 @@ struct GestaoDeEquipeView: View {
             await carregarParticipantes(da: equipeAtiva)
         }
         .confirmationDialog(
-            "Trocar o código de entrada?",
+            "Trocar o código de entrada?".localized,
             isPresented: $confirmandoRotacaoDoCodigo,
             titleVisibility: .visible
         ) {
-            Button("Trocar código e revogar acessos", role: .destructive) {
+            Button("Trocar código e revogar acessos".localized, role: .destructive) {
                 guard let equipeAtiva else { return }
                 Task { await rotacionarCodigo(da: equipeAtiva) }
             }
         } message: {
-            Text("O código e o link atuais deixarão de funcionar. Por segurança, os participantes aceitos precisarão entrar novamente com o novo código.")
+            Text("O código e o link atuais deixarão de funcionar. Por segurança, os participantes aceitos precisarão entrar novamente com o novo código.".localized)
         }
         .confirmationDialog(
-            "Excluir esta equipe para todos?",
+            "Excluir esta equipe para todos?".localized,
             isPresented: $confirmandoExclusaoDaEquipe,
             titleVisibility: .visible
         ) {
-            Button("Excluir equipe e dados", role: .destructive) {
+            Button("Excluir equipe e dados".localized, role: .destructive) {
                 guard let equipeAtiva else { return }
                 Task { await excluir(equipeAtiva) }
             }
         } message: {
-            Text("A zona do CloudKit, as conversas compartilhadas e os dados deste Mac serão apagados. Outros Macs atualizados removem suas cópias ao se conectarem ao iCloud. Esta ação não pode ser desfeita.")
+            Text("A zona do CloudKit, as conversas compartilhadas e os dados deste Mac serão apagados. Outros Macs atualizados removem suas cópias ao se conectarem ao iCloud. Esta ação não pode ser desfeita.".localized)
         }
     }
 
     private func cabecalho(_ equipe: EquipeDisponivel) -> some View {
         HStack(alignment: .bottom, spacing: PapagaioTema.Espaco.largo) {
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                Text("Gerenciar equipe")
+                Text("Gerenciar equipe".localized)
                     .font(PapagaioTema.Tipo.tituloDePagina)
                     .foregroundStyle(PapagaioTema.texto)
-                Text("Compartilhe o código para dar acesso ao espaço compartilhado.")
+                Text("Compartilhe o código para dar acesso ao espaço compartilhado.".localized)
                     .font(.title3)
                     .foregroundStyle(PapagaioTema.textoSecundario)
             }
             Spacer()
-            Button("Mudar: \(equipe.nome)", systemImage: "arrow.triangle.2.circlepath") {
+            Button("\("Mudar".localized): \(equipe.nome)", systemImage: "arrow.triangle.2.circlepath") {
                 mostrandoTrocarEquipe = true
             }
             .buttonStyle(BotaoDeContornoPapagaio())
@@ -149,18 +149,18 @@ struct GestaoDeEquipeView: View {
         HStack(spacing: PapagaioTema.Espaco.medio) {
             switch estadoDaSincronizacao {
             case .local:
-                Label("Espaço local", systemImage: "internaldrive")
+                Label("Espaço local".localized, systemImage: "internaldrive")
             case .enviando:
                 ProgressView()
-                Text("Sincronizando com o iCloud…")
+                Text("Sincronizando com o iCloud…".localized)
             case .sincronizado:
-                Label("Sincronizado com o iCloud", systemImage: "checkmark.icloud")
+                Label("Sincronizado com o iCloud".localized, systemImage: "checkmark.icloud")
                     .foregroundStyle(PapagaioTema.sucesso)
             case let .falhou(mensagem):
-                Label(mensagem, systemImage: "exclamationmark.icloud")
+                Label(mensagem.localized, systemImage: "exclamationmark.icloud")
                     .foregroundStyle(PapagaioTema.perigo)
                 Spacer()
-                Button("Tentar agora", action: aoRetomarSincronizacao)
+                Button("Tentar agora".localized, action: aoRetomarSincronizacao)
                     .buttonStyle(BotaoDeContornoPapagaio())
             }
             if !sincronizacaoFalhou {
@@ -179,11 +179,11 @@ struct GestaoDeEquipeView: View {
 
     private func codigoDaEquipe(_ equipe: EquipeDisponivel) -> some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-            Label("Código de entrada", systemImage: "number").font(.headline)
-            Text(equipe.codigoDeEntrada ?? "Código indisponível para equipes criadas antes desta atualização.")
+            Label("Código de entrada".localized, systemImage: "number").font(.headline)
+            Text(equipe.codigoDeEntrada ?? "Código indisponível para equipes criadas antes desta atualização.".localized)
                 .font(.title2.monospaced().weight(.semibold))
                 .textSelection(.enabled)
-            Text("Compartilhe este código com quem deve entrar. Ao informá-lo no Ōmu, a pessoa recebe acesso de leitura e escrita à equipe nesta Apple Account.")
+            Text("Compartilhe este código com quem deve entrar. Ao informá-lo no Ōmu, a pessoa recebe acesso de leitura e escrita à equipe nesta Apple Account.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
         }
@@ -194,22 +194,22 @@ struct GestaoDeEquipeView: View {
     private func participantesDaEquipe(_ equipe: EquipeDisponivel) -> some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
             HStack {
-                Label("Participantes", systemImage: "person.3")
+                Label("Participantes".localized, systemImage: "person.3")
                     .font(.headline)
                 Spacer()
-                Button("Atualizar", systemImage: "arrow.clockwise") {
+                Button("Atualizar".localized, systemImage: "arrow.clockwise") {
                     Task { await carregarParticipantes(da: equipe) }
                 }
                 .buttonStyle(BotaoDeContornoPapagaio())
                 .disabled(carregandoParticipantes)
             }
-            Text("A lista vem diretamente do compartilhamento do iCloud. O CloudKit não disponibiliza os e-mails das Apple Accounts.")
+            Text("A lista vem diretamente do compartilhamento do iCloud. O CloudKit não disponibiliza os e-mails das Apple Accounts.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
             if carregandoParticipantes {
-                ProgressView("Carregando participantes…")
+                ProgressView("Carregando participantes…".localized)
             } else if let erroDosParticipantes {
-                Label(erroDosParticipantes, systemImage: "exclamationmark.icloud")
+                Label(erroDosParticipantes.localized, systemImage: "exclamationmark.icloud")
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.perigo)
             } else {
@@ -247,42 +247,42 @@ struct GestaoDeEquipeView: View {
             )
         }
         .confirmationDialog(
-            "Remover \(participanteParaRemover?.nome ?? "este participante")?",
+            "Remover %@?".localized(participanteParaRemover?.nome ?? "este participante".localized),
             isPresented: Binding(
                 get: { participanteParaRemover != nil },
                 set: { if !$0 { participanteParaRemover = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("Remover acesso", role: .destructive) {
+            Button("Remover acesso".localized, role: .destructive) {
                 guard let participante = participanteParaRemover else { return }
                 participanteParaRemover = nil
                 Task { await remover(participante, da: equipe) }
             }
         } message: {
-            Text("Essa Apple Account não poderá mais ler nem alterar as conversas da equipe.")
+            Text("Essa Apple Account não poderá mais ler nem alterar as conversas da equipe.".localized)
         }
     }
 
     private func configuracoesDaEquipe(_ equipe: EquipeDisponivel) -> some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-            Label("Configurações da equipe", systemImage: "gearshape")
+            Label("Configurações da equipe".localized, systemImage: "gearshape")
                 .font(.headline)
-            Picker("Visibilidade dos arquivos", selection: $configuracoes.visibilidadeDosArquivos) {
-                ForEach(VisibilidadeDosArquivosDaEquipe.allCases) { Text($0.rawValue).tag($0) }
+            Picker("Visibilidade dos arquivos".localized, selection: $configuracoes.visibilidadeDosArquivos) {
+                ForEach(VisibilidadeDosArquivosDaEquipe.allCases) { Text($0.rawValue.localized).tag($0) }
             }
-            Picker("Recebimento de arquivos", selection: $configuracoes.recebimentoDeArquivos) {
-                ForEach(RecebimentoDeArquivosDaEquipe.allCases) { Text($0.rawValue).tag($0) }
+            Picker("Recebimento de arquivos".localized, selection: $configuracoes.recebimentoDeArquivos) {
+                ForEach(RecebimentoDeArquivosDaEquipe.allCases) { Text($0.rawValue.localized).tag($0) }
             }
-            Text("Estas preferências são compartilhadas no iCloud. A política de revisão de recebimento será aplicada ao fluxo de arquivos em uma próxima etapa; ainda não bloqueia automaticamente envios.")
+            Text("Estas preferências são compartilhadas no iCloud. A política de revisão de recebimento será aplicada ao fluxo de arquivos em uma próxima etapa; ainda não bloqueia automaticamente envios.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
             if let erroDasConfiguracoes {
-                Label(erroDasConfiguracoes, systemImage: "exclamationmark.icloud")
+                Label(erroDasConfiguracoes.localized, systemImage: "exclamationmark.icloud")
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.perigo)
             }
-            Button("Salvar configurações") {
+            Button("Salvar configurações".localized) {
                 Task { await salvarConfiguracoes(da: equipe) }
             }
             .buttonStyle(BotaoDeContornoPapagaio())
@@ -294,23 +294,23 @@ struct GestaoDeEquipeView: View {
 
     private func acoesIrreversiveis(_ equipe: EquipeDisponivel) -> some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-            Label("Acesso e exclusão", systemImage: "lock.trianglebadge.exclamationmark")
+            Label("Acesso e exclusão".localized, systemImage: "lock.trianglebadge.exclamationmark")
                 .font(.headline)
-            Text("Trocar o código cria um novo compartilhamento e exige que os participantes entrem novamente. Excluir a equipe apaga a zona compartilhada e os dados locais deste Mac.")
+            Text("Trocar o código cria um novo compartilhamento e exige que os participantes entrem novamente. Excluir a equipe apaga a zona compartilhada e os dados locais deste Mac.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
             if let erroDaOperacaoCritica {
-                Label(erroDaOperacaoCritica, systemImage: "exclamationmark.icloud")
+                Label(erroDaOperacaoCritica.localized, systemImage: "exclamationmark.icloud")
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.perigo)
             }
             HStack {
-                Button("Trocar código de entrada", systemImage: "key") {
+                Button("Trocar código de entrada".localized, systemImage: "key") {
                     confirmandoRotacaoDoCodigo = true
                 }
                 .buttonStyle(BotaoDeContornoPapagaio())
                 .disabled(rotacionandoCodigo || excluindoEquipe)
-                Button("Excluir equipe", systemImage: "trash", role: .destructive) {
+                Button("Excluir equipe".localized, systemImage: "trash", role: .destructive) {
                     confirmandoExclusaoDaEquipe = true
                 }
                 .buttonStyle(BotaoDeContornoPapagaio())
@@ -322,7 +322,7 @@ struct GestaoDeEquipeView: View {
     }
 
     private var avisoDeMembro: some View {
-        Label("Somente a conta que criou a equipe pode consultar participantes, alterar configurações, trocar o código ou excluir a equipe.", systemImage: "person.crop.circle.badge.exclamationmark")
+        Label("Somente a conta que criou a equipe pode consultar participantes, alterar configurações, trocar o código ou excluir a equipe.".localized, systemImage: "person.crop.circle.badge.exclamationmark")
             .font(.callout)
             .foregroundStyle(PapagaioTema.textoSecundario)
             .padding(PapagaioTema.Espaco.secao)
@@ -331,21 +331,21 @@ struct GestaoDeEquipeView: View {
 
     private func atualizacaoDeEquipeExistente(_ equipe: EquipeDisponivel) -> some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.medio) {
-            Label("Já usava esta equipe antes do acesso por código?", systemImage: "arrow.triangle.2.circlepath")
+            Label("Já usava esta equipe antes do acesso por código?".localized, systemImage: "arrow.triangle.2.circlepath")
                 .font(.headline)
-            Text("Use esta ação uma vez para que o código também libere a zona compartilhada no iCloud. Convites pendentes por e-mail deixam de valer.")
+            Text("Use esta ação uma vez para que o código também libere a zona compartilhada no iCloud. Convites pendentes por e-mail deixam de valer.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
             if let erroDaEntradaPorCodigo {
-                Label(erroDaEntradaPorCodigo, systemImage: "exclamationmark.icloud")
+                Label(erroDaEntradaPorCodigo.localized, systemImage: "exclamationmark.icloud")
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.perigo)
             } else if entradaPorCodigoAtualizada {
-                Label("A entrada por código está ativa.", systemImage: "checkmark.icloud")
+                Label("A entrada por código está ativa.".localized, systemImage: "checkmark.icloud")
                     .font(.callout)
                     .foregroundStyle(PapagaioTema.sucesso)
             }
-            Button("Reconfigurar acesso por código") {
+            Button("Reconfigurar acesso por código".localized) {
                 Task { await ativarEntradaPorCodigo(na: equipe) }
             }
             .buttonStyle(BotaoDeContornoPapagaio())
@@ -492,15 +492,15 @@ private struct EditorDePermissaoDaEquipe: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.secao) {
-            Text("Permissão de \(participante.nome)")
+            Text("Permissão de %@".localized(participante.nome))
                 .font(.title2.weight(.bold))
-            Picker("Acesso", selection: $permissao) {
-                ForEach(ParticipanteDaEquipe.Permissao.allCases) { Text($0.rawValue).tag($0) }
+            Picker("Acesso".localized, selection: $permissao) {
+                ForEach(ParticipanteDaEquipe.Permissao.allCases) { Text($0.rawValue.localized).tag($0) }
             }
             HStack {
-                Button("Cancelar", action: aoCancelar)
+                Button("Cancelar".localized, action: aoCancelar)
                 Spacer()
-                Button("Salvar") { aoSalvar(permissao) }
+                Button("Salvar".localized) { aoSalvar(permissao) }
                     .buttonStyle(BotaoDeContornoPapagaio())
             }
         }
@@ -529,16 +529,16 @@ private struct EditorDeNomeDaEquipe: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.secao) {
-            Text("Nome na equipe")
+            Text("Nome na equipe".localized)
                 .font(.title2.weight(.bold))
-            TextField("Nome", text: $nome)
-            Text("Este nome será exibido para todas as pessoas desta equipe.")
+            TextField("Nome".localized, text: $nome)
+            Text("Este nome será exibido para todas as pessoas desta equipe.".localized)
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.textoSecundario)
             HStack {
-                Button("Cancelar", action: aoCancelar)
+                Button("Cancelar".localized, action: aoCancelar)
                 Spacer()
-                Button("Salvar") { aoSalvar(nome) }
+                Button("Salvar".localized) { aoSalvar(nome) }
                     .buttonStyle(BotaoDeContornoPapagaio())
                     .disabled(nome.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }

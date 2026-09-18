@@ -62,6 +62,11 @@ final class Biblioteca {
     /// continua sendo o único caminho para qualquer processamento manual ou
     /// automático, mantendo um único par de modelos carregado por vez.
     var processamentoAutomatico = true
+    /// Preferência de saída capturada quando a execução entra na fila. O
+    /// Whisper ainda detecta o idioma falado; isto só governa a tradução local
+    /// posterior e o idioma que o resumo deve usar.
+    var traducaoAutomatica = true
+    var idiomaPadraoDeProcessamento = IdiomaDeProcessamento(locale: .autoupdatingCurrent)
     var aoNotificar: (@MainActor (_ titulo: String, _ mensagem: String, _ tipo: NotificacaoDoApp.Tipo) -> Void)?
     var aoConcluirProcessamento: (@MainActor (_ arquivo: Arquivo) -> Void)?
 
@@ -200,7 +205,12 @@ final class Biblioteca {
 
     // MARK: - Ciclo de vida
 
+    private var contextoDoEspaco = UUID()
+    private var cargaAtual = UUID()
+
     func usarEspaco(_ novoEspaco: EspacoID, equipeCloudKit: EquipeDisponivel? = nil) async {
+        contextoDoEspaco = UUID()
+        let contexto = contextoDoEspaco
         tarefaDeRetryCloudKit?.cancel()
         tarefaDeRetryCloudKit = nil
         let mudouDeEspaco = espaco != novoEspaco
@@ -218,9 +228,11 @@ final class Biblioteca {
             erroDaLixeira = nil
         }
         await carregar()
+        guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
         if equipeCloudKit != nil {
             await retomarSincronizacaoCloudKit()
         }
+        guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
         await baixarAtualizacoesDaEquipe()
     }
 
@@ -231,13 +243,22 @@ final class Biblioteca {
     }
 
     func carregar() async {
+        let contexto = contextoDoEspaco
+        let espacoDaCarga = espaco
+        let carga = UUID()
+        cargaAtual = carga
         do {
-            arquivos = try await repositorio.listar(espaco: espaco)
-            arquivosNaLixeira = try await repositorio.listarNaLixeira(espaco: espaco)
-            // Uma carga bem-sucedida limpa o lixo de execuções anteriores.
+            let ativos = try await repositorio.listar(espaco: espacoDaCarga)
+            let excluidos = try await repositorio.listarNaLixeira(espaco: espacoDaCarga)
+            guard contexto == contextoDoEspaco, carga == cargaAtual,
+                  !Task.isCancelled else { return }
+            arquivos = ativos
+            arquivosNaLixeira = excluidos
             erroDeCarregamento = nil
         } catch {
-            erroDeCarregamento = "Não foi possível abrir a biblioteca: \(error)"
+            guard contexto == contextoDoEspaco, carga == cargaAtual,
+                  !Task.isCancelled else { return }
+            erroDeCarregamento = "Não foi possível abrir a biblioteca: %@".localized(error.localizedDescription)
         }
     }
 
@@ -275,7 +296,7 @@ final class Biblioteca {
         do {
             try await repositorio.salvar(arquivo)
         } catch {
-            erros[arquivo.id.rawValue] = "Não foi possível salvar: \(error)"
+            erros[arquivo.id.rawValue] = "Não foi possível salvar: %@".localized(error.localizedDescription)
             return nil
         }
         if espacosExcluidos.contains(espacoDestino) {
@@ -347,7 +368,7 @@ final class Biblioteca {
         do {
             try await repositorio.salvar(arquivo)
         } catch {
-            erros[arquivo.id.rawValue] = "Não foi possível importar a reunião: \(error)"
+            erros[arquivo.id.rawValue] = "Não foi possível importar a reunião: %@".localized(error.localizedDescription)
             return nil
         }
         if espacosExcluidos.contains(espacoDestino) {
@@ -410,7 +431,7 @@ final class Biblioteca {
                 )
                 iniciarProximoProcessamentoSeNecessario()
             }
-            erroDaLixeira = "Não foi possível mover o arquivo para a lixeira: \(error.localizedDescription)"
+            erroDaLixeira = "Não foi possível mover o arquivo para a lixeira: %@".localized(error.localizedDescription)
             return false
         }
     }
@@ -438,7 +459,7 @@ final class Biblioteca {
             await sincronizar(restaurado)
             return true
         } catch {
-            erroDaLixeira = "Não foi possível recuperar o arquivo: \(error.localizedDescription)"
+            erroDaLixeira = "Não foi possível recuperar o arquivo: %@".localized(error.localizedDescription)
             return false
         }
     }
@@ -451,7 +472,7 @@ final class Biblioteca {
               arquivoEmProcessamento != arquivo.id,
               !operacoesDeLixeiraEmAndamento.contains(arquivo.id)
         else {
-            erroDaLixeira = "Mova o arquivo para a lixeira antes de apagá-lo definitivamente."
+            erroDaLixeira = "Mova o arquivo para a lixeira antes de apagá-lo definitivamente.".localized
             return
         }
 
@@ -466,9 +487,9 @@ final class Biblioteca {
                     try await filaCloudKit.agendarRemocao(arquivo.id, da: equipeCloudKit)
                     await retomarSincronizacaoCloudKit()
                 } catch {
-                    let mensagem = "A conversa saiu deste Mac, mas a remoção não entrou na fila do iCloud: \(error.localizedDescription)"
+                    let mensagem = "A conversa saiu deste Mac, mas a remoção não entrou na fila do iCloud: %@".localized(error.localizedDescription)
                     estadoDaSincronizacaoCloudKit = .falhou(mensagem)
-                    aoNotificar?("Falha ao remover do iCloud", mensagem, .aviso)
+                    aoNotificar?("Falha ao remover do iCloud".localized, mensagem, .aviso)
                 }
             }
             arquivosNaLixeira.removeAll { $0.id == arquivo.id }
@@ -479,7 +500,7 @@ final class Biblioteca {
             // pode continuar apontando para esta conversa inexistente.
             LimpezaDeArquivo.executar(arquivo.id)
         } catch {
-            erroDaLixeira = "Não foi possível apagar o arquivo definitivamente: \(error.localizedDescription)"
+            erroDaLixeira = "Não foi possível apagar o arquivo definitivamente: %@".localized(error.localizedDescription)
         }
     }
 
@@ -598,7 +619,7 @@ final class Biblioteca {
             substituir(editado)
             await sincronizar(editado)
         } catch {
-            erros[arquivo.id.rawValue] = "Não foi possível renomear: \(error.localizedDescription)"
+            erros[arquivo.id.rawValue] = "Não foi possível renomear: %@".localized(error.localizedDescription)
         }
     }
 
@@ -632,7 +653,7 @@ final class Biblioteca {
             substituir(editado)
             await sincronizar(editado)
         } catch {
-            erros[arquivo.id.rawValue] = "Não foi possível salvar as informações: \(error.localizedDescription)"
+            erros[arquivo.id.rawValue] = "Não foi possível salvar as informações: %@".localized(error.localizedDescription)
         }
     }
 
@@ -647,7 +668,7 @@ final class Biblioteca {
             substituir(editado)
             await sincronizar(editado)
         } catch {
-            erros[arquivo.id.rawValue] = "Não foi possível salvar as notas: \(error.localizedDescription)"
+            erros[arquivo.id.rawValue] = "Não foi possível salvar as notas: %@".localized(error.localizedDescription)
         }
     }
 
@@ -667,7 +688,7 @@ final class Biblioteca {
             substituir(editado)
             await sincronizar(editado)
         } catch {
-            erros[arquivo.id.rawValue] = "Não foi possível salvar a transcrição: \(error.localizedDescription)"
+            erros[arquivo.id.rawValue] = "Não foi possível salvar a transcrição: %@".localized(error.localizedDescription)
         }
     }
 
@@ -690,7 +711,7 @@ final class Biblioteca {
 
             var copia = Arquivo(
                 id: novoID,
-                titulo: "\(arquivo.titulo) cópia",
+                titulo: "%@ cópia".localized(arquivo.titulo),
                 criadoEm: Date(),
                 duracao: arquivo.duracao,
                 pastaRelativa: pastaNovaRelativa,
@@ -707,7 +728,7 @@ final class Biblioteca {
             )
             if let resumo = arquivo.resumo {
                 copia.resumo = Resumo(
-                    titulo: "\(resumo.titulo) cópia",
+                    titulo: "%@ cópia".localized(resumo.titulo),
                     visaoGeral: resumo.visaoGeral,
                     temas: resumo.temas,
                     citacoes: resumo.citacoes,
@@ -738,9 +759,9 @@ final class Biblioteca {
             TarefasGeraisStore.remover(novoID)
             do {
                 try armazenamento.removerGravacao(relativa: pastaNovaRelativa)
-                erros[arquivo.id.rawValue] = "Não foi possível duplicar: \(error.localizedDescription)"
+                erros[arquivo.id.rawValue] = "Não foi possível duplicar: %@".localized(error.localizedDescription)
             } catch {
-                erros[arquivo.id.rawValue] = "Não foi possível duplicar: \(error.localizedDescription). A cópia incompleta permaneceu no armazenamento para não apagar dados de forma insegura."
+                erros[arquivo.id.rawValue] = "Não foi possível duplicar: %@. A cópia incompleta permaneceu no armazenamento para não apagar dados de forma insegura.".localized(error.localizedDescription)
             }
             return nil
         }
@@ -865,6 +886,10 @@ final class Biblioteca {
         fases[chave] = .transcrevendo
         iniciadoEm[chave] = Date()
         let promptDeEntidades = await PromptDeEntidades.construir(para: arquivo)
+        let configuracaoDeTraducao = ConfiguracaoDeTraducaoAutomatica(
+            habilitada: traducaoAutomatica,
+            idiomaPadrao: idiomaPadraoDeProcessamento
+        )
 
         // Criado por execução, e descarregado no fim: os dois modelos somam
         // Eles não podem ficar residentes entre gravações num Mac de 18 GB.
@@ -892,6 +917,13 @@ final class Biblioteca {
             resumir: { [motores] trechos in
                 try await motores.resumir(trechos)
             },
+            resumirNoIdioma: { [motores] trechos, idiomaDeSaida in
+                try await motores.resumir(trechos, idiomaDeSaida: idiomaDeSaida)
+            },
+            traducaoAutomatica: configuracaoDeTraducao,
+            traduzir: { [motores] trechos, idiomaDeDestino in
+                try await motores.traduzir(trechos, para: idiomaDeDestino)
+            },
             diarizar: { [diarizacao] url in
                 try await diarizacao.diarizar(url)
             },
@@ -915,23 +947,23 @@ final class Biblioteca {
                 await sincronizar(final)
                 aoConcluirProcessamento?(final)
                 if final.trechos.isEmpty {
-                    erros[chave] = "Nenhuma fala reconhecida neste áudio."
+                    erros[chave] = "Nenhuma fala reconhecida neste áudio.".localized
                     aoNotificar?(
-                        "Transcrição finalizada sem falas",
-                        "\(final.resumo?.titulo ?? final.titulo) não teve fala reconhecida.",
+                        "Transcrição finalizada sem falas".localized,
+                        "%@ não teve fala reconhecida.".localized(final.resumo?.titulo ?? final.titulo),
                         .aviso
                     )
                 } else {
                     aoNotificar?(
-                        "Transcrição concluída",
-                        "\(final.resumo?.titulo ?? final.titulo) já está com transcrição e resumo prontos.",
+                        "Transcrição concluída".localized,
+                        "%@ já está com transcrição e resumo prontos.".localized(final.resumo?.titulo ?? final.titulo),
                         .sucesso
                     )
                 }
             } catch {
                 erros[chave] = "\(error)"
                 aoNotificar?(
-                    "Transcrição falhou",
+                    "Transcrição falhou".localized,
                     "\(arquivo.titulo): \(error.localizedDescription)",
                     .erro
                 )
@@ -961,7 +993,7 @@ final class Biblioteca {
 
         let diarizacao = GerenciadorDeModelosDeDiarizacao.embutido()
         guard diarizacao.disponivel else {
-            erros[chave] = "Modelos de diarização não estagiados. Rode Scripts/bootstrap-runtimes.sh."
+            erros[chave] = "Modelos de diarização não estagiados. Rode Scripts/bootstrap-runtimes.sh.".localized
             return
         }
 
@@ -1000,7 +1032,7 @@ final class Biblioteca {
                 try await repositorio.salvar(diarizado)
                 substituir(diarizado)
             } catch {
-                erros[chave] = "Não foi possível salvar a diarização: \(error.localizedDescription)"
+                erros[chave] = "Não foi possível salvar a diarização: %@".localized(error.localizedDescription)
             }
         } limpar: {
             await motores.descarregarTudo()
@@ -1047,14 +1079,15 @@ final class Biblioteca {
             try await filaCloudKit.agendarEnvio(arquivo, para: equipeCloudKit)
             await retomarSincronizacaoCloudKit()
         } catch {
-            let mensagem = "Não foi possível guardar a sincronização pendente de \(arquivo.titulo): \(error.localizedDescription)"
+            let mensagem = "Não foi possível guardar a sincronização pendente de %@: %@".localized(arquivo.titulo, error.localizedDescription)
             estadoDaSincronizacaoCloudKit = .falhou(mensagem)
-            aoNotificar?("Conversa salva só neste Mac", mensagem, .aviso)
+            aoNotificar?("Conversa salva só neste Mac".localized, mensagem, .aviso)
         }
     }
 
     func retomarSincronizacaoCloudKit(forcar: Bool = false) async {
         guard equipeCloudKit != nil else { return }
+        let contexto = contextoDoEspaco
         tarefaDeRetryCloudKit?.cancel()
         tarefaDeRetryCloudKit = nil
         estadoDaSincronizacaoCloudKit = .enviando
@@ -1064,6 +1097,7 @@ final class Biblioteca {
                 com: sincronizadorCloudKit,
                 ignorarBackoff: forcar
             )
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
             if resultado.pendentes == 0 {
                 estadoDaSincronizacaoCloudKit = .sincronizado
             } else {
@@ -1072,16 +1106,17 @@ final class Biblioteca {
                     ? ""
                     : ": \(DiagnosticoDaSincronizacaoCloudKit.mensagem(paraTexto: erro))"
                 estadoDaSincronizacaoCloudKit = .falhou(
-                    "\(resultado.pendentes) alteração(ões) aguardando nova tentativa no iCloud\(detalhe)"
+                    "%d alteração(ões) aguardando nova tentativa no iCloud%@".localized(resultado.pendentes, detalhe)
                 )
                 if !DiagnosticoDaSincronizacaoCloudKit.exigeAcaoDoProprietario(erro) {
                     agendarRetryCloudKit(para: resultado.proximaTentativa)
                 }
             }
         } catch {
-            let mensagem = "Não foi possível ler ou salvar a fila do iCloud: \(error.localizedDescription)"
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+            let mensagem = "Não foi possível ler ou salvar a fila do iCloud: %@".localized(error.localizedDescription)
             estadoDaSincronizacaoCloudKit = .falhou(mensagem)
-            aoNotificar?("Falha na fila do iCloud", mensagem, .aviso)
+            aoNotificar?("Falha na fila do iCloud".localized, mensagem, .aviso)
         }
     }
 
@@ -1102,6 +1137,7 @@ final class Biblioteca {
 
     private func baixarAtualizacoesDaEquipe() async {
         guard let equipeCloudKit else { return }
+        let contexto = contextoDoEspaco
         estadoDaSincronizacaoCloudKit = .enviando
         do {
             let revisoesPendentes = try await filaCloudKit.revisoesLocaisPendentes(
@@ -1109,6 +1145,7 @@ final class Biblioteca {
             )
             var conflitos = 0
             for conversa in try await sincronizadorCloudKit.baixarComVersoes(da: equipeCloudKit) {
+                guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
                 if PoliticaDeConflitoCloudKit.decidir(
                     revisaoRemota: conversa.atualizadoEm,
                     revisaoLocalPendente: revisoesPendentes[conversa.arquivo.id]
@@ -1132,25 +1169,29 @@ final class Biblioteca {
                 )
                 try await repositorio.salvar(combinado)
             }
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
             await carregar()
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
             if conflitos == 0 {
                 let pendentes = try await filaCloudKit.operacoesPendentes().count
+                guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
                 if pendentes == 0 {
                     estadoDaSincronizacaoCloudKit = .sincronizado
                 } else {
                     estadoDaSincronizacaoCloudKit = .falhou(
-                        "\(pendentes) alteração(ões) continuam na fila do iCloud."
+                        "%d alteração(ões) continuam na fila do iCloud.".localized(pendentes)
                     )
                 }
             } else {
-                let mensagem = "\(conflitos) conversa(s) têm uma edição local pendente; a cópia local foi preservada até o próximo envio."
+                let mensagem = "%d conversa(s) têm uma edição local pendente; a cópia local foi preservada até o próximo envio.".localized(conflitos)
                 estadoDaSincronizacaoCloudKit = .falhou(mensagem)
-                aoNotificar?("Conflito de sincronização", mensagem, .aviso)
+                aoNotificar?("Conflito de sincronização".localized, mensagem, .aviso)
             }
         } catch {
-            let mensagem = "Não foi possível baixar as conversas da equipe: \(DiagnosticoDaSincronizacaoCloudKit.mensagem(para: error))"
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+            let mensagem = "Não foi possível baixar as conversas da equipe: %@".localized(DiagnosticoDaSincronizacaoCloudKit.mensagem(para: error))
             estadoDaSincronizacaoCloudKit = .falhou(mensagem)
-            aoNotificar?("Falha de sincronização do iCloud", mensagem, .aviso)
+            aoNotificar?("Falha de sincronização do iCloud".localized, mensagem, .aviso)
         }
     }
 
@@ -1281,7 +1322,7 @@ final class Biblioteca {
 
         // Sem pasta não há transcrição possível — falha antes de sujar o banco.
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
-            erros[ArquivoID().rawValue] = "O arquivo de áudio escolhido não foi encontrado."
+            erros[ArquivoID().rawValue] = "O arquivo de áudio escolhido não foi encontrado.".localized
             return nil
         }
 
@@ -1323,7 +1364,7 @@ final class Biblioteca {
                 }
             }
         } catch {
-            erros[arquivo.id.rawValue] = "Não foi possível copiar o áudio da reunião: \(error)"
+            erros[arquivo.id.rawValue] = "Não foi possível copiar o áudio da reunião: %@".localized(error.localizedDescription)
             return nil
         }
 
@@ -1333,7 +1374,7 @@ final class Biblioteca {
             if !arquivo.pastaRelativa.isEmpty {
                 try? armazenamento.removerGravacao(relativa: arquivo.pastaRelativa)
             }
-            erros[arquivo.id.rawValue] = "Não foi possível criar arquivo da reunião: \(error)"
+            erros[arquivo.id.rawValue] = "Não foi possível criar arquivo da reunião: %@".localized(error.localizedDescription)
             return nil
         }
 
@@ -1386,7 +1427,7 @@ final class Biblioteca {
         var errorDescription: String? {
             switch self {
             case .pastaInesperada:
-                "A gravação não estava na pasta esperada da biblioteca."
+                "A gravação não estava na pasta esperada da biblioteca.".localized
             }
         }
     }

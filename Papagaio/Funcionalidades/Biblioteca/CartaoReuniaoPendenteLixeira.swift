@@ -13,9 +13,9 @@ struct CartaoReuniaoPendenteLixeira: View {
 
     private var dataFormatada: String {
         let formatador = DateFormatter()
-        formatador.locale = Locale(identifier: "pt_BR")
-        formatador.dateFormat = "EEEE, d 'de' MMMM"
-        return formatador.string(from: pendente.dataHora).capitalized
+        formatador.locale = LocalizacaoDoApp.localeAtual
+        formatador.setLocalizedDateFormatFromTemplate("EEEE MMMM d")
+        return formatador.string(from: pendente.dataHora)
     }
 
     var body: some View {
@@ -32,6 +32,7 @@ struct CartaoReuniaoPendenteLixeira: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.85)
 
                     HStack(spacing: 4) {
                         Text(dataFormatada)
@@ -42,17 +43,21 @@ struct CartaoReuniaoPendenteLixeira: View {
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
                     if status == .pendenteExpirada {
-                        Text("pendente")
+                        Text("pendente".localized)
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(PapagaioTema.perigo, in: Capsule())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     } else if status == .expirada {
-                        Text("expirada")
+                        Text("expirada".localized)
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(PapagaioTema.textoSecundario, in: Capsule())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
                 }
 
@@ -61,15 +66,19 @@ struct CartaoReuniaoPendenteLixeira: View {
 
             HStack(spacing: PapagaioTema.Espaco.curto) {
                 Button(action: aoRestaurar) {
-                    Label("Restaurar", systemImage: "arrow.uturn.backward")
+                    Label("Restaurar".localized, systemImage: "arrow.uturn.backward")
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(BotaoPrincipalPapagaio())
 
                 Button(action: aoApagarDefinitivamente) {
-                    Label("Apagar", systemImage: "trash")
+                    Label("Apagar".localized, systemImage: "trash")
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(BotaoDeContornoPapagaio())

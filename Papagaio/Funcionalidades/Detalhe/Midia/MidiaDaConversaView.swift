@@ -71,13 +71,13 @@ struct MidiaDaConversaView: View {
                         .background(recebendoArraste ? PapagaioTema.destaqueSuave : PapagaioTema.superficieSuave, in: Circle())
 
                     VStack(spacing: PapagaioTema.Espaco.minimo) {
-                        Text(recebendoArraste ? "Soltar para adicionar" : "Adicionar mídia")
+                        Text(recebendoArraste ? "Soltar para adicionar".localized : "Adicionar mídia".localized)
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(PapagaioTema.texto)
-                        Text("Foto, vídeo, áudio ou arquivo")
+                        Text("Foto, vídeo, áudio ou arquivo".localized)
                             .font(.callout.weight(.medium))
                             .foregroundStyle(PapagaioTema.textoSecundario)
-                        Text("Clique ou arraste do Finder")
+                        Text("Clique ou arraste do Finder".localized)
                             .font(.caption)
                             .foregroundStyle(PapagaioTema.textoSecundario.opacity(0.8))
                     }
@@ -107,10 +107,10 @@ struct MidiaDaConversaView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture(perform: aoAdicionar)
-                .help("Adicionar mídia")
+                .help("Adicionar mídia".localized)
                 .accessibilityAddTraits(.isButton)
-                .accessibilityLabel("Adicionar mídia")
-                .accessibilityHint("Foto, vídeo, áudio ou arquivo. Também aceita arrastar do Finder.")
+                .accessibilityLabel("Adicionar mídia".localized)
+                .accessibilityHint("Foto, vídeo, áudio ou arquivo. Também aceita arrastar do Finder.".localized)
                 // A área de soltar é o cartão tracejado inteiro, não só o
                 // ícone — é ele que parece uma zona de entrada. Aceita
                 // qualquer arquivo (a mesma mensagem do painel já diz "fotos,
@@ -175,8 +175,14 @@ struct MidiaDaConversaView: View {
             // O "i" mora dentro da pastilha: solto ao lado, virava um terceiro
             // objeto na linha para dizer algo sobre o primeiro.
             HStack(spacing: PapagaioTema.Espaco.curto) {
-                Text(anexos.count == 1 ? "1 arquivo" : "\(anexos.count) arquivos")
+                Text(anexos.count == 1 ? "1 arquivo".localized : "%d arquivos".localized(anexos.count))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: true, vertical: false)
                 Text(tamanhoTotal)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: true, vertical: false)
                 botaoDeAjuda
             }
             .font(.caption.weight(.semibold))
@@ -191,8 +197,8 @@ struct MidiaDaConversaView: View {
 
     private var botaoDeAjuda: some View {
         BotaoDeAjudaPapagaio(
-            texto: "Fotos, vídeos, áudios, documentos e anexos salvos nesta conversa.",
-            ajuda: "O que cabe nesta aba",
+            texto: "Fotos, vídeos, áudios, documentos e anexos salvos nesta conversa.".localized,
+            ajuda: "O que cabe nesta aba".localized,
             largura: 280
         )
     }
@@ -275,21 +281,21 @@ struct MidiaDaConversaView: View {
 
         let rotulo: String
         if tipo.conforms(to: .image) {
-            rotulo = "Imagem colada"
+            rotulo = "Imagem colada".localized
         } else if tipo.conforms(to: .pdf) {
-            rotulo = "PDF colado"
+            rotulo = "PDF colado".localized
         } else if tipo.conforms(to: .movie) {
-            rotulo = "Vídeo colado"
+            rotulo = "Vídeo colado".localized
         } else if tipo.conforms(to: .audio) {
-            rotulo = "Áudio colado"
+            rotulo = "Áudio colado".localized
         } else {
-            rotulo = "Arquivo colado"
+            rotulo = "Arquivo colado".localized
         }
 
         let formatador = DateFormatter()
         // Sem barra nem dois-pontos: os dois quebram nome de arquivo no
         // Finder — "HH.mm.ss" no lugar de "HH:mm:ss".
-        formatador.dateFormat = "dd-MM-yyyy 'às' HH.mm.ss"
+        formatador.dateFormat = "dd-MM-yyyy 'at' HH.mm.ss"
         return "\(rotulo) \(formatador.string(from: Date())).\(extensao)"
     }
 }

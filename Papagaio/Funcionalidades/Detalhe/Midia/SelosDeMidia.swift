@@ -4,9 +4,12 @@ struct SeloDeTipoDoArquivo: View {
     let texto: String
 
     var body: some View {
-        Text(texto)
+        Text(texto.localized)
             .font(.caption.weight(.bold))
             .foregroundStyle(PapagaioTema.texto)
+            .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, PapagaioTema.Espaco.curto)
             .frame(height: PapagaioTema.Altura.compacta)
             .background(PapagaioTema.superficie.opacity(0.88), in: Capsule())
@@ -22,10 +25,12 @@ struct SeloDeMidia: View {
     let simbolo: String
 
     var body: some View {
-        Label(texto, systemImage: simbolo)
+        Label(texto.localized, systemImage: simbolo)
             .font(.caption.weight(.semibold))
             .foregroundStyle(PapagaioTema.textoSecundario)
             .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, PapagaioTema.Espaco.curto)
             .frame(height: PapagaioTema.Altura.compacta)
             .background(PapagaioTema.superficieSuave, in: Capsule())

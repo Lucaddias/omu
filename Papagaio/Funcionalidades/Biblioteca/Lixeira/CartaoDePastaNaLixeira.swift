@@ -17,21 +17,21 @@ struct CartaoDePastaNaLixeira: View {
 
     private var prazoDeExclusao: String {
         guard let limite = Calendar.current.date(byAdding: .day, value: 30, to: item.apagadaEm) else {
-            return "Exclui em 30 dias"
+            return "Exclui em 30 dias".localized
         }
         let dias = Calendar.current.dateComponents([.day], from: Date(), to: limite).day ?? 0
-        if dias <= 0 { return "Exclui hoje" }
-        if dias == 1 { return "Exclui em 1 dia" }
-        return "Exclui em \(dias) dias"
+        if dias <= 0 { return "Exclui hoje".localized }
+        if dias == 1 { return "Exclui em 1 dia".localized }
+        return String(format: "Exclui em %d dias".localized, dias)
     }
 
     private var quantidade: String {
-        item.conversas.count == 1 ? "1 conversa" : "\(item.conversas.count) conversas"
+        item.conversas.count == 1 ? "1 conversa".localized : String(format: "%d conversas".localized, item.conversas.count)
     }
 
     private var dataCurta: String {
-        item.apagadaEm
-            .formatted(.dateTime.day().month(.abbreviated))
+        return item.apagadaEm
+            .formatted(.dateTime.locale(LocalizacaoDoApp.localeAtual).day().month(.abbreviated))
             .uppercased()
             .replacingOccurrences(of: ".", with: "")
     }
@@ -39,9 +39,11 @@ struct CartaoDePastaNaLixeira: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
             HStack(alignment: .top, spacing: PapagaioTema.Espaco.medio) {
-                Label("PASTA", systemImage: "folder.fill")
+                Label("PASTA".localized, systemImage: "folder.fill")
                     .font(.callout.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSobrePrimario)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                     .padding(.horizontal, PapagaioTema.Espaco.medio)
                     .frame(height: PapagaioTema.Altura.compacta)
                     .background(PapagaioTema.preenchimentoPrimario, in: RoundedRectangle(cornerRadius: PapagaioTema.raioDeControle, style: .continuous))
@@ -55,8 +57,8 @@ struct CartaoDePastaNaLixeira: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(PapagaioTema.destaqueEscuro)
-                    .help("Restaurar pasta")
-                    .accessibilityLabel("Restaurar a pasta \(item.nome)")
+                    .help("Restaurar pasta".localized)
+                    .accessibilityLabel(String(format: "Restaurar a pasta %@".localized, item.nome))
 
                     Button(role: .destructive, action: aoApagarDefinitivamente) {
                         Image(systemName: "trash")
@@ -64,8 +66,8 @@ struct CartaoDePastaNaLixeira: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(PapagaioTema.perigo)
-                    .help("Apagar definitivamente")
-                    .accessibilityLabel("Apagar definitivamente a pasta \(item.nome)")
+                    .help("Apagar definitivamente".localized)
+                    .accessibilityLabel(String(format: "Apagar definitivamente a pasta %@".localized, item.nome))
                 }
             }
 
@@ -80,8 +82,8 @@ struct CartaoDePastaNaLixeira: View {
 
                 Text(
                     item.conversas.isEmpty
-                        ? "A pasta estava vazia. Restaure para tê-la de volta com a cor e a imagem que tinha."
-                        : "Restaure a pasta inteira, com a cor e a imagem que tinha, ou traga de volta só uma conversa."
+                        ? "A pasta estava vazia. Restaure para tê-la de volta com a cor e a imagem que tinha.".localized
+                        : "Restaure a pasta inteira, com a cor e a imagem que tinha, ou traga de volta só uma conversa.".localized
                 )
                 .font(.body)
                 .foregroundStyle(PapagaioTema.textoSecundario)
@@ -107,7 +109,7 @@ struct CartaoDePastaNaLixeira: View {
 
                                 Spacer(minLength: PapagaioTema.Espaco.curto)
 
-                                Button("Restaurar") { aoRestaurarConversa(arquivo) }
+                                Button("Restaurar".localized) { aoRestaurarConversa(arquivo) }
                                     .buttonStyle(.plain)
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(PapagaioTema.destaqueEscuro)
@@ -137,6 +139,8 @@ struct CartaoDePastaNaLixeira: View {
                 Text(prazoDeExclusao)
                     .font(.callout.weight(.bold))
                     .foregroundStyle(PapagaioTema.perigo)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .font(.callout.weight(.semibold))
             .foregroundStyle(PapagaioTema.textoSecundario.opacity(0.62))

@@ -18,6 +18,9 @@ public struct QwenEngine: SummarizationEngine {
     /// Tamanho do chunk no modo map-reduce. ~8.000 tokens deixa espaço para o
     /// resumo parcial na mesma janela.
     public static let tokensPorChunk = 8_000
+    /// Um lote de tradução deixa folga para a resposta JSON no contexto e não
+    /// depende do teto de 4.096 tokens de uma única geração.
+    public static let tokensPorLoteDeTraducao = 2_000
 
     public init(modelo: URL) {
         self.contexto = ContextoLlama(modelo: modelo)
@@ -28,6 +31,13 @@ public struct QwenEngine: SummarizationEngine {
     }
 
     public func summarize(_ trechos: [Trecho]) async throws -> Resumo {
+        try await summarize(trechos, idiomaDeSaida: nil)
+    }
+
+    public func summarize(
+        _ trechos: [Trecho],
+        idiomaDeSaida: IdiomaDeProcessamento? = nil
+    ) async throws -> Resumo {
         guard !trechos.isEmpty else {
             throw NotImplemented("resumo de transcrição vazia", passo: 7)
         }
@@ -36,8 +46,8 @@ public struct QwenEngine: SummarizationEngine {
         let tokens = try await contexto.contarTokens(transcricao)
 
         let bruto = tokens <= ContextoLlama.tetoDeEntrada
-            ? try await passeUnico(transcricao)
-            : try await mapReduce(trechos)
+            ? try await passeUnico(transcricao, idiomaDeSaida: idiomaDeSaida)
+            : try await mapReduce(trechos, idiomaDeSaida: idiomaDeSaida)
 
         // O modelo sugere; a transcrição decide. Sem esta passagem, o que
         // chega à tela é a lembrança que o Qwen tem da conversa — texto
@@ -52,10 +62,83 @@ public struct QwenEngine: SummarizationEngine {
         )
     }
 
+    /// Traduz os textos dos trechos mantendo a linha do tempo e o canal de
+    /// origem. As palavras do Whisper são removidas deliberadamente: depois da
+    /// tradução elas não representam mais o texto mostrado e não podem servir
+    /// de âncora de busca ou reprodução palavra a palavra.
+    public func traduzir(
+        _ trechos: [Trecho],
+        para idioma: IdiomaDeProcessamento
+    ) async throws -> [Trecho] {
+        guard !trechos.isEmpty else { return [] }
+
+        let lotes = try await particionarParaTraducao(trechos)
+        var traduzidos: [Trecho] = []
+        traduzidos.reserveCapacity(trechos.count)
+        for lote in lotes {
+            try Task.checkCancellation()
+            traduzidos.append(contentsOf: try await traduzirLote(lote, para: idioma))
+        }
+        return traduzidos
+    }
+
+    private func traduzirLote(
+        _ trechos: [Trecho],
+        para idioma: IdiomaDeProcessamento
+    ) async throws -> [Trecho] {
+        let bruto = try await contexto.completar(
+            prompt: Self.promptDeTraducao(trechos, para: idioma),
+            gramatica: GramaticaDaTraducao.gbnf,
+            maxTokens: 4_096
+        )
+        guard let traducoes = Self.decodificarTraducoes(bruto),
+              traducoes.count == trechos.count,
+              traducoes.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        else {
+            throw ErroLlama.gramaticaInvalida
+        }
+
+        return zip(trechos, traducoes).map { original, textoTraduzido in
+            Trecho(
+                id: original.id,
+                start: original.start,
+                end: original.end,
+                texto: textoTraduzido,
+                speaker: original.speaker,
+                palavras: [],
+                confianca: original.confianca,
+                noSpeechProb: original.noSpeechProb
+            )
+        }
+    }
+
+    private func particionarParaTraducao(_ trechos: [Trecho]) async throws -> [[Trecho]] {
+        let contagens = try await contexto.contarTokens(trechos.map(\.texto))
+        var lotes: [[Trecho]] = []
+        var loteAtual: [Trecho] = []
+        var tokensAtuais = 0
+
+        for (trecho, tokens) in zip(trechos, contagens) {
+            if tokensAtuais + tokens > Self.tokensPorLoteDeTraducao,
+               !loteAtual.isEmpty {
+                lotes.append(loteAtual)
+                loteAtual = []
+                tokensAtuais = 0
+            }
+            loteAtual.append(trecho)
+            tokensAtuais += tokens
+        }
+        if !loteAtual.isEmpty { lotes.append(loteAtual) }
+        return lotes
+    }
+
     // MARK: - Passe único
 
-    private func passeUnico(_ transcricao: String) async throws -> Resumo {
-        let prompt = Self.prompt(paraTranscricao: transcricao)
+    private func passeUnico(
+        _ transcricao: String,
+        idiomaDeSaida: IdiomaDeProcessamento?
+    ) async throws -> Resumo {
+        let prompt = Self.prompt(paraTranscricao: transcricao, idiomaDeSaida: idiomaDeSaida)
         return try await gerarComReprompt(prompt: prompt)
     }
 
@@ -87,7 +170,10 @@ public struct QwenEngine: SummarizationEngine {
 
     // MARK: - Map-reduce
 
-    private func mapReduce(_ trechos: [Trecho]) async throws -> Resumo {
+    private func mapReduce(
+        _ trechos: [Trecho],
+        idiomaDeSaida: IdiomaDeProcessamento?
+    ) async throws -> Resumo {
         let chunks = try await particionar(trechos)
 
         var parciais: [String] = []
@@ -95,7 +181,7 @@ public struct QwenEngine: SummarizationEngine {
             // Sessão nova por chunk — o `completar` limpa a memória do contexto
             // ao final de cada chamada.
             let parcial = try await contexto.completar(
-                prompt: Self.promptParcial(Self.formatar(chunk)),
+                prompt: Self.promptParcial(Self.formatar(chunk), idiomaDeSaida: idiomaDeSaida),
                 gramatica: nil,
                 maxTokens: 2_048
             )
@@ -107,7 +193,7 @@ public struct QwenEngine: SummarizationEngine {
             .joined(separator: "\n\n")
 
         return try await gerarComReprompt(
-            prompt: Self.promptDeReducao(consolidado)
+            prompt: Self.promptDeReducao(consolidado, idiomaDeSaida: idiomaDeSaida)
         )
     }
 
@@ -146,12 +232,15 @@ public struct QwenEngine: SummarizationEngine {
         }.joined(separator: "\n")
     }
 
-    static func prompt(paraTranscricao transcricao: String) -> String {
+    static func prompt(
+        paraTranscricao transcricao: String,
+        idiomaDeSaida: IdiomaDeProcessamento? = nil
+    ) -> String {
         """
         <|im_start|>system
         Você é o "Ateiro Profissa", um analista sênior que transforma diálogos \
         caóticos e transcrições brutas em atas limpas, estratégicas e acionáveis \
-        em português do Brasil. Regras: (1) seja fiel à transcrição, não invente \
+        \(Self.instrucaoDeIdioma(idiomaDeSaida)). Regras: (1) seja fiel à transcrição, não invente \
         números, nomes nem decisões. (2) Sem termos corporativos vazios — nada de \
         "sinergia", "disrupção" ou "com base em nossos aprendizados". Seja direto \
         e realista. (3) Use os nomes EXATAMENTE como aparecem na transcrição, sem \
@@ -175,11 +264,14 @@ public struct QwenEngine: SummarizationEngine {
         """
     }
 
-    static func promptParcial(_ transcricao: String) -> String {
+    static func promptParcial(
+        _ transcricao: String,
+        idiomaDeSaida: IdiomaDeProcessamento?
+    ) -> String {
         """
         <|im_start|>system
         Você é o "Ateiro Profissa". Resume trechos de reunião de forma fiel, \
-        detalhada e sem floreios, em português do Brasil.<|im_end|>
+        detalhada e sem floreios. \(Self.instrucaoDeIdioma(idiomaDeSaida))<|im_end|>
         <|im_start|>user
         Resuma este trecho de forma completa e detalhada, preservando números, \
         nomes, decisões e argumentos de cada lado. Não comprima.
@@ -193,14 +285,17 @@ public struct QwenEngine: SummarizationEngine {
         """
     }
 
-    static func promptDeReducao(_ parciais: String) -> String {
+    static func promptDeReducao(
+        _ parciais: String,
+        idiomaDeSaida: IdiomaDeProcessamento?
+    ) -> String {
         """
         <|im_start|>system
         Você é o "Ateiro Profissa". Consolida resumos parciais de uma mesma \
-        reunião em português do Brasil, conectando assuntos e classificando \
+        reunião, conectando assuntos e classificando \
         cada tópico como Ponto Principal ou Secundário. Produza uma ata completa.<|im_end|>
         <|im_start|>user
-        Os textos abaixo são resumos de partes consecutivas da MESMA reunião. \
+        \(Self.instrucaoDeIdioma(idiomaDeSaida)) Os textos abaixo são resumos de partes consecutivas da MESMA reunião. \
         Consolide numa ata profissional completa e detalhada, conectando assuntos \
         que aparecem em partes diferentes. Cubra todos os tópicos discutidos.
 
@@ -211,6 +306,39 @@ public struct QwenEngine: SummarizationEngine {
         <think>
 
         </think>\n
+
+        """
+    }
+
+    /// `nil` preserva o idioma detectado na transcrição. Isso é diferente de
+    /// "português por padrão": um sistema em inglês falando inglês não deve
+    /// receber uma ata traduzida só porque o prompt foi escrito em português.
+    private static func instrucaoDeIdioma(_ idioma: IdiomaDeProcessamento?) -> String {
+        guard let idioma else {
+            return "Escreva no mesmo idioma predominante da transcrição; não a traduza."
+        }
+        return "Escreva toda a resposta em \(idioma.nomeParaPrompt)."
+    }
+
+    private static func promptDeTraducao(
+        _ trechos: [Trecho],
+        para idioma: IdiomaDeProcessamento
+    ) -> String {
+        let entrada = trechos.enumerated().map { indice, trecho in
+            "\(indice): \(trecho.texto)"
+        }.joined(separator: "\n")
+        return """
+        <|im_start|>system
+        You are a precise offline translator. Translate each input item into \(idioma.nomeParaPrompt). Preserve names, numbers, dates, acronyms and intent. Do not summarize, omit, merge or split items.<|im_end|>
+        <|im_start|>user
+        Return exactly one JSON object matching the requested grammar. Its `traducoes` array must contain exactly \(trechos.count) strings in the same order as the numbered inputs. No explanations.
+
+        INPUTS:
+        \(entrada)<|im_end|>
+        <|im_start|>assistant
+        <think>
+
+        </think>
 
         """
     }
@@ -246,6 +374,18 @@ public struct QwenEngine: SummarizationEngine {
         else { return nil }
         let json = String(bruto[inicio...fim])
         return try? JSONDecoder().decode(Resumo.self, from: Data(json.utf8))
+    }
+
+    private static func decodificarTraducoes(_ bruto: String) -> [String]? {
+        struct Resposta: Decodable { let traducoes: [String] }
+        guard let inicio = bruto.firstIndex(of: "{"),
+              let fim = bruto.lastIndex(of: "}"), inicio < fim
+        else { return nil }
+        let resposta = try? JSONDecoder().decode(
+            Resposta.self,
+            from: Data(String(bruto[inicio...fim]).utf8)
+        )
+        return resposta?.traducoes
     }
 
     public func preaquecer() async throws {

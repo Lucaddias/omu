@@ -46,6 +46,7 @@ struct ContentView: View {
     }
 
     @State private var biblioteca: Biblioteca?
+    @State private var tarefaDeSelecaoDeEspaco: Task<Void, Never>?
     @State private var modelos: ModelosViewModel?
     /// A conexão com o Granola. Nasce junto com a biblioteca (`abrir`), que é
     /// quem também entrega o destino das importações.
@@ -92,6 +93,7 @@ struct ContentView: View {
     @State private var pastaDaBibliotecaSelecionada: String?
     @AppStorage("processamentoAutomatico") private var processamentoAutomatico = true
     @AppStorage("exibirFichaAutomaticamente") private var exibirFichaAutomaticamente = true
+    @AppStorage("traducaoAutomatica") private var traducaoAutomatica = true
     @AppStorage("contextoDaConta") private var contextoDaContaRaw = ContextoDaConta.perfil.rawValue
     @AppStorage("equipeAtiva") private var equipeAtivaID = ""
     @AppStorage("aparenciaDoApp") private var aparenciaRaw = AparenciaDoApp.sistema.rawValue
@@ -198,6 +200,15 @@ struct ContentView: View {
         // do Mac. Nos outros dois casos isto fixa a aparência da janela, e as
         // cores dinâmicas do tema resolvem em cima dela.
         .preferredColorScheme(aparencia.wrappedValue.esquemaPreferido)
+        .onChange(of: aparenciaRaw) { _, novoRaw in
+            let nova = AparenciaDoApp(rawValue: novoRaw) ?? .sistema
+            SincroniaDeAparencia.aplicar(nova)
+        }
+        .onAppear {
+            // Relançamento com claro/escuro salvo: preferredColorScheme aplica,
+            // mas window.appearance ainda é nil sem isto.
+            SincroniaDeAparencia.aplicar(AparenciaDoApp(rawValue: aparenciaRaw) ?? .sistema)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .equipeCloudKitAceita)) { notificacao in
             guard let equipe = notificacao.object as? EquipeDisponivel else { return }
             equipes = EquipesDoUsuario.carregar()
@@ -205,7 +216,10 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .equipeCloudKitFalhou)) { notificacao in
             guard let mensagem = notificacao.object as? String else { return }
-            falhaDeAbertura = "Não foi possível aceitar o convite do iCloud: \(mensagem)"
+            falhaDeAbertura = "Não foi possível aceitar o convite do iCloud: %@".localized(mensagem)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .abrirGravacaoNoApp)) { _ in
+            voltarParaGravacao()
         }
         .task {
             await abrir()
@@ -222,6 +236,12 @@ struct ContentView: View {
         }
         .onChange(of: processamentoAutomatico) { _, novoValor in
             biblioteca?.processamentoAutomatico = novoValor
+        }
+        .onChange(of: traducaoAutomatica) { _, novoValor in
+            biblioteca?.traducaoAutomatica = novoValor
+            biblioteca?.idiomaPadraoDeProcessamento = IdiomaDeProcessamento(
+                locale: .autoupdatingCurrent
+            )
         }
         .onChange(of: biblioteca?.arquivosComFichaPendente) { _, novoValor in
             abrirFichaPendenteSeNecessario(novoValor)
@@ -261,11 +281,11 @@ struct ContentView: View {
                 aoSalvar: salvarFichaDaEntrevista
             )
         }
-        .alert("Não foi possível entrar", isPresented: Binding(
+        .alert("Não foi possível entrar".localized, isPresented: Binding(
             get: { perfil.erro != nil },
             set: { if !$0 { perfil.dispensarErro() } }
         )) {
-            Button("OK", role: .cancel) { perfil.dispensarErro() }
+            Button("OK".localized, role: .cancel) { perfil.dispensarErro() }
         } message: {
             Text(perfil.erro ?? "")
         }
@@ -273,18 +293,19 @@ struct ContentView: View {
 
     private func mensagemDeErro(_ mensagem: String) -> some View {
         HStack(spacing: PapagaioTema.Espaco.medio) {
-            Label(mensagem, systemImage: "xmark.octagon.fill")
+            Label(mensagem.localized, systemImage: "xmark.octagon.fill")
                 .font(.callout)
                 .foregroundStyle(PapagaioTema.perigo)
+                .minimumScaleFactor(0.85)
 
             Spacer()
 
-            Button("Fechar", systemImage: "xmark") {
+            Button("Fechar".localized, systemImage: "xmark") {
                 falhaDeAbertura = nil
             }
             .buttonStyle(.plain)
             .foregroundStyle(PapagaioTema.perigo)
-            .help("Dispensar mensagem de erro")
+            .help("Dispensar mensagem de erro".localized)
         }
         .padding(PapagaioTema.Espaco.largo)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -295,13 +316,13 @@ struct ContentView: View {
         BarraSuperiorPapagaioView(
             consulta: $consulta, legendaAtiva: $legendaDaBarra,
             // Sem o chevron nas telas que já têm atalho próprio na barra:
-            // Tarefas, Mídias, Configurações e Lixeira. Ali o botão de voltar
-            // seria um segundo caminho para a Biblioteca, redundante e não
-            // obrigatório como é numa conversa aberta ou na captura.
+            // Tarefas, Mídias e Lixeira. Ali o botão de voltar seria um
+            // segundo caminho para a Biblioteca, redundante e não obrigatório
+            // como é numa conversa aberta ou na captura. Configurações mantém
+            // o chevron (além dos atalhos) para garantir saída explícita.
             exibindoBotaoVoltar: !naTelaInicial
                 && telaSelecionada != .tarefas
                 && telaSelecionada != .midias
-                && telaSelecionada != .configuracoes
                 && !(telaSelecionada == .biblioteca && secaoDaBiblioteca == .lixeira),
             bibliotecaSelecionada: telaSelecionada == .biblioteca && secaoDaBiblioteca != .lixeira,
             tarefasSelecionada: telaSelecionada == .tarefas,
@@ -350,13 +371,13 @@ struct ContentView: View {
                                     arquivoParaConfigurar = nil
                                     Task {
                                         await aoAlternarGravacao()
-                                        withAnimation(.snappy(duration: 0.18)) { focoNaGravacao = true }
+                                        if !modelo.gravando { pendenteEmGravacao.pendente = nil }
                                     }
                                 },
                                 aoImportarAudioDaReuniao: { (pendente: ReuniaoPendenteCalendar) in
                                     guard let bib = biblioteca else { return }
                                     let painel = NSOpenPanel()
-                                    painel.title = "Escolha o arquivo de áudio da reunião"
+                                    painel.title = "Escolha o arquivo de áudio da reunião".localized
                                     painel.allowedContentTypes = [.audio, .mpeg4Audio, .mp3, .wav]
                                     painel.allowsMultipleSelection = false
                                     guard painel.runModal() == .OK, let url = painel.url else { return }
@@ -378,7 +399,7 @@ struct ContentView: View {
         case .midias:
             MidiasView(biblioteca: biblioteca, consulta: consulta)
         case .configuracoes:
-            ConfiguracoesView(processamentoAutomatico: $processamentoAutomatico, exibirFichaAutomaticamente: $exibirFichaAutomaticamente, aparencia: aparencia,
+            ConfiguracoesView(processamentoAutomatico: $processamentoAutomatico, exibirFichaAutomaticamente: $exibirFichaAutomaticamente, traducaoAutomatica: $traducaoAutomatica, aparencia: aparencia,
                               granola: granola, googleCalendar: googleCalendar, biblioteca: biblioteca)
         case .perfil:
             PerfilPessoalView(perfil: perfil, equipeAtiva: equipeAtiva, equipes: equipes,
@@ -403,16 +424,18 @@ struct ContentView: View {
         do {
             let nova = try Biblioteca()
             nova.processamentoAutomatico = processamentoAutomatico
+            nova.traducaoAutomatica = traducaoAutomatica
+            nova.idiomaPadraoDeProcessamento = IdiomaDeProcessamento(locale: .autoupdatingCurrent)
             nova.aoNotificar = { titulo, mensagem, tipo in
                 notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
             }
-            nova.aoConcluirProcessamento = { arquivo in
+            nova.aoConcluirProcessamento = { [weak nova] arquivo in
                 guard arquivosAguardandoFicha.contains(arquivo.id) else { return }
                 arquivosAguardandoFicha.remove(arquivo.id)
                 // Sempre marca como pendente; a exibição automática é decidida
                 // pela View (onChange de arquivosComFichaPendente + preferência)
                 // para manter a decisão de UI na camada de View.
-                nova.marcarFichaPendente(arquivo.id)
+                nova?.marcarFichaPendente(arquivo.id)
             }
             biblioteca = nova
             await reconciliarEquipesExcluidas()
@@ -423,23 +446,11 @@ struct ContentView: View {
             }
             granola = conexao
 
-let conexaoGoogle = GoogleCalendarViewModel()
+            let conexaoGoogle = GoogleCalendarViewModel()
             conexaoGoogle.aoNotificar = { titulo, mensagem, tipo in
                 notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
             }
             googleCalendar = conexaoGoogle
-
-            // Conecta automaticamente se o usuário já autenticou antes
-            // (tem refresh token salvo). Na primeira vez, só conecta
-            // pelo botão nas configurações para não abrir o navegador
-            // toda vez que o app inicia.
-            let temTokenSalvo = CofreDeTokens(servico: "papagaio:google-calendar")
-                .carregar(conta: "refresh_token") != nil
-            if CredenciaisGoogle.estaConfigurado && temTokenSalvo {
-                Task {
-                    await conexaoGoogle.conectar(biblioteca: nova)
-                }
-            }
 
             let gerenciador = ModelosViewModel(
                 pastaDoContainer: nova.armazenamento.pastaDeModelos
@@ -454,6 +465,10 @@ let conexaoGoogle = GoogleCalendarViewModel()
             // Caixa capturada por referência: `@State` não pode ser lido
             // diretamente num handler instalado uma vez (captura obsoleta).
             let caixaPendente = pendenteEmGravacao
+            modelo.aoCancelarGravacao = {
+                caixaPendente.pendente = nil
+                focoNaGravacao = false
+            }
             let gcalCapturado = googleCalendar
             modelo.aoProduzirAudio = { titulo, pasta, duracao, notas, dataDeGravacao in
                 if let pendente = caixaPendente.pendente {
@@ -496,7 +511,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
             await nova.preparar()
             atualizarEspacoDaBiblioteca()
         } catch {
-            falhaDeAbertura = "Não foi possível abrir a biblioteca: \(error)"
+            falhaDeAbertura = "Não foi possível abrir a biblioteca: %@".localized(error.localizedDescription)
         }
     }
 
@@ -554,6 +569,9 @@ let conexaoGoogle = GoogleCalendarViewModel()
             naFila: biblioteca.estaNaFila(arquivo),
             responsaveisDisponiveis: responsaveisDaEquipeAtiva,
             aoTranscrever: { biblioteca.enfileirarProcessamento(arquivo) },
+            // Regera tudo (transcrição, resumo e próximos passos), não só o
+            // resumo: é o mesmo pipeline do "Transcrever".
+            aoGerarNovoResumo: { biblioteca.enfileirarProcessamento(arquivo) },
             aoAtualizarNotas: { notas in
                 await biblioteca.atualizarNotas(notas, de: arquivo)
             },
@@ -730,6 +748,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
         EquipesDoUsuario.salvar(equipes)
 
         if equipeAtivaID == equipe.id || equipes.isEmpty {
+            tarefaDeSelecaoDeEspaco?.cancel()
             equipeAtivaID = ""
             contextoDaConta = .perfil
             await biblioteca?.usarEspaco(Biblioteca.espacoPessoal())
@@ -799,7 +818,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
                 EquipesDoUsuario.salvar(equipes)
                 usarEquipe(publicada)
             } catch {
-                falhaDeAbertura = "Não foi possível criar a equipe no iCloud: \(error.localizedDescription)"
+                falhaDeAbertura = "Não foi possível criar a equipe no iCloud: %@".localized(error.localizedDescription)
             }
         }
     }
@@ -812,7 +831,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
                 equipes = EquipesDoUsuario.carregar()
                 usarEquipe(equipe)
             } catch {
-                falhaDeAbertura = "Não foi possível entrar na equipe: \(error.localizedDescription)"
+                falhaDeAbertura = "Não foi possível entrar na equipe: %@".localized(error.localizedDescription)
             }
         }
     }
@@ -826,6 +845,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
     }
 
     private func atualizarEspacoDaBiblioteca() {
+        tarefaDeSelecaoDeEspaco?.cancel()
         guard let biblioteca else { return }
         let espaco: EspacoID
         let equipeParaSincronizar: EquipeDisponivel?
@@ -839,12 +859,13 @@ let conexaoGoogle = GoogleCalendarViewModel()
             espaco = Biblioteca.espacoPessoal()
             equipeParaSincronizar = nil
         }
-        Task { @MainActor in
+        tarefaDeSelecaoDeEspaco = Task { @MainActor in
             var equipeParaUsar = equipeParaSincronizar
             if let equipeParaSincronizar {
                 do {
                     let corrigida = try await servicoDeEquipesCloudKit
                         .completarReferenciaDaZonaCompartilhada(da: equipeParaSincronizar)
+                    guard !Task.isCancelled else { return }
                     equipeParaUsar = corrigida
                     if corrigida != equipeParaSincronizar,
                        let indice = equipes.firstIndex(where: { $0.id == corrigida.id }) {
@@ -857,6 +878,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
                     // falha acionável se a zona não estiver disponível.
                 }
             }
+            guard !Task.isCancelled else { return }
             await biblioteca.usarEspaco(espaco, equipeCloudKit: equipeParaUsar)
         }
     }
@@ -864,6 +886,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
     private func sairDoPerfil() {
         perfil.sair()
         contextoDaConta = .perfil
+        atualizarEspacoDaBiblioteca()
         voltarParaBiblioteca()
     }
 
@@ -871,6 +894,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
     /// do app e modelos baixados são preservados para que uma nova conta não
     /// precise reconfigurar a aparência nem baixar pesos novamente.
     private func excluirConta() async throws {
+        tarefaDeSelecaoDeEspaco?.cancel()
         if modelo.gravando {
             await modelo.cancelar()
         }
@@ -950,8 +974,10 @@ let conexaoGoogle = GoogleCalendarViewModel()
                             .fill(modelo.pausado ? PapagaioTema.aviso : PapagaioTema.perigo)
                             .frame(width: 9, height: 9)
 
-                        Text(modelo.pausado ? "Pausado" : "Gravando")
+                        Text(modelo.pausado ? "Pausado".localized : "Gravando".localized)
                             .font(.callout.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
 
                         Text(modelo.tempoDeGravacao.comoCronometro)
                             .font(.system(.callout, design: .monospaced))
@@ -961,7 +987,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Voltar para a gravação em andamento")
+                .help("Voltar para a gravação em andamento".localized)
 
                 Divider().frame(height: 18)
 
@@ -969,7 +995,7 @@ let conexaoGoogle = GoogleCalendarViewModel()
                 // outra tarefa quer resolver ali, não navegar até a captura.
                 BotaoDoSelo(
                     simbolo: modelo.pausado ? "play.fill" : "pause.fill",
-                    ajuda: modelo.pausado ? "Continuar gravação" : "Pausar gravação"
+                    ajuda: modelo.pausado ? "Continuar gravação".localized : "Pausar gravação".localized
                 ) {
                     Task {
                         if modelo.pausado {
@@ -980,11 +1006,11 @@ let conexaoGoogle = GoogleCalendarViewModel()
                     }
                 }
 
-                BotaoDoSelo(simbolo: "stop.fill", ajuda: "Finalizar gravação") {
+                BotaoDoSelo(simbolo: "stop.fill", ajuda: "Finalizar gravação".localized) {
                     Task { await aoAlternarGravacao() }
                 }
 
-                BotaoDoSelo(simbolo: "xmark", ajuda: "Cancelar gravação", perigo: true) {
+                BotaoDoSelo(simbolo: "xmark", ajuda: "Cancelar gravação".localized, perigo: true) {
                     confirmandoCancelamentoDaGravacao = true
                 }
             }
@@ -996,16 +1022,16 @@ let conexaoGoogle = GoogleCalendarViewModel()
             .padding(PapagaioTema.Espaco.secao)
             .transition(.opacity.combined(with: .scale(scale: 0.96)))
             .confirmationDialog(
-                "Cancelar a gravação?",
+                "Cancelar a gravação?".localized,
                 isPresented: $confirmandoCancelamentoDaGravacao,
                 titleVisibility: .visible
             ) {
-                Button("Cancelar gravação", role: .destructive) {
+                Button("Cancelar gravação".localized, role: .destructive) {
                     Task { await aoCancelarGravacao() }
                 }
-                Button("Continuar gravando", role: .cancel) {}
+                Button("Continuar gravando".localized, role: .cancel) {}
             } message: {
-                Text("O áudio capturado até agora é descartado.")
+                Text("O áudio capturado até agora é descartado.".localized)
             }
         }
     }

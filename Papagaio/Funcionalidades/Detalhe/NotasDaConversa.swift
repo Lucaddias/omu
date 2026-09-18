@@ -73,10 +73,10 @@ struct PainelDeNotasDaConversa: View {
             if notasVisiveis.isEmpty {
                 CartaoDeEstadoVazio(
                     simbolo: "note.text",
-                    titulo: notas.isEmpty ? "Nenhuma nota ainda" : "Nada com esse filtro",
+                    titulo: notas.isEmpty ? "Nenhuma nota ainda".localized : "Nada com esse filtro".localized,
                     mensagem: notas.isEmpty
-                        ? "Escreva no campo acima e pressione Enter. O instante do áudio fica guardado junto."
-                        : "Troque o filtro para ver as outras notas."
+                        ? "Escreva no campo acima e pressione Enter. O instante do áudio fica guardado junto.".localized
+                        : "Troque o filtro para ver as outras notas.".localized
                 )
                 // Menor que antes: o bloco de escrita já ocupa a parte de cima,
                 // e um vazio de 200pt embaixo dele fazia a tela parecer mais
@@ -106,8 +106,8 @@ struct PainelDeNotasDaConversa: View {
     /// primeira nota. Ele continua atrás do "?", para quem chega agora.
     private var botaoDeAjuda: some View {
         BotaoDeAjudaPapagaio(
-            texto: "Cada nota fica presa a um instante. Clique no tempo para ouvir o trecho, e use #etiquetas para agrupar depois.",
-            ajuda: "Como funcionam as notas",
+            texto: "Cada nota fica presa a um instante. Clique no tempo para ouvir o trecho, e use #etiquetas para agrupar depois.".localized,
+            ajuda: "Como funcionam as notas".localized,
             largura: 300
         )
     }
@@ -141,7 +141,7 @@ struct PainelDeNotasDaConversa: View {
                 // bloco alto parece papel, e é para onde o olho volta entre
                 // uma anotação e outra. Ele também absorve o parágrafo inteiro
                 // sem rolar, no caso em que a ideia vem completa.
-                TextField("Escreva uma nota e pressione Enter…", text: $rascunho, axis: .vertical)
+                TextField("Escreva uma nota e pressione Enter…".localized, text: $rascunho, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(PapagaioTema.Tipo.corpo)
                     .lineLimit(4...14)
@@ -181,7 +181,7 @@ struct PainelDeNotasDaConversa: View {
                         .foregroundStyle(PapagaioTema.perigo)
                         .lineLimit(2)
                 } else {
-                    Text("Enter salva · Enter vazio marca o instante")
+                    Text("Enter salva · Enter vazio marca o instante".localized)
                         .font(.caption)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
@@ -189,7 +189,7 @@ struct PainelDeNotasDaConversa: View {
                 Spacer()
 
                 Label(
-                    estadoDeSalvamento,
+                    estadoDeSalvamento.localized,
                     systemImage: estadoDeSalvamento == "Salvo" ? "checkmark.circle" : "clock"
                 )
                 .font(.caption.weight(.semibold))
@@ -204,7 +204,7 @@ struct PainelDeNotasDaConversa: View {
     /// nada depois não é usada duas vezes.
     private var filtros: some View {
         LayoutDeFluxo(espacoHorizontal: PapagaioTema.Espaco.curto, espacoVertical: PapagaioTema.Espaco.curto) {
-            chipDeFiltro("Todas", ativo: filtro == .todas) { filtro = .todas }
+            chipDeFiltro("Todas".localized, ativo: filtro == .todas) { filtro = .todas }
 
             ForEach(etiquetas, id: \.self) { nome in
                 chipDeFiltro("#\(nome)", ativo: filtro == .etiqueta(nome)) {
@@ -224,6 +224,9 @@ struct PainelDeNotasDaConversa: View {
             Text(texto)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(ativo ? PapagaioTema.textoSobrePrimario : cor)
+                .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, PapagaioTema.Espaco.medio)
                 .frame(height: PapagaioTema.Altura.compacta)
                 .background(ativo ? cor : cor.opacity(0.12), in: Capsule())
@@ -238,11 +241,11 @@ struct PainelDeNotasDaConversa: View {
                 .foregroundStyle(PapagaioTema.destaqueEscuro)
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                Text(ditado.gravando ? "Ouvindo…" : "Refinando com o modelo local…")
+                Text(ditado.gravando ? "Ouvindo…".localized : "Refinando com o modelo local…".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
-                Text(ditado.textoParcial.isEmpty ? "Fale — o texto aparece aqui." : ditado.textoParcial)
+                Text(ditado.textoParcial.isEmpty ? "Fale — o texto aparece aqui.".localized : ditado.textoParcial)
                     .font(.body)
                     .foregroundStyle(PapagaioTema.texto)
                     .fixedSize(horizontal: false, vertical: true)
@@ -257,9 +260,9 @@ struct PainelDeNotasDaConversa: View {
 
     private var rotuloDoDitado: String {
         switch ditado.estado {
-        case .gravando: "Parar e transcrever"
-        case .transcrevendo: "Transcrevendo…"
-        default: "Ditar nota"
+        case .gravando: "Parar e transcrever".localized
+        case .transcrevendo: "Transcrevendo…".localized
+        default: "Ditar nota".localized
         }
     }
 
@@ -367,13 +370,13 @@ private struct LinhaDeNotaDaConversa: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Ouvir a partir de \(nota.start.comoRelogio)")
+            .help("Ouvir a partir de %@".localized(nota.start.comoRelogio))
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
                 if editando {
                     // Campo que cresce com o texto: a área enorme em branco de
                     // antes intimidava e não sugeria nada.
-                    TextField("O que aconteceu aqui? Use #etiqueta para agrupar", text: $nota.texto, axis: .vertical)
+                    TextField("O que aconteceu aqui? Use #etiqueta para agrupar".localized, text: $nota.texto, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16))
                         .lineLimit(1...12)
@@ -386,7 +389,7 @@ private struct LinhaDeNotaDaConversa: View {
                     // Marcador: ponto guardado sem texto. Antes ele caía no
                     // ramo de edição e virava um campo vazio — um cartão alto,
                     // mudo, que parecia defeito.
-                    Label("Marcador", systemImage: "bookmark.fill")
+                    Label("Marcador".localized, systemImage: "bookmark.fill")
                         .font(.system(size: 15).italic())
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -442,7 +445,7 @@ private struct LinhaDeNotaDaConversa: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(editando ? "Concluir edição" : "Editar nota")
+                .help(editando ? "Concluir edição".localized : "Editar nota".localized)
 
                 Button(action: aoRemover) {
                     Image(systemName: "trash")
@@ -452,7 +455,7 @@ private struct LinhaDeNotaDaConversa: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Apagar nota")
+                .help("Apagar nota".localized)
             }
         }
         .padding(PapagaioTema.Espaco.largo)

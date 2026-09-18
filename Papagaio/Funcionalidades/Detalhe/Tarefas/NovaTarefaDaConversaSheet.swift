@@ -7,15 +7,15 @@ struct NovaTarefaDaConversaSheet: View {
 
         var titulo: String {
             switch self {
-            case .criacao: "Nova tarefa"
-            case .edicao: "Editar tarefa"
+            case .criacao: "Nova tarefa".localized
+            case .edicao: "Editar tarefa".localized
             }
         }
 
         var botao: String {
             switch self {
-            case .criacao: "Adicionar tarefa"
-            case .edicao: "Salvar alterações"
+            case .criacao: "Adicionar tarefa".localized
+            case .edicao: "Salvar alterações".localized
             }
         }
 
@@ -68,7 +68,7 @@ struct NovaTarefaDaConversaSheet: View {
                         .font(.title2.weight(.bold))
                         .foregroundStyle(PapagaioTema.texto)
 
-                    Text("Defina título, responsável, prioridade e deadline antes de salvar.")
+                    Text("Defina título, responsável, prioridade e deadline antes de salvar.".localized)
                         .font(.callout)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .fixedSize(horizontal: false, vertical: true)
@@ -78,11 +78,11 @@ struct NovaTarefaDaConversaSheet: View {
             }
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                Text("Título")
+                Text("Título".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
-                TextField("Ex.: Revisar pontos da entrevista", text: $titulo)
+                TextField("Ex.: Revisar pontos da entrevista".localized, text: $titulo)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -95,13 +95,13 @@ struct NovaTarefaDaConversaSheet: View {
             }
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                Text("Responsável")
+                Text("Responsável".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
                 VStack(spacing: PapagaioTema.Espaco.curto) {
                     Menu {
-                        Button("Sem responsável") {
+                        Button("Sem responsável".localized) {
                             responsavel = ""
                         }
 
@@ -115,8 +115,9 @@ struct NovaTarefaDaConversaSheet: View {
                     } label: {
                         HStack(spacing: PapagaioTema.Espaco.curto) {
                             Image(systemName: "person.crop.circle")
-                            Text(responsavel.isEmpty ? "Escolher participante" : responsavel)
+                            Text(responsavel.isEmpty ? "Escolher participante".localized : responsavel)
                                 .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                             Spacer()
                             Image(systemName: "chevron.down")
                                 .font(.caption.weight(.bold))
@@ -134,7 +135,7 @@ struct NovaTarefaDaConversaSheet: View {
                     .menuStyle(.button)
                     .buttonStyle(.plain)
 
-                    TextField("Ou digite nome, e-mail ou login", text: $responsavel)
+                    TextField("Ou digite nome, e-mail ou login".localized, text: $responsavel)
                         .textFieldStyle(.plain)
                         .font(.body)
                         .padding(.horizontal, PapagaioTema.Espaco.medio)
@@ -148,27 +149,27 @@ struct NovaTarefaDaConversaSheet: View {
             }
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                Text("Prioridade")
+                Text("Prioridade".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
                 ControleSegmentadoPapagaio(
                     opcoes: PrioridadeDaTarefa.allCases,
                     selecionado: $prioridade,
-                    titulo: { $0.rawValue },
+                    titulo: { $0.titulo },
                     simbolo: { _ in nil }
                 )
             }
 
             VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) {
-                Text("Deadline")
+                Text("Deadline".localized)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(PapagaioTema.textoSecundario)
 
-                CampoDeDataPapagaio(data: $prazo, rotuloAcessivel: "Data de entrega")
+                CampoDeDataPapagaio(data: $prazo, rotuloAcessivel: "Data de entrega".localized)
 
                 if prazoEstaPerto && status != .concluida {
-                    Label("Deadline perto: a tarefa será marcada como prioridade alta.", systemImage: "bell.badge")
+                    Label("Deadline perto: a tarefa será marcada como prioridade alta.".localized, systemImage: "bell.badge")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(PapagaioTema.perigo)
                 }
@@ -176,23 +177,23 @@ struct NovaTarefaDaConversaSheet: View {
 
             HStack(spacing: PapagaioTema.Espaco.medio) {
                 if let aoExcluir {
-                    Button("Excluir", systemImage: "trash", role: .destructive) {
+                    Button("Excluir".localized, systemImage: "trash", role: .destructive) {
                         confirmandoExclusao = true
                     }
                     .buttonStyle(BotaoDeContornoDestrutivoPapagaio())
                     .confirmationDialog(
-                        "Excluir esta tarefa?",
+                        "Excluir esta tarefa?".localized,
                         isPresented: $confirmandoExclusao,
                         titleVisibility: .visible
                     ) {
-                        Button("Excluir", role: .destructive, action: aoExcluir)
-                        Button("Cancelar", role: .cancel) {}
+                        Button("Excluir".localized, role: .destructive, action: aoExcluir)
+                        Button("Cancelar".localized, role: .cancel) {}
                     } message: {
-                        Text("Ela vai para a lixeira, de onde dá para restaurar depois.")
+                        Text("Ela vai para a lixeira, de onde dá para restaurar depois.".localized)
                     }
                 }
 
-                Button("Cancelar", action: aoCancelar)
+                Button("Cancelar".localized, action: aoCancelar)
                     .buttonStyle(BotaoDeContornoPapagaio())
 
                 Spacer()

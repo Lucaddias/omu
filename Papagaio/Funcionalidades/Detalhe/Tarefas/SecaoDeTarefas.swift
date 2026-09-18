@@ -42,7 +42,7 @@ struct SecaoDeTarefas: View {
                     .background(PapagaioTema.superficieSuave, in: Circle())
 
                 if !oculta {
-                    Text("Arraste tarefas para cá")
+                    Text("Arraste tarefas para cá".localized)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(PapagaioTema.textoSecundario)
                 }
@@ -57,7 +57,7 @@ struct SecaoDeTarefas: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help(oculta ? "Mostrar seção \(titulo)" : "Ocultar seção \(titulo)")
+                .help(oculta ? "Mostrar seção %@".localized(titulo) : "Ocultar seção %@".localized(titulo))
             }
             .padding(.leading, PapagaioTema.Espaco.curto)
 
@@ -65,7 +65,7 @@ struct SecaoDeTarefas: View {
                 // Recolhida, mas continua soltável: mesma faixa fina do
                 // Painel de Tarefas geral, coerente com o `.dropDestination`
                 // que envolve a seção inteira (ver o fim do arquivo).
-                Text("Seção recolhida — pode soltar aqui.")
+                Text("Seção recolhida — pode soltar aqui.".localized)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -76,7 +76,7 @@ struct SecaoDeTarefas: View {
             } else {
                 VStack(spacing: PapagaioTema.Espaco.curto) {
                     if tarefas.isEmpty {
-                        Text("Solte uma tarefa aqui para mudar para \(titulo.lowercased()).")
+                        Text("Solte uma tarefa aqui para mudar para %@.".localized(titulo.lowercased()))
                             .font(.callout)
                             .foregroundStyle(PapagaioTema.textoSecundario)
                             .frame(maxWidth: .infinity, minHeight: 62)
