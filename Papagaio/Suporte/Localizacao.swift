@@ -8,8 +8,19 @@ public enum LocalizacaoDoApp: Sendable {
     public static var localeAtual: Locale { .autoupdatingCurrent }
 
     /// Retorna a tradução do catálogo oficial compilado da Apple (Localizable.xcstrings).
+    /// Caso a chave retorne sem alteração e o sistema esteja em inglês, utiliza a tabela canônica como salvaguarda.
     public static func texto(_ chave: String) -> String {
-        NSLocalizedString(chave, tableName: nil, bundle: .main, value: chave, comment: "")
+        let localizado = NSLocalizedString(chave, tableName: nil, bundle: .main, value: chave, comment: "")
+        if localizado != chave {
+            return localizado
+        }
+        let idioma = localeAtual.language.languageCode?.identifier ?? Locale.preferredLanguages.first ?? ""
+        if idioma.hasPrefix("en") {
+            if let traducao = TabelaDeStrings.en[chave] {
+                return traducao
+            }
+        }
+        return chave
     }
 }
 

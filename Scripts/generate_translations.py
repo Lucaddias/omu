@@ -519,5 +519,5 @@ def generate_xcstrings(translations, output_path):
     print(f"Generated Localizable.xcstrings with {len(translations)} entries at {output_path}")
 
 if __name__ == "__main__":
-    generate_swift_table(TRANSLATIONS, "Papagaio/Suporte/TabelaDeStrings.swift")
-    generate_xcstrings(TRANSLATIONS, "Papagaio/Localizable.xcstrings")
+    from Scripts.build_complete_catalog import main as build_main
+    build_main()

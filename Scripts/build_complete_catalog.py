@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from Scripts.generate_translations import TRANSLATIONS, generate_xcstrings
+from Scripts.generate_translations import TRANSLATIONS, generate_xcstrings, generate_swift_table
 
 # Mapeamento completo e preciso para todas as chaves pendentes
 EXTRA_TRANSLATIONS = {
@@ -702,24 +702,91 @@ EXTRA_TRANSLATIONS = {
     "Vincular": "Link",
     "Vincular conta": "Link account",
     "Visualizar": "Preview",
-    "Voltar para a lista": "Back to list"
+    "Voltar para a lista": "Back to list",
+    # Chaves adicionais das fotos e fluxos revisados
+    "Salvo": "Saved",
+    "Salvando...": "Saving...",
+    "Salvando…": "Saving…",
+    "Nome de exibição": "Display name",
+    "É o nome exibido no cartão acima.": "This is the name displayed on the card above.",
+    "Deadline": "Deadline",
+    "Workspace": "Workspace",
+    "Reprocessa a conversa inteira: transcrição, resumo e próximos passos": "Reprocesses the entire conversation: transcription, summary, and next steps",
+    "Entrevistada": "Interviewee",
+    "Entrevistados": "Interviewees",
+    "Entrevistadas": "Interviewees",
+    "Entrevistador": "Interviewer",
+    "Entrevistadora": "Interviewer",
+    "Entrevistadoras": "Interviewers",
+    "Presencial": "In-person",
+    "Online": "Online",
+    "Falante %@": "Speaker %@",
+    "Falante %d": "Speaker %d",
+    "Quem é quem?": "Who’s who?",
+    "Mudar": "Switch",
+    "Ficha": "Details",
+    "Temas": "Topics",
+    "Gerar novo resumo": "Generate new summary",
+    "Mostrar confiança": "Show confidence",
+    "Pesquisar na transcrição: Cmd + F": "Search transcript: Cmd + F",
+    "Foto, vídeo, áudio ou arquivo": "Photo, video, audio, or file",
+    "Clique ou arraste do Finder": "Click or drag from Finder",
+    "Soltar para adicionar": "Drop to add",
+    "Restaurar Tudo": "Restore All",
+    "ÁUDIO": "AUDIO",
+    "TRANSCRIÇÃO": "TRANSCRIPTION",
+    "NOTA": "NOTE",
+    "ARQUIVO": "FILE",
+    "MEMBRO": "MEMBER",
+    "IDENTIDADE": "IDENTITY",
+    "ACESSO": "ACCESS",
+    "AÇÕES": "ACTIONS",
+    "Conta proprietária": "Owner account",
+    "Apple Account compartilhada": "Shared Apple Account",
+    "Proprietário": "Owner",
+    "Visibilidade dos arquivos": "File visibility",
+    "Recebimento de arquivos": "File receiving",
+    "Todos os membros": "All members",
+    "Entrar automaticamente": "Join automatically",
+    "Estas preferências são compartilhadas no iCloud. A política de revisão de recebimento será aplicada ao fluxo de arquivos em uma próxima etapa; ainda não bloqueia automaticamente envios.": "These preferences are shared in iCloud. The file review policy will be applied in a future step; it does not automatically block uploads yet.",
+    "Voltar 10 segundos": "Back 10 seconds",
+    "Avançar 10 segundos": "Forward 10 seconds",
+    "Não foi possível apagar definitivamente \"%@\": %@": "Could not permanently delete \"%@\": %@",
+    "Não foi possível remover \"%@\": %@": "Could not remove \"%@\": %@",
+    "Não foi possível restaurar \"%@\".": "Could not restore \"%@\"."
 }
 
 def main():
+    import re
     merged = dict(TRANSLATIONS)
     merged.update(EXTRA_TRANSLATIONS)
 
-    # Verifica se ainda resta alguma chave do tmp/keys.json
-    if os.path.exists("tmp/keys.json"):
-        with open("tmp/keys.json", "r", encoding="utf-8") as f:
-            all_keys = json.load(f)
-        missing = [k for k in all_keys if k not in merged]
-        for m in missing:
-            # Fallback inteligente para chaves dinâmicas ou raras
-            merged[m] = m
+    # Coleta todas as strings .localized da codebase
+    swift_pattern = re.compile(r"\"((?:[^\"\\]|\\.)*)\"\.localized")
+    for root, dirs, files in os.walk(str(ROOT / "Papagaio")):
+        for f in files:
+            if f.endswith(".swift"):
+                with open(os.path.join(root, f), "r", encoding="utf-8") as fp:
+                    for m in swift_pattern.finditer(fp.read()):
+                        k = m.group(1).replace("\\\"", "\"").replace("\\\\", "\\")
+                        if k not in merged:
+                            merged[k] = k
 
-    generate_xcstrings(merged, "Papagaio/Localizable.xcstrings")
-    print(f"Successfully generated catalog with {len(merged)} total strings!")
+    # Verifica se ainda resta alguma chave do tmp/keys.json
+    keys_file = ROOT / "tmp/keys.json"
+    if keys_file.exists():
+        with open(keys_file, "r", encoding="utf-8") as f:
+            all_keys = json.load(f)
+        for m in all_keys:
+            if m not in merged:
+                merged[m] = m
+
+    xcstrings_path = str(ROOT / "Papagaio/Localizable.xcstrings")
+    swift_table_path = str(ROOT / "Papagaio/Suporte/TabelaDeStrings.swift")
+
+    generate_xcstrings(merged, xcstrings_path)
+    generate_swift_table(merged, swift_table_path)
+    print(f"Successfully generated catalog and Swift table with {len(merged)} total strings!")
 
 if __name__ == "__main__":
     main()
