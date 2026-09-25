@@ -6,11 +6,9 @@ enum GramaticaDaTraducao {
     static let gbnf = #"""
     root ::= "{" ws "\"traducoes\":" ws traducoes ws "}"
     traducoes ::= "[" ws (string (ws "," ws string)*)? ws "]"
-    string ::= "\"" chars "\""
-    chars ::= char*
-    char ::= [^"\\] | "\\" escape
-    escape ::= ["\\/bfnrt] | "u" hex hex hex hex
+    string ::= "\"" char* "\""
+    char ::= [^"\\] | "\\" (["\\bfnrt] | "u" hex hex hex hex)
     hex ::= [0-9a-fA-F]
-    ws ::= [ \t\n\r]*
+    ws ::= [ \t\n]*
     """#
 }
