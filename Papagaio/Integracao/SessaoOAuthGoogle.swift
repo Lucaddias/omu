@@ -359,12 +359,16 @@ actor ServidorOAuthLocal {
     private let estadoEsperado: String
     private var listener: FileHandle?
     private var conexao = ConexaoOAuthLocal()
+    private var esperaAtiva = false
 
     init(estadoEsperado: String) {
         self.estadoEsperado = estadoEsperado
     }
 
     func iniciar() async throws -> Int {
+        guard !esperaAtiva else {
+            throw ErroOAuthGoogle.servidorLocalFalhou("já existe uma espera pelo callback")
+        }
         parar()
         conexao = ConexaoOAuthLocal()
         let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
@@ -414,9 +418,14 @@ actor ServidorOAuthLocal {
     }
 
     func aguardarCodigo() async throws -> String {
+        guard !esperaAtiva else {
+            throw ErroOAuthGoogle.servidorLocalFalhou("já existe uma espera pelo callback")
+        }
         guard let listener else {
             throw ErroOAuthGoogle.servidorLocalFalhou("servidor não iniciado")
         }
+        esperaAtiva = true
+        defer { esperaAtiva = false }
         let conexao = self.conexao
         let estadoEsperado = self.estadoEsperado
 
@@ -486,16 +495,7 @@ actor ServidorOAuthLocal {
         conexao: ConexaoOAuthLocal,
         estadoEsperado: String
     ) throws -> String {
-        var endereco = sockaddr_in()
-        var tamanho = socklen_t(MemoryLayout<sockaddr_in>.size)
-        let cliente = withUnsafeMutablePointer(to: &endereco) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                Darwin.accept(socket, $0, &tamanho)
-            }
-        }
-        guard cliente >= 0 else {
-            throw CancellationError()
-        }
+        let cliente = try aguardarCliente(no: socket, conexao: conexao)
         guard conexao.registrar(cliente) else {
             Darwin.close(cliente)
             throw CancellationError()
@@ -537,6 +537,40 @@ actor ServidorOAuthLocal {
             try? enviarResposta(status: "400 Bad Request", no: cliente)
             throw error
         }
+    }
+
+    /// `accept()` bloqueante não é interrompido consistentemente pelo
+    /// `shutdown()` do listener em todas as versões do macOS. O poll curto
+    /// verifica o cancelamento e mantém o descritor vivo até o worker sair.
+    nonisolated private static func aguardarCliente(
+        no socket: Int32,
+        conexao: ConexaoOAuthLocal
+    ) throws -> Int32 {
+        while !conexao.cancelada {
+            var evento = pollfd(fd: socket, events: Int16(POLLIN), revents: 0)
+            let pronto = poll(&evento, 1, 50)
+            if pronto < 0 {
+                if conexao.cancelada { throw CancellationError() }
+                if errno == EINTR { continue }
+                throw ErroOAuthGoogle.servidorLocalFalhou("poll do callback falhou")
+            }
+            guard pronto > 0 else { continue }
+            if conexao.cancelada { throw CancellationError() }
+            guard evento.revents & Int16(POLLIN) != 0 else { continue }
+
+            var endereco = sockaddr_in()
+            var tamanho = socklen_t(MemoryLayout<sockaddr_in>.size)
+            let cliente = withUnsafeMutablePointer(to: &endereco) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    Darwin.accept(socket, $0, &tamanho)
+                }
+            }
+            if cliente >= 0 { return cliente }
+            if errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK { continue }
+            if conexao.cancelada { throw CancellationError() }
+            throw ErroOAuthGoogle.servidorLocalFalhou("accept do callback falhou")
+        }
+        throw CancellationError()
     }
 
     nonisolated private static func enviarResposta(
