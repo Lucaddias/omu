@@ -37,6 +37,7 @@ public enum Segmentacao {
                 return vals.reduce(0, +) / Float(vals.count)
             }()
             trechos.append(Trecho(
+                id: primeiro.id,
                 start: primeiro.start,
                 end: ultimo.end,
                 texto: acumulados.map(\.texto).joined(separator: " "),
