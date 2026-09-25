@@ -8,6 +8,23 @@ import LlamaRuntime
 /// conectar um assunto do início com a retomada dele no fim, que é justamente o
 /// que um modelo de 4k não faz.
 public struct QwenEngine: SummarizationEngine {
+    private enum ErroDeTraducao: Error, CustomStringConvertible {
+        case respostaJSONInvalida(caracteres: Int)
+        case quantidadeIncorreta(esperada: Int, recebida: Int)
+        case textoVazio(indice: Int)
+
+        var description: String {
+            switch self {
+            case let .respostaJSONInvalida(caracteres):
+                "resposta JSON de tradução inválida (\(caracteres) caracteres)"
+            case let .quantidadeIncorreta(esperada, recebida):
+                "tradução retornou \(recebida) itens; esperados \(esperada)"
+            case let .textoVazio(indice):
+                "tradução vazia no item \(indice)"
+            }
+        }
+    }
+
     /// Ver a nota em `WhisperEngine.identificador` — mesmo motivo.
     public static let identificador = "qwen3.5-9b-q4_k_m"
 
@@ -88,14 +105,22 @@ public struct QwenEngine: SummarizationEngine {
     ) async throws -> [Trecho] {
         let bruto = try await contexto.completar(
             prompt: Self.promptDeTraducao(trechos, para: idioma),
-            gramatica: GramaticaDaTraducao.gbnf,
+            gramatica: GramaticaDaTraducao.gbnf(quantidade: trechos.count),
             maxTokens: 4_096
         )
-        guard let traducoes = Self.decodificarTraducoes(bruto),
-              traducoes.count == trechos.count,
-              traducoes.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
-        else {
-            throw ErroLlama.gramaticaInvalida
+        guard let traducoes = Self.decodificarTraducoes(bruto) else {
+            throw ErroDeTraducao.respostaJSONInvalida(caracteres: bruto.count)
+        }
+        guard traducoes.count == trechos.count else {
+            throw ErroDeTraducao.quantidadeIncorreta(
+                esperada: trechos.count,
+                recebida: traducoes.count
+            )
+        }
+        if let indiceVazio = traducoes.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) {
+            throw ErroDeTraducao.textoVazio(indice: indiceVazio)
         }
 
         return zip(trechos, traducoes).map { original, textoTraduzido in
