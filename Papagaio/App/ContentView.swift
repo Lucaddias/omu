@@ -106,12 +106,12 @@ struct ContentView: View {
     private var telaDaSonda: String {
         if telaSelecionada == .biblioteca, !conversaAberta.isEmpty { return "detalhe" }
         switch telaSelecionada {
-        case .biblioteca: "biblioteca"
-        case .tarefas: "tarefas"
-        case .midias: "midias"
-        case .configuracoes: "configuracoes"
-        case .perfil: "perfil"
-        case .equipe: "equipe"
+        case .biblioteca: return "biblioteca"
+        case .tarefas: return "tarefas"
+        case .midias: return "midias"
+        case .configuracoes: return "configuracoes"
+        case .perfil: return "perfil"
+        case .equipe: return "equipe"
         }
     }
 #endif
