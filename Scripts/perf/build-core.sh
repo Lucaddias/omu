@@ -51,10 +51,7 @@ else
     exit "$STATUS"
 fi
 
-BINARIA="$SCRATCH/arm64-apple-macosx/release/papagaio-eval"
-if [[ ! -x "$BINARIA" ]]; then
-    BINARIA="$(find "$SCRATCH" -path '*/release/papagaio-eval' -type f -perm -111 -print -quit)"
-fi
+BINARIA="$(find "$SCRATCH" -type f -name papagaio-eval -perm -111 -print -quit)"
 [[ -x "$BINARIA" ]] || { echo "papagaio-eval Release não encontrado em $SCRATCH" >&2; cat "$LOG" >&2; exit 1; }
 /usr/bin/ditto "$(dirname "$BINARIA")" "$DESTINO"
 /usr/bin/xattr -cr "$DESTINO"
