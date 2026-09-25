@@ -17,7 +17,7 @@ GIT_BRANCH="$(git -C "$ROOT_DIR" branch --show-current)"
 SIGNING_IDENTITY="${OMU_PERF_SIGNING_IDENTITY:--}"
 
 DERIVED="$OMU_PERF_DIR/build/dd-$ROTULO"
-DESTINO="$OMU_PERF_DIR/apps/$ROTULO"
+DESTINO="$OMU_PERF_DIR/apps/$ROTULO.app"
 LOG="$OMU_PERF_DIR/runs/build-app-$ROTULO.log"
 ENTITLEMENTS="$ROOT_DIR/Config/Papagaio-Perf.entitlements"
 DESTINO_PREEXISTENTE=false
