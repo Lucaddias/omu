@@ -52,6 +52,7 @@ gerar_base() {
     local destino="$FIXTURES/$idioma""_30s.wav"
     local lista="$TMP/$idioma/concat.txt"
     local metadados="$TMP/$idioma/segmentos.tsv"
+    mkdir -p "$TMP/$idioma"
     : > "$lista"; : > "$metadados"
     local indice=0 inicio=0 fim
     while IFS='|' read -r falante voz texto texto_saida; do
