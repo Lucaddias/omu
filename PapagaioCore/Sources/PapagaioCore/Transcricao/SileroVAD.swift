@@ -19,6 +19,9 @@ import OnnxApi
 ///
 /// A inferência é bloqueante, mas minúscula: ~0,07 ms por quadro nesta máquina.
 public actor SileroVAD: CicloDeVidaDeModelos.Residente {
+#if OMU_PERF
+    public typealias RegistradorDeEventoPerf = @Sendable (String, String, TimeInterval?) -> Void
+#endif
     /// Um só lugar para o identificador (ver `WhisperEngine.identificador`).
     public static let identificador = "silero-vad"
 
@@ -29,6 +32,13 @@ public actor SileroVAD: CicloDeVidaDeModelos.Residente {
 
     public nonisolated var identificador: String { SileroVAD.identificador }
 
+    /// Resource `silero_vad.onnx` no bundle do PapagaioCore (processado pelo
+    /// SwiftPM). Exposto para a CLI de bench medir o caminho neural real.
+    public static var urlDoModeloPadrao: URL {
+        Bundle.module.url(forResource: "silero_vad", withExtension: "onnx")
+            ?? URL(fileURLWithPath: "/inexistente/silero_vad.onnx")
+    }
+
     private let caminhoDoModelo: URL
     private let sessao: SessaoOnnx
     private var contexto = [Float](repeating: 0, count: SileroVAD.contextoEmAmostras)
@@ -36,10 +46,23 @@ public actor SileroVAD: CicloDeVidaDeModelos.Residente {
     private var modeloVerificado = false
 
     /// - Parameter modelo: caminho do `silero_vad.onnx` (resource do bundle).
+#if OMU_PERF
+    public init(modelo: URL, registrarEventoPerf: RegistradorDeEventoPerf? = nil) {
+        self.caminhoDoModelo = modelo
+        let callbackOnnx: SessaoOnnx.RegistradorDeEventoPerf?
+        if let registrarEventoPerf {
+            callbackOnnx = { evento, duracao in registrarEventoPerf(evento, Self.identificador, duracao) }
+        } else {
+            callbackOnnx = nil
+        }
+        self.sessao = SessaoOnnx(modelo: modelo, registrarEventoPerf: callbackOnnx)
+    }
+#else
     public init(modelo: URL) {
         self.caminhoDoModelo = modelo
         self.sessao = SessaoOnnx(modelo: modelo)
     }
+#endif
 
     /// O `.onnx` está no lugar? Sem ele a inferência lança `modeloAusente` —
     /// quem chama usa isto para degradar com aviso em vez de falhar.

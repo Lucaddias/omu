@@ -145,7 +145,48 @@ final class Biblioteca {
     /// perfil excluído é aposentado e não deve voltar a receber dados.
     private var espacosExcluidos: Set<EspacoID> = []
 
+    private func criarMotoresLocais() -> MotoresLocais {
+#if OMU_PERF
+        if PerfProbe.ativada {
+            return MotoresLocais(pastaDeModelos: pastaDeModelos, ciclo: ciclo) { evento, modelo, duracao in
+                Task { @MainActor in
+                    PerfProbe.shared.registrarEventoModelo(evento, modelo: modelo, duracao: duracao)
+                }
+            }
+        }
+#endif
+        return MotoresLocais(pastaDeModelos: pastaDeModelos, ciclo: ciclo)
+    }
+
     init() throws {
+#if OMU_PERF
+        if let configuracao = PerfProbe.configuracao {
+            try FileManager.default.createDirectory(
+                at: configuracao.raiz,
+                withIntermediateDirectories: true
+            )
+            let armazenamento = Armazenamento(raiz: configuracao.raiz)
+            let repositorio = SwiftDataRepository(
+                modelContainer: try SwiftDataRepository.containerLocal(
+                    nome: "OmuPerf",
+                    url: configuracao.raiz.appendingPathComponent("biblioteca.store")
+                )
+            )
+            self.armazenamento = armazenamento
+            self.pastaDeModelos = configuracao.modelos
+            self.repositorio = repositorio
+            self.salvarReuniaoNoRepositorio = { arquivo in
+                try await repositorio.salvar(arquivo)
+            }
+            self.filaCloudKit = FilaPersistenteCloudKit(
+                url: configuracao.raiz
+                    .appendingPathComponent("CloudKit", isDirectory: true)
+                    .appendingPathComponent("fila-pendente.json")
+            )
+            self.espaco = PerfProbe.espacoPadrao
+            return
+        }
+#endif
         let armazenamento = try Armazenamento.padrao()
         let repositorio = SwiftDataRepository(
             modelContainer: try SwiftDataRepository.containerLocal()
@@ -849,7 +890,7 @@ final class Biblioteca {
             throw ErroDeDitado.modelosIndisponiveis(preflight.mensagem)
         }
 
-        let motores = MotoresLocais(pastaDeModelos: pastaDeModelos, ciclo: ciclo)
+        let motores = criarMotoresLocais()
         return try await OperacaoComLimpeza.executar {
             try await motores.transcrever(audio, speaker: nil, initialPrompt: nil)
                 .map(\.texto)
@@ -873,6 +914,9 @@ final class Biblioteca {
     private func executarProcessamento(_ arquivo: Arquivo, execucao: UUID) async {
         let chave = arquivo.id.rawValue
         defer { finalizarProcessamento(chave, execucao: execucao) }
+#if OMU_PERF
+        PerfProbe.shared.registrarPipelineInicio(arquivo)
+#endif
 
         // Sem os pesos, o Whisper falharia lá dentro com um erro de carga. Dizer
         // o que falta é mais útil que repassar o erro do llama.cpp.
@@ -885,7 +929,15 @@ final class Biblioteca {
         erros[chave] = nil
         fases[chave] = .transcrevendo
         iniciadoEm[chave] = Date()
+#if OMU_PERF
+        // Reusa a normalização real do prompt com nomes sintéticos, sem consultar Contatos ou Calendário.
+        let promptDeEntidades = await PromptDeEntidades.construir(
+            para: arquivo,
+            termosSinteticos: PerfProbe.termosDeEntidades
+        )
+#else
         let promptDeEntidades = await PromptDeEntidades.construir(para: arquivo)
+#endif
         let configuracaoDeTraducao = ConfiguracaoDeTraducaoAutomatica(
             habilitada: traducaoAutomatica,
             idiomaPadrao: idiomaPadraoDeProcessamento
@@ -893,7 +945,7 @@ final class Biblioteca {
 
         // Criado por execução, e descarregado no fim: os dois modelos somam
         // Eles não podem ficar residentes entre gravações num Mac de 18 GB.
-        let motores = MotoresLocais(pastaDeModelos: pastaDeModelos, ciclo: ciclo)
+        let motores = criarMotoresLocais()
 
         // Diarização acústica: mini modelos embutidos no bundle (~40 MB
         // compilados). Se o bootstrap não os estagiou, a primeira diarização
@@ -935,8 +987,12 @@ final class Biblioteca {
         await OperacaoComLimpeza.executar {
             do {
                 let final = try await pipeline.processar(arquivo) { fase in
+                    let instante = DispatchTime.now().uptimeNanoseconds
                     Task { @MainActor [weak self] in
                         guard self?.identificadorDaExecucao == execucao else { return }
+#if OMU_PERF
+                        PerfProbe.shared.registrarFase(String(describing: fase), timestamp: instante)
+#endif
                         self?.fases[chave] = fase
                     }
                 }
@@ -1005,7 +1061,7 @@ final class Biblioteca {
         // chama transcrever/resumir, então o Whisper não entra em memória. A
         // resolução contextual usa o Qwen quando há caso entre vozes
         // diferentes (o mesmo modelo do resumo, carregado e descarregado aqui).
-        let motores = MotoresLocais(pastaDeModelos: pastaDeModelos, ciclo: ciclo)
+        let motores = criarMotoresLocais()
         let pipeline = PipelineDeArquivo(
             armazenamento: armazenamento,
             repositorio: repositorio,

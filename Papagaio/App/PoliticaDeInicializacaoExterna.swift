@@ -13,7 +13,12 @@ struct PoliticaDeInicializacaoExterna {
     init(ambiente: [String: String] = ProcessInfo.processInfo.environment) {
         let execucaoDeTeste = ambiente["PAPAGAIO_TEST_MODE"] == "1"
             || ambiente["XCTestConfigurationFilePath"] != nil
-        permiteServicosExternos = !execucaoDeTeste
+#if OMU_PERF
+        let execucaoDePerf = PerfProbe.ativada
+#else
+        let execucaoDePerf = false
+#endif
+        permiteServicosExternos = !execucaoDeTeste && !execucaoDePerf
     }
 
     func executar(_ operacao: @MainActor () async -> Void) async {

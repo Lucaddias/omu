@@ -24,11 +24,19 @@ final class ModelosViewModel {
     private let download: DownloadDeModelos
     private var tarefa: Task<Void, Never>?
 
+#if OMU_PERF
+    init(pastaDoContainer: URL, ignorarPastaEscolhidaPersistida: Bool) {
+        self.pastaDoContainer = pastaDoContainer
+        self.download = DownloadDeModelos(pastaDeModelos: pastaDoContainer)
+        self.pastaEscolhida = ignorarPastaEscolhidaPersistida ? nil : PastaDeModelosDoUsuario.resolver()
+    }
+#else
     init(pastaDoContainer: URL) {
         self.pastaDoContainer = pastaDoContainer
         self.download = DownloadDeModelos(pastaDeModelos: pastaDoContainer)
         self.pastaEscolhida = PastaDeModelosDoUsuario.resolver()
     }
+#endif
 
     /// A pasta que vale agora. O download só escreve no container: gravar dentro
     /// da pasta do usuário mexeria em arquivos que não são do app.

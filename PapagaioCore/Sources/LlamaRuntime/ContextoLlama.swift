@@ -1,4 +1,7 @@
 import Foundation
+#if OMU_PERF
+import Dispatch
+#endif
 // `internal`: o módulo C não vaza para quem importa este target. Ver D-3.2.
 internal import llama
 
@@ -34,6 +37,9 @@ public enum ErroLlama: Error, CustomStringConvertible {
 /// O modelo fica residente entre resumos: são ~6,2 GB, e recarregar leva
 /// 10–30 s.
 public actor ContextoLlama {
+#if OMU_PERF
+    public typealias RegistradorDeEventoPerf = @Sendable (String, TimeInterval?) -> Void
+#endif
     /// Caixa em volta dos ponteiros C, pelo mesmo motivo do `ContextoWhisper`:
     /// `deinit` não isolado não pode tocar propriedade isolada do ator.
     private final class Caixa: @unchecked Sendable {
@@ -48,6 +54,9 @@ public actor ContextoLlama {
     private var caixa = Caixa()
     private let caminhoDoModelo: URL
     private let janela: UInt32
+#if OMU_PERF
+    private let registrarEventoPerf: RegistradorDeEventoPerf?
+#endif
 
     /// Janela operacional de 32k do Qwen3.5-9B. Passe único é o padrão até ~28k de entrada,
     /// deixando margem para a saída dentro dos 32k.
@@ -61,15 +70,38 @@ public actor ContextoLlama {
     /// passe único vai até 28k tokens, o prefill é obrigatoriamente fatiado.
     public static let tokensPorLote = 2_048
 
+#if OMU_PERF
+    public init(
+        modelo: URL,
+        janela: UInt32 = ContextoLlama.janelaPadrao,
+        registrarEventoPerf: RegistradorDeEventoPerf? = nil
+    ) {
+        self.caminhoDoModelo = modelo
+        self.janela = janela
+        self.registrarEventoPerf = registrarEventoPerf
+    }
+#else
     public init(modelo: URL, janela: UInt32 = ContextoLlama.janelaPadrao) {
         self.caminhoDoModelo = modelo
         self.janela = janela
     }
+#endif
 
     public var carregado: Bool { caixa.contexto != nil }
 
     public func carregar() throws {
         guard caixa.contexto == nil else { return }
+#if OMU_PERF
+        let inicio = registrarEventoPerf == nil ? nil : DispatchTime.now().uptimeNanoseconds
+        if inicio != nil { registrarEventoPerf?("model.load.start", nil) }
+        var sucesso = false
+        defer {
+            if let inicio {
+                let evento = sucesso ? "model.load.end" : "model.load.error"
+                registrarEventoPerf?(evento, Double(DispatchTime.now().uptimeNanoseconds &- inicio) / 1_000_000_000)
+            }
+        }
+#endif
 
         llama_backend_init()
 
@@ -79,7 +111,9 @@ public actor ContextoLlama {
         let modelo = caminhoDoModelo.path.withCString { caminho in
             llama_model_load_from_file(caminho, paramsModelo)
         }
-        guard let modelo else { throw ErroLlama.modeloNaoCarregou(caminhoDoModelo.path) }
+        guard let modelo else {
+            throw ErroLlama.modeloNaoCarregou(caminhoDoModelo.path)
+        }
 
         var paramsContexto = llama_context_default_params()
         paramsContexto.n_ctx = janela
@@ -96,13 +130,29 @@ public actor ContextoLlama {
 
         caixa.modelo = modelo
         caixa.contexto = contexto
+#if OMU_PERF
+        sucesso = true
+#endif
     }
 
     public func descarregar() {
+        guard caixa.contexto != nil || caixa.modelo != nil else { return }
+#if OMU_PERF
+        let inicio = registrarEventoPerf == nil ? nil : DispatchTime.now().uptimeNanoseconds
+        if inicio != nil { registrarEventoPerf?("model.unload.start", nil) }
+#endif
         if let contexto = caixa.contexto { llama_free(contexto) }
         if let modelo = caixa.modelo { llama_model_free(modelo) }
         caixa.contexto = nil
         caixa.modelo = nil
+#if OMU_PERF
+        if let inicio {
+            registrarEventoPerf?(
+                "model.unload.end",
+                Double(DispatchTime.now().uptimeNanoseconds &- inicio) / 1_000_000_000
+            )
+        }
+#endif
     }
 
     /// Conta tokens sem gerar nada — é o que decide passe único vs. map-reduce.

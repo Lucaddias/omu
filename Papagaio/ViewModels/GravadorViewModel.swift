@@ -70,12 +70,21 @@ final class GravadorViewModel {
     private var identificadorDaGravacao: UUID?
     private let armazenamento: Armazenamento?
 
+#if OMU_PERF
+    init(armazenamento: Armazenamento? = nil) {
+        self.armazenamento = armazenamento ?? (try? Armazenamento.padrao())
+        if self.armazenamento == nil {
+            estado = .falhou("não foi possível abrir a pasta de suporte do app".localized)
+        }
+    }
+#else
     init() {
         armazenamento = try? Armazenamento.padrao()
         if armazenamento == nil {
             estado = .falhou("não foi possível abrir a pasta de suporte do app".localized)
         }
     }
+#endif
 
     var gravando: Bool { estado == .gravando || estado == .pausado }
     var pausado: Bool { estado == .pausado }
@@ -373,6 +382,10 @@ final class GravadorViewModel {
     func importar(_ url: URL) async {
         guard let armazenamento else { return }
         estado = .processando
+#if OMU_PERF
+        let inicioImportacao = DispatchTime.now().uptimeNanoseconds
+        PerfProbe.shared.registrarImportacaoInicio(url)
+#endif
         do {
             let importado = try await ImportadorAudio(armazenamento: armazenamento).importar(de: url)
             avisos = ["Arquivo importado: um canal só, sem separação de falante.".localized]
@@ -381,8 +394,24 @@ final class GravadorViewModel {
                 importado.tituloSugerido, importado.pastaRelativa, importado.duracao, [],
                 importado.dataOriginal
             )
+#if OMU_PERF
+            let duracao = Double(DispatchTime.now().uptimeNanoseconds &- inicioImportacao) / 1_000_000_000
+            PerfProbe.shared.registrarImportacaoFim(
+                duracao: duracao,
+                bytes: importado.bytes,
+                duracaoAudio: importado.duracao
+            )
+#endif
         } catch {
             estado = .falhou(Self.mensagemAmigavelDeImportacao(error))
+#if OMU_PERF
+            let duracao = Double(DispatchTime.now().uptimeNanoseconds &- inicioImportacao) / 1_000_000_000
+            PerfProbe.shared.registrarImportacaoFim(
+                duracao: duracao,
+                bytes: 0,
+                erro: String(describing: error)
+            )
+#endif
         }
     }
 

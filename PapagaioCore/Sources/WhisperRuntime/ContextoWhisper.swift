@@ -1,4 +1,7 @@
 import Foundation
+#if OMU_PERF
+import Dispatch
+#endif
 // `internal`: o módulo C não vaza para quem importa este target. Ver D-3.2.
 internal import whisper
 
@@ -80,6 +83,9 @@ public enum ErroWhisper: Error, CustomStringConvertible {
 /// segundos, e recarregar a cada chamada tornaria a transcrição de um trecho
 /// curto mais lenta que o próprio áudio.
 public actor ContextoWhisper {
+#if OMU_PERF
+    public typealias RegistradorDeEventoPerf = @Sendable (String, TimeInterval?) -> Void
+#endif
     /// Caixa em volta do ponteiro C.
     ///
     /// Existe por uma restrição do Swift 6: um `deinit` não isolado não pode
@@ -94,20 +100,34 @@ public actor ContextoWhisper {
     private var caixa = Caixa()
     private var contexto: OpaquePointer? { caixa.ponteiro }
     private let caminhoDoModelo: URL
+#if OMU_PERF
+    private let registrarEventoPerf: RegistradorDeEventoPerf?
+#endif
 
     /// Amostras esperadas: PCM Float32 **mono 16 kHz** — o formato canônico do
     /// `FormatoAudio`. O Whisper não reamostra por conta própria.
     public static let taxaEsperada: Double = 16_000
 
+#if OMU_PERF
+    public init(modelo: URL, registrarEventoPerf: RegistradorDeEventoPerf? = nil) {
+        self.caminhoDoModelo = modelo
+        self.registrarEventoPerf = registrarEventoPerf
+    }
+#else
     public init(modelo: URL) {
         self.caminhoDoModelo = modelo
     }
+#endif
 
     public var carregado: Bool { contexto != nil }
 
     /// Carrega o peso GGUF na memória (e na GPU, via Metal).
     public func carregar() throws {
         guard contexto == nil else { return }
+#if OMU_PERF
+        let inicio = registrarEventoPerf == nil ? nil : DispatchTime.now().uptimeNanoseconds
+        if inicio != nil { registrarEventoPerf?("model.load.start", nil) }
+#endif
 
         var params = whisper_context_default_params()
         params.use_gpu = true
@@ -117,15 +137,44 @@ public actor ContextoWhisper {
             whisper_init_from_file_with_params(caminho, params)
         }
         guard let ponteiro else {
+#if OMU_PERF
+            if let inicio {
+                registrarEventoPerf?(
+                    "model.load.error",
+                    Double(DispatchTime.now().uptimeNanoseconds &- inicio) / 1_000_000_000
+                )
+            }
+#endif
             throw ErroWhisper.modeloNaoCarregou(caminhoDoModelo.path)
         }
         caixa.ponteiro = ponteiro
+#if OMU_PERF
+        if let inicio {
+            registrarEventoPerf?(
+                "model.load.end",
+                Double(DispatchTime.now().uptimeNanoseconds &- inicio) / 1_000_000_000
+            )
+        }
+#endif
     }
 
     /// Libera o modelo. Chamado sob pressão de memória — ver `CicloDeVidaDeModelos`.
     public func descarregar() {
-        if let ponteiro = caixa.ponteiro { whisper_free(ponteiro) }
+        guard let ponteiro = caixa.ponteiro else { return }
+#if OMU_PERF
+        let inicio = registrarEventoPerf == nil ? nil : DispatchTime.now().uptimeNanoseconds
+        if inicio != nil { registrarEventoPerf?("model.unload.start", nil) }
+#endif
+        whisper_free(ponteiro)
         caixa.ponteiro = nil
+#if OMU_PERF
+        if let inicio {
+            registrarEventoPerf?(
+                "model.unload.end",
+                Double(DispatchTime.now().uptimeNanoseconds &- inicio) / 1_000_000_000
+            )
+        }
+#endif
     }
 
     /// Transcreve amostras PCM Float32 mono 16 kHz.

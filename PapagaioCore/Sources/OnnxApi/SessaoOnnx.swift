@@ -1,4 +1,7 @@
 import Foundation
+#if OMU_PERF
+import Dispatch
+#endif
 // `internal`: o módulo C do onnxruntime não vaza para quem importa este
 // target — mesma regra de isolamento de `WhisperRuntime`/`LlamaRuntime`
 // (D-3.2). Só a API C atravessa esta fronteira.
@@ -29,6 +32,9 @@ public enum DadosTensorOnnx: Sendable {
 /// precisa, nada mais. A inferência é bloqueante e roda na CPU (o modelo de
 /// VAD é minúsculo: ~0,07 ms por quadro de 32 ms medido nesta máquina).
 public actor SessaoOnnx {
+#if OMU_PERF
+    public typealias RegistradorDeEventoPerf = @Sendable (String, TimeInterval?) -> Void
+#endif
     /// Caixa em volta dos ponteiros C, pelo mesmo motivo do `ContextoWhisper`:
     /// um `deinit` não isolado não pode tocar propriedade isolada do ator.
     private final class Caixa: @unchecked Sendable {
@@ -56,16 +62,37 @@ public actor SessaoOnnx {
 
     private let caixa = Caixa()
     private let caminhoDoModelo: URL
+#if OMU_PERF
+    private let registrarEventoPerf: RegistradorDeEventoPerf?
+#endif
 
+#if OMU_PERF
+    public init(modelo: URL, registrarEventoPerf: RegistradorDeEventoPerf? = nil) {
+        self.caminhoDoModelo = modelo
+        self.registrarEventoPerf = registrarEventoPerf
+    }
+#else
     public init(modelo: URL) {
         self.caminhoDoModelo = modelo
     }
+#endif
 
     public var carregado: Bool { caixa.sessao != nil }
 
     /// Cria o ambiente e carrega o modelo. Idempotente.
     public func carregar() throws {
         guard caixa.sessao == nil else { return }
+#if OMU_PERF
+        let inicio = registrarEventoPerf == nil ? nil : DispatchTime.now().uptimeNanoseconds
+        if inicio != nil { registrarEventoPerf?("model.load.start", nil) }
+        var sucesso = false
+        defer {
+            if let inicio {
+                let duracao = Double(DispatchTime.now().uptimeNanoseconds &- inicio) / 1_000_000_000
+                registrarEventoPerf?(sucesso ? "model.load.end" : "model.load.error", duracao)
+            }
+        }
+#endif
 
         guard let base = OrtGetApiBase(), let apiPtr = base.pointee.GetApi(24) else {
             throw ErroOnnx.falha("não foi possível obter a API 24 do ONNX Runtime")
@@ -95,12 +122,28 @@ public actor SessaoOnnx {
         caixa.opcoes = opcoes
         caixa.memoria = memoria
         caixa.sessao = sessao
+#if OMU_PERF
+        sucesso = true
+#endif
     }
 
     /// Libera o modelo. Chamado sob pressão de memória — ver
     /// `CicloDeVidaDeModelos`.
     public func descarregar() {
+#if OMU_PERF
+        let estavaCarregada = caixa.sessao != nil
+        let inicio = estavaCarregada && registrarEventoPerf != nil ? DispatchTime.now().uptimeNanoseconds : nil
+        if estavaCarregada { registrarEventoPerf?("model.unload.start", nil) }
+#endif
         caixa.liberar()
+#if OMU_PERF
+        if let inicio {
+            registrarEventoPerf?(
+                "model.unload.end",
+                Double(DispatchTime.now().uptimeNanoseconds &- inicio) / 1_000_000_000
+            )
+        }
+#endif
     }
 
     /// Roda uma inferência com os tensores dados, devolvendo os tensores de

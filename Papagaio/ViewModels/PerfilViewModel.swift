@@ -27,12 +27,29 @@ final class PerfilViewModel: NSObject {
     private(set) var verificando = false
     private(set) var erro: String?
     private var observadorDeRevogacao: NSObjectProtocol?
+#if OMU_PERF
+    private let semPersistenciaDeConta: Bool
+#endif
 
     var conectado: Bool { identificador != nil }
 
+#if OMU_PERF
+    init(semPersistenciaDeConta: Bool = false) {
+        self.semPersistenciaDeConta = semPersistenciaDeConta
+        super.init()
+        guard !semPersistenciaDeConta else { return }
+        carregarPerfilLocal()
+        observarRevogacaoDaCredencial()
+    }
+#else
     override init() {
         super.init()
         carregarPerfilLocal()
+        observarRevogacaoDaCredencial()
+    }
+#endif
+
+    private func observarRevogacaoDaCredencial() {
         observadorDeRevogacao = NotificationCenter.default.addObserver(
             forName: ASAuthorizationAppleIDProvider.credentialRevokedNotification,
             object: nil,
@@ -50,12 +67,18 @@ final class PerfilViewModel: NSObject {
 
     /// Restaura a sessão local e confirma seu estado com a Apple.
     func iniciar() {
+#if OMU_PERF
+        guard !semPersistenciaDeConta else { return }
+#endif
         guard let id = lerDoKeychain() else { return }
         identificador = id
         verificarEstadoDaCredencial(id)
     }
 
     func entrar() {
+#if OMU_PERF
+        guard !semPersistenciaDeConta else { return }
+#endif
         erro = nil
         let requisicao = ASAuthorizationAppleIDProvider().createRequest()
         requisicao.requestedScopes = [.fullName, .email]
@@ -67,6 +90,9 @@ final class PerfilViewModel: NSObject {
     }
 
     func sair() {
+#if OMU_PERF
+        guard !semPersistenciaDeConta else { return }
+#endif
         // Sair só remove o perfil deste app. Não revoga o consentimento na Apple.
         removerCredencial()
     }
@@ -75,6 +101,9 @@ final class PerfilViewModel: NSObject {
     /// A revogação do consentimento do Sign in with Apple é administrada pela
     /// Apple; aqui removemos a conta local e seus dados no dispositivo.
     func excluirDadosDaConta() {
+#if OMU_PERF
+        guard !semPersistenciaDeConta else { return }
+#endif
         removerDoKeychain()
         UserDefaults.standard.removeObject(forKey: Chave.nome)
         UserDefaults.standard.removeObject(forKey: Chave.email)
@@ -87,6 +116,9 @@ final class PerfilViewModel: NSObject {
     }
 
     func salvarDados(nome: String, email: String) {
+#if OMU_PERF
+        guard !semPersistenciaDeConta else { return }
+#endif
         let nomeLimpo = nome.trimmingCharacters(in: .whitespacesAndNewlines)
         let emailLimpo = email.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -97,6 +129,9 @@ final class PerfilViewModel: NSObject {
     }
 
     func escolherAvatar(_ url: URL) {
+#if OMU_PERF
+        guard !semPersistenciaDeConta else { return }
+#endif
         do {
             let dados = try url.bookmarkData(
                 options: [.withSecurityScope],

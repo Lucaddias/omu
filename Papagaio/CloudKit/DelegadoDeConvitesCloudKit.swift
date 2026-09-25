@@ -10,6 +10,13 @@ extension Notification.Name {
 /// Recebe o convite aberto pelo macOS. A aceitação é feita fora da view para
 /// também funcionar quando o Papagaio ainda não estava aberto.
 final class DelegadoDeConvitesCloudKit: NSObject, NSApplicationDelegate {
+#if OMU_PERF
+    @MainActor
+    func applicationWillTerminate(_ notification: Notification) {
+        PerfProbe.shared.aplicaçãoVaiTerminar()
+    }
+#endif
+
     func application(
         _ application: NSApplication,
         userDidAcceptCloudKitShareWith metadados: CKShare.Metadata

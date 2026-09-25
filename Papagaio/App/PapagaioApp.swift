@@ -1,4 +1,5 @@
 import AppKit
+import PapagaioCore
 import SwiftUI
 
 extension Notification.Name {
@@ -10,9 +11,22 @@ extension Notification.Name {
 enum InicializacaoDoPapagaio {
     @MainActor
     static func main() {
-        if PoliticaDeInicializacaoExterna().permiteServicosExternos {
+#if OMU_PERF
+        PerfProbe.inicializarAntesDoApp()
+        let modoPerf = PerfProbe.ativada
+#else
+        let modoPerf = false
+#endif
+        let politica = PoliticaDeInicializacaoExterna()
+        if politica.permiteServicosExternos || modoPerf {
             PapagaioApp.main()
         } else {
+            // Os testes comparam cópias PT-BR das mensagens. Registra apenas
+            // um domínio volátil no host de testes; não persiste preferências.
+            UserDefaults.standard.setVolatileDomain(
+                ["AppleLanguages": ["pt-BR"], "AppleLocale": "pt_BR"],
+                forName: UserDefaults.argumentDomain
+            )
             HostDeTestesDoPapagaio.main()
         }
     }
@@ -30,7 +44,13 @@ struct PapagaioApp: App {
     /// A gravação nasce aqui, e não dentro da `ContentView`, para que o item da
     /// barra de menus observe o mesmo objeto que a janela — sem isso seriam
     /// duas gravações independentes, cada uma com seu cronômetro.
+#if OMU_PERF
+    @State private var gravador = GravadorViewModel(
+        armazenamento: PerfProbe.configuracao.map { Armazenamento(raiz: $0.raiz) }
+    )
+#else
     @State private var gravador = GravadorViewModel()
+#endif
 
     /// O painel flutuante que acompanha a gravação fora da janela do app.
     @State private var painelFlutuante = JanelaFlutuanteDeGravacao()
@@ -39,6 +59,12 @@ struct PapagaioApp: App {
     @AppStorage("painelFlutuanteDuranteGravacao") private var painelHabilitado = true
 
     init() {
+#if OMU_PERF
+        PerfProbe.shared.registrarInicioDoApp()
+        // A build de perf usa armazenamento e defaults isolados. Não execute
+        // migrações do perfil real nem altere preferências nesta build.
+        if PerfProbe.ativada { return }
+#endif
         // Modo de diagnóstico do R-11: roda a matriz de configurações do tap
         // dentro deste bundle (que tem a permissão de TCC) e encerra.
         if DiagnosticoTap.pedido {

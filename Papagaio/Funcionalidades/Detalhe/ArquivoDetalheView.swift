@@ -502,6 +502,9 @@ struct ArquivoDetalheView: View {
                 return
             }
             reprodutor = novo
+#if OMU_PERF
+            PerfProbe.shared.iniciarReproducaoSintetica(novo)
+#endif
         }
         .onChange(of: trechos) { _, novos in
             // A transcrição chega minutos depois de a tela abrir. Atualizar em

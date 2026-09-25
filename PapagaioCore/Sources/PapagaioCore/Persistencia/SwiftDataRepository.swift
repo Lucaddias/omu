@@ -19,13 +19,7 @@ public actor SwiftDataRepository: ArquivoRepository {
         nome: String = "Papagaio",
         emMemoria: Bool = false
     ) throws -> ModelContainer {
-        let schema = Schema([
-            ArquivoPersistido.self,
-            TrechoPersistido.self,
-            InsightPersistido.self,
-            NotaPersistida.self,
-            EspacoPersistido.self,
-        ])
+        let schema = esquemaLocal()
         let configuracao = ModelConfiguration(
             nome,
             schema: schema,
@@ -33,6 +27,32 @@ public actor SwiftDataRepository: ArquivoRepository {
             cloudKitDatabase: .none
         )
         return try ModelContainer(for: schema, configurations: [configuracao])
+    }
+
+#if OMU_PERF
+    public static func containerLocal(
+        nome: String = "Papagaio",
+        url: URL
+    ) throws -> ModelContainer {
+        let schema = esquemaLocal()
+        let configuracao = ModelConfiguration(
+            nome,
+            schema: schema,
+            url: url,
+            cloudKitDatabase: .none
+        )
+        return try ModelContainer(for: schema, configurations: [configuracao])
+    }
+#endif
+
+    private static func esquemaLocal() -> Schema {
+        Schema([
+            ArquivoPersistido.self,
+            TrechoPersistido.self,
+            InsightPersistido.self,
+            NotaPersistida.self,
+            EspacoPersistido.self,
+        ])
     }
 
     // MARK: - ArquivoRepository

@@ -336,6 +336,15 @@ CartaoReuniaoPendente(
     }
 
     private var arquivosFiltrados: [Arquivo] {
+#if OMU_PERF
+        let inicioBusca = DispatchTime.now().uptimeNanoseconds
+        defer {
+            if PerfProbe.ativada {
+                let duracao = Double(DispatchTime.now().uptimeNanoseconds &- inicioBusca) / 1_000_000_000
+                PerfProbe.shared.registrarBuscaCalculada(consulta, duracao: duracao)
+            }
+        }
+#endif
         guard let biblioteca else { return [] }
         _ = invalidacaoVisual.geracao
         let fonte: [Arquivo]

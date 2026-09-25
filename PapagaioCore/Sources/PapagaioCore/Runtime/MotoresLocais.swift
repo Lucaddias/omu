@@ -14,17 +14,36 @@ import WhisperRuntime
 /// É um ator porque a alternância entre os dois é justamente a invariante que
 /// não pode ser corrida por duas chamadas concorrentes.
 public actor MotoresLocais {
+#if OMU_PERF
+    public typealias RegistradorDeEventoPerf = @Sendable (String, String, TimeInterval?) -> Void
+#endif
+
     public let pastaDeModelos: URL
 
     private var contextoWhisper: ContextoWhisper?
     private var contextoLlama: ContextoLlama?
     private let fila = FilaEstrita()
     private let ciclo: CicloDeVidaDeModelos?
+#if OMU_PERF
+    private let registrarEventoPerf: RegistradorDeEventoPerf?
+#endif
 
+#if OMU_PERF
+    public init(
+        pastaDeModelos: URL,
+        ciclo: CicloDeVidaDeModelos? = nil,
+        registrarEventoPerf: RegistradorDeEventoPerf? = nil
+    ) {
+        self.pastaDeModelos = pastaDeModelos
+        self.ciclo = ciclo
+        self.registrarEventoPerf = registrarEventoPerf
+    }
+#else
     public init(pastaDeModelos: URL, ciclo: CicloDeVidaDeModelos? = nil) {
         self.pastaDeModelos = pastaDeModelos
         self.ciclo = ciclo
     }
+#endif
 
     public var pesoDaTranscricao: URL {
         pastaDeModelos.appendingPathComponent(Pesos.whisperLargeV3.nomeArquivo)
@@ -33,6 +52,18 @@ public actor MotoresLocais {
     public var pesoDoResumo: URL {
         pastaDeModelos.appendingPathComponent(Pesos.qwen35_9B.nomeArquivo)
     }
+
+#if OMU_PERF
+    private func callbackPerfWhisper() -> ContextoWhisper.RegistradorDeEventoPerf? {
+        guard let registrarEventoPerf else { return nil }
+        return { evento, duracao in registrarEventoPerf(evento, "whisper", duracao) }
+    }
+
+    private func callbackPerfQwen() -> ContextoLlama.RegistradorDeEventoPerf? {
+        guard let registrarEventoPerf else { return nil }
+        return { evento, duracao in registrarEventoPerf(evento, "qwen", duracao) }
+    }
+#endif
 
     // MARK: - Uso
 
@@ -43,7 +74,19 @@ public actor MotoresLocais {
         initialPrompt: String? = nil
     ) async throws -> [Trecho] {
         await descarregarResumoSemFila()
-        let contexto = contextoWhisper ?? ContextoWhisper(modelo: pesoDaTranscricao)
+        let contexto: ContextoWhisper
+        if let existente = contextoWhisper {
+            contexto = existente
+        } else {
+#if OMU_PERF
+            contexto = ContextoWhisper(
+                modelo: pesoDaTranscricao,
+                registrarEventoPerf: callbackPerfWhisper()
+            )
+#else
+            contexto = ContextoWhisper(modelo: pesoDaTranscricao)
+#endif
+        }
         contextoWhisper = contexto
         await ciclo?.registrar(contexto)
         return try await WhisperEngine(contexto: contexto).transcribe(
@@ -59,7 +102,19 @@ public actor MotoresLocais {
         idiomaDeSaida: IdiomaDeProcessamento?
     ) async throws -> Resumo {
         await descarregarTranscricaoSemFila()
-        let contexto = contextoLlama ?? ContextoLlama(modelo: pesoDoResumo)
+        let contexto: ContextoLlama
+        if let existente = contextoLlama {
+            contexto = existente
+        } else {
+#if OMU_PERF
+            contexto = ContextoLlama(
+                modelo: pesoDoResumo,
+                registrarEventoPerf: callbackPerfQwen()
+            )
+#else
+            contexto = ContextoLlama(modelo: pesoDoResumo)
+#endif
+        }
         contextoLlama = contexto
         await ciclo?.registrar(contexto)
         return try await QwenEngine(contexto: contexto).summarize(
@@ -73,7 +128,19 @@ public actor MotoresLocais {
         para idioma: IdiomaDeProcessamento
     ) async throws -> [Trecho] {
         await descarregarTranscricaoSemFila()
-        let contexto = contextoLlama ?? ContextoLlama(modelo: pesoDoResumo)
+        let contexto: ContextoLlama
+        if let existente = contextoLlama {
+            contexto = existente
+        } else {
+#if OMU_PERF
+            contexto = ContextoLlama(
+                modelo: pesoDoResumo,
+                registrarEventoPerf: callbackPerfQwen()
+            )
+#else
+            contexto = ContextoLlama(modelo: pesoDoResumo)
+#endif
+        }
         contextoLlama = contexto
         await ciclo?.registrar(contexto)
         return try await QwenEngine(contexto: contexto).traduzir(trechos, para: idioma)
@@ -98,7 +165,19 @@ public actor MotoresLocais {
         guard !casos.isEmpty else { return costurado }
 
         await descarregarTranscricaoSemFila()
-        let contexto = contextoLlama ?? ContextoLlama(modelo: pesoDoResumo)
+        let contexto: ContextoLlama
+        if let existente = contextoLlama {
+            contexto = existente
+        } else {
+#if OMU_PERF
+            contexto = ContextoLlama(
+                modelo: pesoDoResumo,
+                registrarEventoPerf: callbackPerfQwen()
+            )
+#else
+            contexto = ContextoLlama(modelo: pesoDoResumo)
+#endif
+        }
         contextoLlama = contexto
         await ciclo?.registrar(contexto)
 

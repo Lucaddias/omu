@@ -53,7 +53,11 @@ struct ContentView: View {
     @State private var granola: GranolaViewModel?
     /// A conexão com o Google Calendar.
     @State private var googleCalendar: GoogleCalendarViewModel?
+#if OMU_PERF
+    @State private var perfil = PerfilViewModel(semPersistenciaDeConta: PerfProbe.ativada)
+#else
     @State private var perfil = PerfilViewModel()
+#endif
     @State private var notificacoes = NotificacoesViewModel()
     @State private var equipes = EquipesDoUsuario.carregar()
     @State private var falhaDeAbertura: String?
@@ -97,6 +101,20 @@ struct ContentView: View {
     @AppStorage("contextoDaConta") private var contextoDaContaRaw = ContextoDaConta.perfil.rawValue
     @AppStorage("equipeAtiva") private var equipeAtivaID = ""
     @AppStorage("aparenciaDoApp") private var aparenciaRaw = AparenciaDoApp.sistema.rawValue
+
+#if OMU_PERF
+    private var telaDaSonda: String {
+        if telaSelecionada == .biblioteca, !conversaAberta.isEmpty { return "detalhe" }
+        switch telaSelecionada {
+        case .biblioteca: "biblioteca"
+        case .tarefas: "tarefas"
+        case .midias: "midias"
+        case .configuracoes: "configuracoes"
+        case .perfil: "perfil"
+        case .equipe: "equipe"
+        }
+    }
+#endif
 
     private var aparencia: Binding<AparenciaDoApp> {
         Binding(
@@ -155,6 +173,15 @@ struct ContentView: View {
                 destinoDaConversa(id)
             }
         }
+#if OMU_PERF
+        .overlay(alignment: .topLeading) {
+            MarcadorDoPrimeiroFrame(tela: telaDaSonda)
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+#endif
         // Piso de conforto, não de correção: quem garante que nada transborda é
         // a própria barra superior, que colapsa em estágios. Este mínimo só
         // evita abrir a janela num tamanho em que a grade de cartões fica com
@@ -228,6 +255,29 @@ struct ContentView: View {
                 perfil.iniciar()
                 await conectarGoogleCalendarSeAutorizado()
             }
+#if OMU_PERF
+            if PerfProbe.ativada {
+                PerfProbe.shared.iniciarCenario(
+                    importar: { url in await modelo.importar(url) },
+                    navegar: { tela in
+                        switch tela {
+                        case "biblioteca": telaSelecionada = .biblioteca
+                        case "tarefas": telaSelecionada = .tarefas
+                        case "midias": telaSelecionada = .midias
+                        case "configuracoes": telaSelecionada = .configuracoes
+                        default: break
+                        }
+                    },
+                    buscar: { texto in
+                        PerfProbe.shared.registrarBuscaSolicitada(texto)
+                        consulta = texto
+                    },
+                    abrirDetalhe: { id in
+                        conversaAberta.append(id)
+                    }
+                )
+            }
+#endif
         }
         // Retorno do navegador quando a autorização do Granola roda no
         // navegador padrão do sistema.
@@ -426,10 +476,17 @@ struct ContentView: View {
             nova.processamentoAutomatico = processamentoAutomatico
             nova.traducaoAutomatica = traducaoAutomatica
             nova.idiomaPadraoDeProcessamento = IdiomaDeProcessamento(locale: .autoupdatingCurrent)
-            nova.aoNotificar = { titulo, mensagem, tipo in
-                notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
+            if politicaDeInicializacaoExterna.permiteServicosExternos {
+                nova.aoNotificar = { titulo, mensagem, tipo in
+                    notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
+                }
+            } else {
+                nova.aoNotificar = nil
             }
             nova.aoConcluirProcessamento = { [weak nova] arquivo in
+#if OMU_PERF
+                PerfProbe.shared.registrarPipelineFim(arquivo)
+#endif
                 guard arquivosAguardandoFicha.contains(arquivo.id) else { return }
                 arquivosAguardandoFicha.remove(arquivo.id)
                 // Sempre marca como pendente; a exibição automática é decidida
@@ -438,23 +495,36 @@ struct ContentView: View {
                 nova?.marcarFichaPendente(arquivo.id)
             }
             biblioteca = nova
-            await reconciliarEquipesExcluidas()
-
-            let conexao = GranolaViewModel()
-            conexao.aoNotificar = { titulo, mensagem, tipo in
-                notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
+            if politicaDeInicializacaoExterna.permiteServicosExternos {
+                await reconciliarEquipesExcluidas()
             }
-            granola = conexao
 
-            let conexaoGoogle = GoogleCalendarViewModel()
-            conexaoGoogle.aoNotificar = { titulo, mensagem, tipo in
-                notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
+            if politicaDeInicializacaoExterna.permiteServicosExternos {
+                let conexao = GranolaViewModel()
+                conexao.aoNotificar = { titulo, mensagem, tipo in
+                    notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
+                }
+                granola = conexao
+
+                let conexaoGoogle = GoogleCalendarViewModel()
+                conexaoGoogle.aoNotificar = { titulo, mensagem, tipo in
+                    notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
+                }
+                googleCalendar = conexaoGoogle
             }
-            googleCalendar = conexaoGoogle
 
+#if OMU_PERF
+            let pastaModelos = PerfProbe.configuracao?.modelos ?? nova.armazenamento.pastaDeModelos
             let gerenciador = ModelosViewModel(
-                pastaDoContainer: nova.armazenamento.pastaDeModelos
+                pastaDoContainer: pastaModelos,
+                ignorarPastaEscolhidaPersistida: PerfProbe.ativada
             )
+#else
+            let pastaModelos = nova.armazenamento.pastaDeModelos
+            let gerenciador = ModelosViewModel(
+                pastaDoContainer: pastaModelos
+            )
+#endif
             gerenciador.verificar()
             nova.pastaDeModelos = gerenciador.pasta
             modelos = gerenciador
@@ -503,6 +573,16 @@ struct ContentView: View {
                         if nova.processamentoAutomatico {
                             arquivosAguardandoFicha.insert(arquivo.id)
                         } else {
+#if OMU_PERF
+                            switch PerfProbe.configuracao?.cenario.lowercased() {
+                            case "i1": return
+                            case "u3":
+                                PerfProbe.shared.registrarNavegacaoSolicitada("detalhe")
+                                conversaAberta.append(arquivo.id.rawValue)
+                                return
+                            default: break
+                            }
+#endif
                             abrirFichaDaEntrevista(para: arquivo)
                         }
                     }
@@ -510,6 +590,12 @@ struct ContentView: View {
             }
             await nova.preparar()
             atualizarEspacoDaBiblioteca()
+#if OMU_PERF
+            if PerfProbe.ativada {
+                await tarefaDeSelecaoDeEspaco?.value
+                PerfProbe.shared.registrarBibliotecaPronta()
+            }
+#endif
         } catch {
             falhaDeAbertura = "Não foi possível abrir a biblioteca: %@".localized(error.localizedDescription)
         }
@@ -699,16 +785,19 @@ struct ContentView: View {
     }
 
     private func abrirPerfil() {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         telaSelecionada = .perfil
         secaoDaBiblioteca = .todos
     }
 
     private func abrirEquipe() {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         telaSelecionada = .equipe
         secaoDaBiblioteca = .todos
     }
 
     private func selecionarPerfilPessoal() {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         contextoDaConta = .perfil
         atualizarEspacoDaBiblioteca()
     }
@@ -716,6 +805,7 @@ struct ContentView: View {
     /// Entra no contexto de equipe mesmo sem equipe alguma — é lá que mora o
     /// estado vazio que convida a criar a primeira.
     private func selecionarEquipe() {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         contextoDaConta = .equipe
         if let equipeAtiva {
             equipeAtivaID = equipeAtiva.id
@@ -725,6 +815,7 @@ struct ContentView: View {
     }
 
     private func usarEquipe(_ equipe: EquipeDisponivel) {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         contextoDaConta = .equipe
         equipeAtivaID = equipe.id
         garantirEspacoParaEquipe(id: equipe.id)
@@ -732,6 +823,7 @@ struct ContentView: View {
     }
 
     private func atualizarEquipe(_ equipe: EquipeDisponivel) {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         guard let indice = equipes.firstIndex(where: { $0.id == equipe.id }) else { return }
         equipes[indice] = equipe
         EquipesDoUsuario.salvar(equipes)
@@ -741,6 +833,7 @@ struct ContentView: View {
     /// Assim a interface não esconde a equipe nem apaga este Mac por uma ação
     /// que falhou no CloudKit.
     private func excluirEquipe(_ equipe: EquipeDisponivel) async throws {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         try await servicoDeEquipesCloudKit.excluirEquipeGlobalmente(equipe)
         try await limparDadosLocais(da: equipe)
         MembrosDasEquipes.remover(equipeID: equipe.id)
@@ -759,6 +852,7 @@ struct ContentView: View {
     /// cada instalação consulta o marcador público e só então remove a cópia
     /// local, inclusive mídia e itens na lixeira daquele espaço.
     private func reconciliarEquipesExcluidas() async {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         let candidatas = equipes.filter { $0.zonaCloudKit != nil }
         for equipe in candidatas {
             do {
@@ -795,6 +889,7 @@ struct ContentView: View {
     }
 
     private func adicionarEquipe(nome: String) {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         let nomeLimpo = nome.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !nomeLimpo.isEmpty else { return }
 
@@ -824,6 +919,7 @@ struct ContentView: View {
     }
 
     private func entrarNaEquipeComCodigo(_ codigo: String) {
+        guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
         Task { @MainActor in
             do {
                 let equipe = try await servicoDeEquipesCloudKit.entrarNaEquipe(com: codigo)
@@ -849,6 +945,22 @@ struct ContentView: View {
         guard let biblioteca else { return }
         let espaco: EspacoID
         let equipeParaSincronizar: EquipeDisponivel?
+#if OMU_PERF
+        if PerfProbe.ativada {
+            // O store de perf usa um espaço fixo e não consulta defaults do perfil.
+            espaco = PerfProbe.espacoPadrao
+            equipeParaSincronizar = nil
+        } else if contextoDaConta == .equipe,
+                  let equipe = equipeAtiva,
+                  let texto = equipe.espacoID,
+                  let id = UUID(uuidString: texto) {
+            espaco = EspacoID(rawValue: id)
+            equipeParaSincronizar = equipe.zonaCloudKit == nil ? nil : equipe
+        } else {
+            espaco = Biblioteca.espacoPessoal()
+            equipeParaSincronizar = nil
+        }
+#else
         if contextoDaConta == .equipe,
            let equipe = equipeAtiva,
            let texto = equipe.espacoID,
@@ -859,6 +971,7 @@ struct ContentView: View {
             espaco = Biblioteca.espacoPessoal()
             equipeParaSincronizar = nil
         }
+#endif
         tarefaDeSelecaoDeEspaco = Task { @MainActor in
             var equipeParaUsar = equipeParaSincronizar
             if let equipeParaSincronizar {

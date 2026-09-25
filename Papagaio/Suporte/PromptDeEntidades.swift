@@ -7,14 +7,35 @@ import PapagaioCore
 /// para nomes próprios, não uma correção automática: o texto reconhecido ainda
 /// precisa ser produzido pelo áudio.
 enum PromptDeEntidades {
+#if OMU_PERF
+    static func construir(para arquivo: Arquivo, termosSinteticos: [String]? = nil) async -> String? {
+        let termos: [String]
+        if let termosSinteticos {
+            termos = termosSinteticos
+        } else {
+            async let termosDoCalendario = termosDoCalendario(
+                inicio: arquivo.criadoEm,
+                fim: arquivo.criadoEm.addingTimeInterval(max(arquivo.duracao, 1))
+            )
+            async let termosDosContatos = termosDosContatos()
+            termos = await termosDoCalendario + termosDosContatos
+        }
+        return montarPrompt(termos)
+    }
+#else
     static func construir(para arquivo: Arquivo) async -> String? {
         async let termosDoCalendario = termosDoCalendario(
             inicio: arquivo.criadoEm,
             fim: arquivo.criadoEm.addingTimeInterval(max(arquivo.duracao, 1))
         )
         async let termosDosContatos = termosDosContatos()
+        let termosCalendario = await termosDoCalendario
+        let termosContato = await termosDosContatos
+        return montarPrompt(termosCalendario + termosContato)
+    }
+#endif
 
-        let termos = (await termosDoCalendario + termosDosContatos)
+    private static func montarPrompt(_ termos: [String]) -> String? {
         let unicos = termos.reduce(into: [String: String]()) { resultado, termo in
             let limpo = termo.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !limpo.isEmpty else { return }

@@ -27,6 +27,38 @@ import os
 /// distingue fala real de tom/DC/ruído. Ver `SileroVAD`.
 /// ═══════════════════════════════════════════════════════════════════════
 public enum DetectorDeAtividadeDeVoz {
+#if OMU_PERF
+    public typealias RegistradorDeEventoPerf = @Sendable (String, String, TimeInterval?) -> Void
+
+    private final class RegistroPerf: @unchecked Sendable {
+        private let trava = NSLock()
+        private var callback: RegistradorDeEventoPerf?
+
+        func configurar(_ novo: RegistradorDeEventoPerf?) {
+            trava.lock()
+            callback = novo
+            trava.unlock()
+        }
+
+        func enviar(_ evento: String, modelo: String, duracao: TimeInterval?) {
+            trava.lock()
+            let copia = callback
+            trava.unlock()
+            copia?(evento, modelo, duracao)
+        }
+    }
+
+    private static let registroPerf = RegistroPerf()
+
+    public static func configurarRegistroPerf(_ callback: RegistradorDeEventoPerf?) {
+        registroPerf.configurar(callback)
+    }
+
+    private static func callbackPerfSilero() -> SileroVAD.RegistradorDeEventoPerf? {
+        { evento, modelo, duracao in registroPerf.enviar(evento, modelo: modelo, duracao: duracao) }
+    }
+#endif
+
     /// Limite de cópias de áudio temporárias por chamada ao Silero. Uma hora
     /// inteira de áudio com energia não pode virar uma segunda cópia de centenas
     /// de megabytes só para a inferência; o estado do modelo é preservado entre
@@ -50,10 +82,14 @@ public enum DetectorDeAtividadeDeVoz {
     /// Instância compartilhada do Silero: o modelo de 2,3 MB fica residente
     /// entre arquivos. O caminho inexistente é proposital — `SessaoOnnx`
     /// devolve erro de carga em vez de crashar se o resource faltar.
+#if OMU_PERF
     private static let sileroVAD = SileroVAD(
-        modelo: Bundle.module.url(forResource: "silero_vad", withExtension: "onnx")
-            ?? URL(fileURLWithPath: "/inexistente/silero_vad.onnx")
+        modelo: SileroVAD.urlDoModeloPadrao,
+        registrarEventoPerf: callbackPerfSilero()
     )
+#else
+    private static let sileroVAD = SileroVAD(modelo: SileroVAD.urlDoModeloPadrao)
+#endif
 
     /// Exclusividade de sessão inteira. O ator do Silero serializa chamadas,
     /// mas cada `await` do laço de quadros reentra nele: dois arquivos

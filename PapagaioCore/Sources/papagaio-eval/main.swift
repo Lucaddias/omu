@@ -8,19 +8,29 @@ import WhisperRuntime
 // arrastar SwiftUI. O harness de medição real (WER, acurácia de entidades)
 // chega no Passo 6.
 
-let versao = "0.1.0-passo1"
+let versao = "0.2.0-bench"
 
 func formatarBytes(_ bytes: Int64) -> String {
     String(format: "%.2f GB", Double(bytes) / 1_073_741_824)
 }
 
 func uso() {
+#if OMU_PERF
+    let linhaSeed = "      papagaio-eval seed-library --raiz <dir> --quantidade N [--trechos N] [--catalogo JSON]"
+#else
+    let linhaSeed = ""
+#endif
     print("""
     papagaio-eval \(versao)
 
     USO:
       papagaio-eval contratos    imprime os contratos disponíveis
-      papagaio-eval run          harness de medição — chega no Passo 6
+      papagaio-eval bench        micro/macro benchmarks de performance
+                                [--so-micro] [--iteracoes N] [--audio <arquivo>]
+                                [--somente-caso aec.processarBlocos]
+                                [--modelos <dir>] [--saida <json>] [--comparar <baseline>]
+    \(linhaSeed)
+      papagaio-eval run          harness de medição (qualidade/WER) — reserva
       papagaio-eval resolver     diagnóstico da atribuição de falantes:
                                 <audio> (ou --fixture <json>), --modelos <dir>,
                                 --pasta <dir de diarização>, --sem-modelo
@@ -479,9 +489,224 @@ case "granola":
         exit(3)
     }
 
+case "bench":
+    var soMicro = false
+    var iteracoes = 5
+    var audio: URL?
+    var modelos: URL?
+    var saida: String?
+    var compararCom: String?
+    var somenteCaso: String?
+
+    var i = 1
+    while i < argumentos.count {
+        switch argumentos[i] {
+        case "--so-micro":
+            soMicro = true; i += 1
+        case "--iteracoes" where i + 1 < argumentos.count:
+            iteracoes = Int(argumentos[i + 1]) ?? 5; i += 2
+        case "--audio" where i + 1 < argumentos.count:
+            audio = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--modelos" where i + 1 < argumentos.count:
+            modelos = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--saida" where i + 1 < argumentos.count:
+            saida = argumentos[i + 1]; i += 2
+        case "--comparar" where i + 1 < argumentos.count:
+            compararCom = argumentos[i + 1]; i += 2
+        case "--somente-caso" where i + 1 < argumentos.count:
+            somenteCaso = argumentos[i + 1]; i += 2
+        default:
+            print("argumento desconhecido: \(argumentos[i])")
+            exit(2)
+        }
+    }
+
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    let raizPerf = home.appendingPathComponent("OmuPerf", isDirectory: true)
+        .resolvingSymlinksInPath().standardizedFileURL.path + "/"
+    let raizDeRuns = home.appendingPathComponent("OmuPerf/runs", isDirectory: true)
+        .resolvingSymlinksInPath().standardizedFileURL.path + "/"
+    func estaDentro(_ url: URL, da raiz: String) -> Bool {
+        url.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(raiz)
+    }
+
+    if let saida,
+       !estaDentro(URL(fileURLWithPath: saida), da: raizDeRuns) {
+        FileHandle.standardError.write(Data("--saida precisa ficar dentro de ~/OmuPerf/runs/.\n".utf8))
+        exit(2)
+    }
+    if let compararCom,
+       !estaDentro(URL(fileURLWithPath: compararCom), da: raizPerf) {
+        FileHandle.standardError.write(Data("--comparar precisa apontar para uma referência dentro de ~/OmuPerf/.\n".utf8))
+        exit(2)
+    }
+    if let modelos {
+        let modelosDoApp = home.appendingPathComponent("Library/Application Support/Papagaio/Models", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL.path
+        let modelosDaFixture = home.appendingPathComponent("OmuPerf/fixtures", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let caminhoModelos = modelos.resolvingSymlinksInPath().standardizedFileURL.path
+        guard caminhoModelos == modelosDoApp || caminhoModelos.hasPrefix(modelosDaFixture) else {
+            FileHandle.standardError.write(Data("--modelos precisa ser a pasta local do app ou uma fixture em ~/OmuPerf/fixtures/.\n".utf8))
+            exit(2)
+        }
+    }
+
+    if let audio {
+        let pastaDeFixtures = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OmuPerf/fixtures", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let caminhoDoAudio = audio.resolvingSymlinksInPath().standardizedFileURL.path
+        guard caminhoDoAudio.hasPrefix(pastaDeFixtures) else {
+            FileHandle.standardError.write(Data("Audio precisa estar dentro de ~/OmuPerf/fixtures/.\n".utf8))
+            exit(2)
+        }
+    }
+
+    print("papagaio-eval bench — iteracoes=\(iteracoes)")
+    let info = RuntimeInfo.coletar()
+    print("whisper: \(info.whisperSystemInfo.prefix(80))…")
+    print("metal:   \(info.metalDisponivel ? "sim" : "NÃO")")
+    print("memoria: \(formatarBytes(CicloDeVidaDeModelos.memoriaDoProcesso))")
+
+    var todos: [ResultadoBench] = []
+
+    if let somenteCaso {
+        guard somenteCaso == "aec.processarBlocos" else {
+            FileHandle.standardError.write(Data("Caso de micro-benchmark inválido: \(somenteCaso)\n".utf8))
+            exit(2)
+        }
+        soMicro = true
+        print("\n--- micro-benchmark isolado: \(somenteCaso) ---")
+        todos.append(CasosDeMicroBench.rodarAEC(iteracoes: iteracoes))
+    } else {
+        print("\n--- micro-benchmarks (sem modelos) ---")
+        todos += await CasosDeMicroBench.rodar(iteracoes: iteracoes)
+    }
+
+    if !soMicro {
+        if let modelos {
+            print("\n--- macro-benchmarks (modelos locais informados explicitamente) ---")
+            let macro = CasosDeMacroBench.Opcoes(
+                pastaDeModelos: modelos,
+                audio: audio,
+                iteracoes: max(1, min(iteracoes, 3))
+            )
+            todos += await CasosDeMacroBench.rodar(macro)
+        } else {
+            print("\nAVISO: passe --modelos para habilitar macro-benchmarks; nenhum diretório de modelos foi examinado.")
+        }
+    }
+
+    EscritorDeRelatorio.imprimir(todos)
+
+    // Comparar ANTES de gravar: gravar primeiro e depois carregar o mesmo
+    // arquivo faria a comparação sempre sair "igual".
+    if let baselineCaminho = compararCom,
+       let baseline = EscritorDeRelatorio.carregarBaseline(caminho: baselineCaminho) {
+        EscritorDeRelatorio.comparar(atual: todos, baseline: baseline)
+    }
+
+    if let caminho = saida {
+        try EscritorDeRelatorio.gravar(todos, em: caminho)
+    }
+
+#if OMU_PERF
+case "seed-library":
+    var raiz: URL?
+    var catalogo: URL?
+    var quantidade = 0
+    var trechosPorArquivo = 32
+    var i = 1
+    while i < argumentos.count {
+        switch argumentos[i] {
+        case "--raiz" where i + 1 < argumentos.count:
+            raiz = URL(fileURLWithPath: argumentos[i + 1], isDirectory: true); i += 2
+        case "--catalogo" where i + 1 < argumentos.count:
+            catalogo = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--quantidade" where i + 1 < argumentos.count:
+            quantidade = Int(argumentos[i + 1]) ?? -1; i += 2
+        case "--trechos" where i + 1 < argumentos.count:
+            trechosPorArquivo = Int(argumentos[i + 1]) ?? -1; i += 2
+        default:
+            FileHandle.standardError.write(Data("argumento desconhecido: \(argumentos[i])\n".utf8))
+            exit(2)
+        }
+    }
+    guard let raiz, quantidade >= 0, (0...500).contains(trechosPorArquivo) else {
+        FileHandle.standardError.write(Data("uso: seed-library --raiz <dir> --quantidade N [--trechos 0...500]\n".utf8))
+        exit(2)
+    }
+
+    let raizPermitida = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("OmuPerf/runs", isDirectory: true)
+        .resolvingSymlinksInPath().standardizedFileURL.path + "/"
+    guard raiz.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(raizPermitida) else {
+        FileHandle.standardError.write(Data("--raiz do seed precisa ficar dentro de ~/OmuPerf/runs/.\n".utf8))
+        exit(2)
+    }
+
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    let container = try SwiftDataRepository.containerLocal(
+        nome: "OmuPerf",
+        url: raiz.appendingPathComponent("biblioteca.store")
+    )
+    let repositorio = SwiftDataRepository(modelContainer: container)
+    let espaco = EspacoID(rawValue: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!)
+    var conversas: [[String: Any]] = []
+    if let catalogo {
+        let pastaDeFixtures = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("OmuPerf/fixtures", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let caminhoCatalogo = catalogo.resolvingSymlinksInPath().standardizedFileURL.path
+        guard caminhoCatalogo.hasPrefix(pastaDeFixtures) else {
+            FileHandle.standardError.write(Data("Catálogo precisa estar em ~/OmuPerf/fixtures/.\n".utf8))
+            exit(2)
+        }
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: catalogo))
+        guard let objeto = json as? [String: Any],
+              let itens = objeto["conversas"] as? [[String: Any]],
+              quantidade <= itens.count
+        else {
+            FileHandle.standardError.write(Data("Catálogo seed inválido ou pequeno demais.\n".utf8))
+            exit(2)
+        }
+        conversas = Array(itens.prefix(quantidade))
+    }
+    for indice in 0..<quantidade {
+        let item = conversas.indices.contains(indice) ? conversas[indice] : [:]
+        let textosCatalogados = item["trechos"] as? [String]
+        let textos = Array((textosCatalogados ?? []).prefix(trechosPorArquivo))
+        let quantidadeDeTrechos = textos.isEmpty ? trechosPorArquivo : textos.count
+        let termoDeBusca = item["consulta"] as? String ?? ""
+        let trechos = (0..<quantidadeDeTrechos).map { ordem in
+            let inicio = Double(ordem) * 12
+            let base = textos.indices.contains(ordem)
+                ? textos[ordem]
+                : "Decisão sintética \(indice) etapa \(ordem): revisar prazo, orçamento e próximos passos."
+            let texto = ordem == 0 && !termoDeBusca.isEmpty ? "\(base) \(termoDeBusca)" : base
+            return Trecho(start: inicio, end: inicio + 4, texto: texto)
+        }
+        let idArquivo = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012X", indice + 1))!
+        let arquivo = Arquivo(
+            id: ArquivoID(rawValue: idArquivo),
+            titulo: item["titulo"] as? String ?? "Reunião sintética \(indice + 1)",
+            pastaRelativa: "",
+            espaco: espaco,
+            trechos: trechos,
+            resumo: Resumo(
+                titulo: item["titulo"] as? String ?? "Plano da reunião \(indice + 1)",
+                visaoGeral: item["resumo"] as? String ?? "Decisões, prazos e tarefas sintéticas para medir abertura e busca."
+            )
+        )
+        try await repositorio.salvar(arquivo)
+    }
+    print("seed-library: \(quantidade) conversas, \(trechosPorArquivo) trechos cada, store em \(raiz.path)")
+#endif
+
 case "run":
     FileHandle.standardError.write(
-        Data("papagaio-eval run: \(NotImplemented("harness de medição", passo: 6))\n".utf8)
+        Data("papagaio-eval run: qualidade/WER ainda no Passo 6 — use `bench` para performance.\n".utf8)
     )
     exit(2)
 

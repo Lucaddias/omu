@@ -1,5 +1,12 @@
 // swift-tools-version: 6.0
+import Foundation
 import PackageDescription
+
+let buildForPerformance = ProcessInfo.processInfo.environment["OMU_PERF_BUILD"] == "1"
+let swiftSettingsBase: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let swiftSettings = buildForPerformance
+    ? swiftSettingsBase + [.define("OMU_PERF")]
+    : swiftSettingsBase
 
 let package = Package(
     name: "PapagaioCore",
@@ -39,17 +46,17 @@ let package = Package(
         .target(
             name: "WhisperRuntime",
             dependencies: ["whisper"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "LlamaRuntime",
             dependencies: ["llama"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "OnnxApi",
             dependencies: ["onnxruntime"],
-            swiftSettings: [.swiftLanguageMode(.v6)],
+            swiftSettings: swiftSettings,
             // O onnxruntime.framework é C++ (libc++).
             linkerSettings: [.linkedLibrary("c++")]
         ),
@@ -61,7 +68,7 @@ let package = Package(
         .target(
             name: "DiarizationRuntime",
             dependencies: ["FluidAudio"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: swiftSettings
         ),
 
         // Biblioteca de domínio. NÃO importa SwiftUI — a CLI depende dela.
@@ -79,17 +86,17 @@ let package = Package(
                 .process("Resources"),
                 .copy("ModelosDeDiarizacao"),
             ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: swiftSettings
         ),
         .executableTarget(
             name: "papagaio-eval",
             dependencies: ["PapagaioCore", "WhisperRuntime", "LlamaRuntime"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "PapagaioCoreTests",
             dependencies: ["PapagaioCore"],
-            swiftSettings: [.swiftLanguageMode(.v6)],
+            swiftSettings: swiftSettings,
             // O bundle .xctest carrega de
             // Products/Debug/PapagaioCoreTests.xctest/Contents/MacOS/, e os
             // frameworks ficam três níveis acima, em Products/Debug/.
