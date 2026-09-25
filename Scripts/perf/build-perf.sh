@@ -19,9 +19,13 @@ DERIVED="$OMU_PERF_DIR/build/dd-$ROTULO"
 DESTINO="$OMU_PERF_DIR/apps/$ROTULO"
 LOG="$OMU_PERF_DIR/runs/build-app-$ROTULO.log"
 ENTITLEMENTS="$ROOT_DIR/Config/Papagaio-Perf.entitlements"
+DESTINO_PREEXISTENTE=false
 [[ -f "$ENTITLEMENTS" ]] || { echo "Entitlements de perf ausentes." >&2; exit 1; }
 mkdir -p "$OMU_PERF_DIR/build" "$OMU_PERF_DIR/runs" "$STATE_DIR" "$(dirname "$DESTINO")"
-[[ ! -e "$DESTINO" ]] || { echo "Destino já existe; escolha outro rótulo: $DESTINO" >&2; exit 2; }
+if [[ -e "$DESTINO" || -L "$DESTINO" ]]; then
+    [[ ! -L "$DESTINO" && -d "$DESTINO" ]] || { echo "Destino não é um diretório comum: $DESTINO" >&2; exit 2; }
+    DESTINO_PREEXISTENTE=true
+fi
 [[ ! -d "$STATE_DIR/measurement.lock" ]] || { echo "Medição ativa; não iniciar build." >&2; exit 3; }
 mkdir "$STATE_DIR/infra.lock" 2>/dev/null || { echo "Outra build/teste/geração está ativa." >&2; exit 3; }
 CAFFEINATE_PID=""
@@ -61,6 +65,9 @@ fi
 
 PRODUTO="$DERIVED/Build/Products/Release/Ōmu.app"
 [[ -d "$PRODUTO" ]] || { echo "Ōmu.app não encontrado em $PRODUTO" >&2; cat "$LOG" >&2; exit 1; }
+if [[ "$DESTINO_PREEXISTENTE" == true ]]; then
+    rmdir "$DESTINO" 2>/dev/null || { echo "Destino passou a conter dados; preservado: $DESTINO" >&2; exit 2; }
+fi
 /usr/bin/ditto "$PRODUTO" "$DESTINO"
 mkdir -p "$DESTINO/Contents/Resources"
 cat > "$DESTINO/Contents/Resources/PerfBuild.json" <<EOF_BUILD
