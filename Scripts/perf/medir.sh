@@ -60,17 +60,17 @@ esac
 if [[ "$REQUIRE_IDLE" == true ]]; then SHORT=false; fi
 case "$SCENARIO_UPPER" in
     I1|P1|P2|P3|P5|P6|Q1|U3)
-        (( ${#FIXTURES[@]} == 1 )) || { echo "Esse cenário exige exatamente um --fixture." >&2; exit 2; }
+        (( ${#FIXTURES[@]-0} == 1 )) || { echo "Esse cenário exige exatamente um --fixture." >&2; exit 2; }
         ;;
-    P4) (( ${#FIXTURES[@]} == 3 )) || { echo "P4 exige exatamente três --fixture." >&2; exit 2; } ;;
-    S1) (( ${#FIXTURES[@]} == 10 )) || { echo "S1 exige dez fixtures sintéticas (--fixture repetido dez vezes)." >&2; exit 2; } ;;
+    P4) (( ${#FIXTURES[@]-0} == 3 )) || { echo "P4 exige exatamente três --fixture." >&2; exit 2; } ;;
+    S1) (( ${#FIXTURES[@]-0} == 10 )) || { echo "S1 exige dez fixtures sintéticas (--fixture repetido dez vezes)." >&2; exit 2; } ;;
     L2) [[ "$SEED_COUNT" == 200 || "$SEED_COUNT" == 1000 ]] || { echo "L2 exige --seed-count 200 ou 1000." >&2; exit 2; } ;;
     U1) [[ "$SEED_COUNT" == 200 ]] || { echo "U1 exige --seed-count 200." >&2; exit 2; } ;;
     U2) [[ "$SEED_COUNT" == 1000 ]] || { echo "U2 exige --seed-count 1000." >&2; exit 2; } ;;
 esac
 case "$SCENARIO_UPPER" in
-    P1|P2|P3|P5|P6|Q1) (( ${#GABARITOS[@]} == 1 )) || { echo "Esse cenário exige um --gabarito." >&2; exit 2; } ;;
-    P4) (( ${#GABARITOS[@]} == 3 )) || { echo "P4 exige três --gabarito para o gate de qualidade." >&2; exit 2; } ;;
+    P1|P2|P3|P5|P6|Q1) (( ${#GABARITOS[@]-0} == 1 )) || { echo "Esse cenário exige um --gabarito." >&2; exit 2; } ;;
+    P4) (( ${#GABARITOS[@]-0} == 3 )) || { echo "P4 exige três --gabarito para o gate de qualidade." >&2; exit 2; } ;;
 esac
 FIXROOT="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$OMU_PERF_DIR/fixtures")/"
 verificar_hash_fixture() {
@@ -90,33 +90,33 @@ if digest != entry.get("sha256"):
     raise SystemExit(f"SHA-256 divergiu do manifesto: {fixture_path}")
 PY
 }
-for indice in "${!FIXTURES[@]}"; do
+for ((indice=0; indice<${#FIXTURES[@]-0}; indice++)); do
     FIXTURES[$indice]="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "${FIXTURES[$indice]}")"
     case "${FIXTURES[$indice]}" in "$FIXROOT"*) ;; *) echo "Áudio fora de ~/OmuPerf/fixtures/." >&2; exit 2 ;; esac
     [[ -f "${FIXTURES[$indice]}" ]] || { echo "Fixture ausente." >&2; exit 2; }
     verificar_hash_fixture "${FIXTURES[$indice]}"
 done
-for indice in "${!GABARITOS[@]}"; do
+for ((indice=0; indice<${#GABARITOS[@]-0}; indice++)); do
     GABARITOS[$indice]="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "${GABARITOS[$indice]}")"
     case "${GABARITOS[$indice]}" in "$FIXROOT"*) ;; *) echo "Gabarito fora de ~/OmuPerf/fixtures/." >&2; exit 2 ;; esac
     [[ -f "${GABARITOS[$indice]}" ]] || { echo "Gabarito ausente." >&2; exit 2; }
     verificar_hash_fixture "${GABARITOS[$indice]}"
 done
-for indice in "${!QUALITY_BASELINES[@]}"; do
+for ((indice=0; indice<${#QUALITY_BASELINES[@]-0}; indice++)); do
     QUALITY_BASELINES[$indice]="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "${QUALITY_BASELINES[$indice]}")"
     case "${QUALITY_BASELINES[$indice]}" in "$OMU_PERF_DIR"/*) ;; *) echo "Baseline de qualidade fora de ~/OmuPerf/." >&2; exit 2 ;; esac
     [[ -f "${QUALITY_BASELINES[$indice]}" ]] || { echo "Baseline de qualidade ausente." >&2; exit 2; }
 done
-if (( ${#QUALITY_BASELINES[@]} > 0 && ${#QUALITY_BASELINES[@]} != ${#GABARITOS[@]} )); then
+if (( ${#QUALITY_BASELINES[@]-0} > 0 && ${#QUALITY_BASELINES[@]-0} != ${#GABARITOS[@]-0} )); then
     echo "Passe uma baseline de qualidade para cada gabarito, ou nenhuma." >&2
     exit 2
 fi
-for indice in "${!BASELINE_ARQUIVOS[@]}"; do
+for ((indice=0; indice<${#BASELINE_ARQUIVOS[@]-0}; indice++)); do
     BASELINE_ARQUIVOS[$indice]="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "${BASELINE_ARQUIVOS[$indice]}")"
     case "${BASELINE_ARQUIVOS[$indice]}" in "$OMU_PERF_DIR"/*) ;; *) echo "Baseline exata fora de ~/OmuPerf/." >&2; exit 2 ;; esac
     [[ -f "${BASELINE_ARQUIVOS[$indice]}" ]] || { echo "Baseline exata ausente." >&2; exit 2; }
 done
-if [[ "$EXIGIR_IDENTICA" == true ]] && (( ${#BASELINE_ARQUIVOS[@]} != ${#GABARITOS[@]} )); then
+if [[ "$EXIGIR_IDENTICA" == true ]] && (( ${#BASELINE_ARQUIVOS[@]-0} != ${#GABARITOS[@]-0} )); then
     echo "--exigir-identica precisa de um --baseline-arquivo para cada gabarito." >&2
     exit 2
 fi
@@ -230,7 +230,9 @@ run_one() {
         -ocultarSecaoNaoIniciado NO -ocultarSecaoEmAndamento NO -ocultarSecaoConcluidas NO -ocultarSecaoAtrasada NO
         -mostrarTarefasOcultasDaConversa NO -ocultarColunaNaoIniciado NO -ocultarColunaEmAndamento NO
         -ocultarColunaConcluidas NO -ocultarColunaAtrasada NO -mostrarTarefasOcultas NO)
-    for fixture in "${FIXTURES[@]}"; do args+=(--perf-fixture "$fixture"); done
+    for ((fixture_indice=0; fixture_indice<${#FIXTURES[@]-0}; fixture_indice++)); do
+        args+=(--perf-fixture "${FIXTURES[$fixture_indice]}")
+    done
     if [[ "$SCENARIO_UPPER" == U1 ]]; then args+=(--perf-detalhe-id "00000000-0000-0000-0000-000000000001"); fi
     local before after start finish wall status leaks_status leaks_log leaks_pid target_pid
     leaks_status=not-run; leaks_log="$DATASET/leaks-$classe-$side-$index.log"; leaks_pid=""
@@ -299,18 +301,18 @@ except (OSError,json.JSONDecodeError): pass
 PY
                 )
                 mkdir -p "$quality_result"
-                if (( ${#output_dumps[@]} != ${#GABARITOS[@]} )); then
+                if (( ${#output_dumps[@]-0} != ${#GABARITOS[@]-0} )); then
                     echo "Quantidade de dumps não corresponde aos gabaritos em $events" >&2
                     status=quality-fail
                 else
                     local quality_index
-                    for ((quality_index=0; quality_index<${#GABARITOS[@]}; quality_index++)); do
+                    for ((quality_index=0; quality_index<${#GABARITOS[@]-0}; quality_index++)); do
                         [[ -f "${output_dumps[$quality_index]}" ]] || { status=quality-fail; break; }
                         local -a quality_args=(--referencia "${GABARITOS[$quality_index]}" --saida-arquivo "${output_dumps[$quality_index]}" --resultado "$quality_result/$quality_index.json")
-                        if (( ${#QUALITY_BASELINES[@]} > 0 )); then
+                        if (( ${#QUALITY_BASELINES[@]-0} > 0 )); then
                             quality_args+=(--baseline "${QUALITY_BASELINES[$quality_index]}")
                         fi
-                        if (( ${#BASELINE_ARQUIVOS[@]} > 0 )); then
+                        if (( ${#BASELINE_ARQUIVOS[@]-0} > 0 )); then
                             quality_args+=(--baseline-arquivo "${BASELINE_ARQUIVOS[$quality_index]}")
                         fi
                         [[ "$EXIGIR_IDENTICA" == true ]] && quality_args+=(--exigir-identica)
@@ -334,7 +336,8 @@ PY
         )"
         [[ "$import_count" == 10 ]] || status=import-fail
     fi
-    python3 - "$events" "$SAMPLES" "$SCENARIO" "$cenario" "$side" "$index" "$classe" "$status" "$wall" "$finish" "$before" "$after" "$swap_max" "$log" "$quality_result" "$app" "$app_label" "$app_version" "$MODELS" "$app_commit" "$OMU_PERF_DIR/fixtures/manifest.json" "$leaks_log" "$leaks_status" "${FIXTURES[@]}" <<'PY'
+    if (( ${#FIXTURES[@]-0} > 0 )); then set -- "${FIXTURES[@]}"; else set --; fi
+    python3 - "$events" "$SAMPLES" "$SCENARIO" "$cenario" "$side" "$index" "$classe" "$status" "$wall" "$finish" "$before" "$after" "$swap_max" "$log" "$quality_result" "$app" "$app_label" "$app_version" "$MODELS" "$app_commit" "$OMU_PERF_DIR/fixtures/manifest.json" "$leaks_log" "$leaks_status" "$@" <<'PY'
 import json,os,re,sys
 (path,out,scenario,app_scenario,side,index,kind,status,wall,exit_ns,before,after,swap_peak,log,quality_path,
  app_path,app_label,app_version,models_path,commit,manifest_path,leaks_path,leaks_status,*fixture_paths)=sys.argv[1:]
