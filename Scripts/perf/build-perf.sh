@@ -14,6 +14,7 @@ ROTULO="${1:-}"
 }
 GIT_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 GIT_BRANCH="$(git -C "$ROOT_DIR" branch --show-current)"
+SIGNING_IDENTITY="${OMU_PERF_SIGNING_IDENTITY:--}"
 
 DERIVED="$OMU_PERF_DIR/build/dd-$ROTULO"
 DESTINO="$OMU_PERF_DIR/apps/$ROTULO"
@@ -71,7 +72,7 @@ fi
 /usr/bin/ditto "$PRODUTO" "$DESTINO"
 mkdir -p "$DESTINO/Contents/Resources"
 cat > "$DESTINO/Contents/Resources/PerfBuild.json" <<EOF_BUILD
-{"rotulo":"$ROTULO","commit":"$GIT_COMMIT","branch":"$GIT_BRANCH"}
+{"rotulo":"$ROTULO","commit":"$GIT_COMMIT","branch":"$GIT_BRANCH","signing_identity":"$SIGNING_IDENTITY"}
 EOF_BUILD
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.papagaio.Papagaio.perf' "$DESTINO/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Ōmu Perf' "$DESTINO/Contents/Info.plist"
@@ -80,14 +81,20 @@ EOF_BUILD
 FRAMEWORKS="$DESTINO/Contents/Frameworks"
 if [[ -d "$FRAMEWORKS" ]]; then
     while IFS= read -r -d '' dylib; do
-        codesign --force --sign - --timestamp=none "$dylib"
+        codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$dylib"
     done < <(find "$FRAMEWORKS" -type f -name '*.dylib' -print0)
     while IFS= read -r -d '' bundle; do
-        codesign --force --sign - --timestamp=none "$bundle"
+        codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$bundle"
     done < <(find "$FRAMEWORKS" -depth -type d \( -name '*.framework' -o -name '*.bundle' \) -print0)
 fi
-codesign --force --sign - --timestamp=none --entitlements "$ENTITLEMENTS" "$DESTINO"
+codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none --entitlements "$ENTITLEMENTS" "$DESTINO"
 codesign --verify --deep --strict --verbose=2 "$DESTINO"
+TEAM_ID="$(codesign -dv --verbose=4 "$DESTINO" 2>&1 | /usr/bin/sed -n 's/^TeamIdentifier=//p' | /usr/bin/head -n 1)"
+if [[ "$SIGNING_IDENTITY" != "-" && -z "$TEAM_ID" ]]; then
+    echo "A identidade selecionada não aparece na assinatura final." >&2
+    exit 1
+fi
+printf 'TeamIdentifier=%s\n' "${TEAM_ID:-ad-hoc}"
 SIGNED_ENTITLEMENTS="$OMU_PERF_DIR/runs/entitlements-$ROTULO.plist"
 codesign -d --entitlements :- "$DESTINO" >"$SIGNED_ENTITLEMENTS" 2>/dev/null
 plutil -lint "$SIGNED_ENTITLEMENTS"
