@@ -83,7 +83,19 @@ cleanup() {
     rmdir "$LOCK" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
-"$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-0.log"
+# Pré-voo curto com espera e nova tentativa: A/B intercalado absorve a sessão ativa,
+# e a inatividade de entrada fica registrada no log de cada bloco.
+preflight_bloco() {
+    local destino="$1" tentativa
+    for ((tentativa=1; tentativa<=30; tentativa++)); do
+        "$SCRIPT_DIR/ambiente.sh" --short >"$destino" 2>&1 && { cat "$destino"; return 0; }
+        [[ ! -e "$STATE_DIR/STOP" ]] || return 20
+        printf 'Pré-voo reprovado (tentativa %s); nova checagem em 60 s: %s\n' "$tentativa" "$(tail -n 2 "$destino" | tr '\n' ' ')"
+        sleep 60
+    done
+    return 14
+}
+preflight_bloco "$DATASET/ambiente-0.log"
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 SAMPLES="$DATASET/amostras.jsonl"
 ORDER="$DATASET/ordem.txt"
@@ -214,7 +226,7 @@ for ((pair=0;pair<N;pair++)); do
             if [[ "$SCENARIO" == P7 || "$SCENARIO" == C2 ]] || (( COUNT%4==0 )); then
                 sleep 90
                 BLOCK=$((BLOCK+1))
-                "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"
+                preflight_bloco "$DATASET/ambiente-$BLOCK.log"
                 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
             fi
         fi
