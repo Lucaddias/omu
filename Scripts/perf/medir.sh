@@ -145,11 +145,26 @@ cleanup() {
     rmdir "$LOCK" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
-if [[ "$SHORT" == true && "$SEED_COUNT" == 0 ]]; then
-    "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-0.log"
-else
-    "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-0.log"
-fi
+# Entre blocos, um pré-voo reprovado (tela ativa, pico de carga) espera e tenta de novo
+# em vez de descartar a série inteira; só desiste após ~30 min sem janela válida.
+preflight_bloco() {
+    local destino="$1" tentativa
+    for ((tentativa=1; tentativa<=30; tentativa++)); do
+        if [[ "$SHORT" == true ]]; then
+            "$SCRIPT_DIR/ambiente.sh" --short >"$destino" 2>&1 && { cat "$destino"; return 0; }
+        else
+            "$SCRIPT_DIR/ambiente.sh" >"$destino" 2>&1 && { cat "$destino"; return 0; }
+        fi
+        [[ ! -e "$STATE_DIR/STOP" ]] || return 20
+        printf 'Pré-voo reprovado (tentativa %s); nova checagem em 60 s: %s\n' "$tentativa" "$(tail -n 2 "$destino" | tr '\n' ' ')"
+        sleep 60
+    done
+    return 14
+}
+
+if [[ "$SEED_COUNT" != 0 ]]; then SHORT_ORIGINAL="$SHORT"; SHORT=false; fi
+preflight_bloco "$DATASET/ambiente-0.log"
+if [[ "$SEED_COUNT" != 0 ]]; then SHORT="$SHORT_ORIGINAL"; fi
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 IDLE_NS="$(ioreg -c IOHIDSystem -d 4 | awk -F'= ' '/HIDIdleTime/ {gsub(/[^0-9]/, "", $2); print $2; exit}')"
 IDLE_S=$(( ${IDLE_NS:-0} / 1000000000 ))
@@ -195,23 +210,6 @@ PY
     printf '%s\t%ss\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$segundos" "$motivo" >>"$DATASET/resfriamento.log"
     printf 'Resfriamento adaptativo: %s s (%s)\n' "$segundos" "$motivo"
     sleep "$segundos"
-}
-
-# Entre blocos, um pré-voo reprovado (tela ativa, pico de carga) espera e tenta de novo
-# em vez de descartar a série inteira; só desiste após ~30 min sem janela válida.
-preflight_bloco() {
-    local destino="$1" tentativa
-    for ((tentativa=1; tentativa<=30; tentativa++)); do
-        if [[ "$SHORT" == true ]]; then
-            "$SCRIPT_DIR/ambiente.sh" --short >"$destino" 2>&1 && { cat "$destino"; return 0; }
-        else
-            "$SCRIPT_DIR/ambiente.sh" >"$destino" 2>&1 && { cat "$destino"; return 0; }
-        fi
-        [[ ! -e "$STATE_DIR/STOP" ]] || return 20
-        printf 'Pré-voo reprovado (tentativa %s); nova checagem em 60 s: %s\n' "$tentativa" "$(tail -n 2 "$destino" | tr '\n' ' ')"
-        sleep 60
-    done
-    return 14
 }
 
 SEED_TEMPLATE=""
