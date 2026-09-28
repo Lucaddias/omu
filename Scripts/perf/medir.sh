@@ -197,6 +197,23 @@ PY
     sleep "$segundos"
 }
 
+# Entre blocos, um pré-voo reprovado (tela ativa, pico de carga) espera e tenta de novo
+# em vez de descartar a série inteira; só desiste após ~30 min sem janela válida.
+preflight_bloco() {
+    local destino="$1" tentativa
+    for ((tentativa=1; tentativa<=30; tentativa++)); do
+        if [[ "$SHORT" == true ]]; then
+            "$SCRIPT_DIR/ambiente.sh" --short >"$destino" 2>&1 && { cat "$destino"; return 0; }
+        else
+            "$SCRIPT_DIR/ambiente.sh" >"$destino" 2>&1 && { cat "$destino"; return 0; }
+        fi
+        [[ ! -e "$STATE_DIR/STOP" ]] || return 20
+        printf 'Pré-voo reprovado (tentativa %s); nova checagem em 60 s: %s\n' "$tentativa" "$(tail -n 2 "$destino" | tr '\n' ' ')"
+        sleep 60
+    done
+    return 14
+}
+
 SEED_TEMPLATE=""
 if (( SEED_COUNT > 0 )); then
     [[ -x "$EVAL_BIN" ]] || { echo "Passe --eval-bin executável para semear a biblioteca." >&2; exit 2; }
@@ -470,7 +487,7 @@ echo "Cenário=$SCENARIO n=$N/lado; dados=$DATASET"
 run_one A "$APP_A" 0 l1 L3
 run_one B "$APP_B" 0 l1 L3
 resfriamento_adaptativo
-if [[ "$SHORT" == true ]]; then "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-1.log"; else "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-1.log"; fi
+preflight_bloco "$DATASET/ambiente-1.log"
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 TOTAL=$((N*2)); NUM=0; IA=0; IB=0
 BLOCK=1
@@ -484,12 +501,12 @@ for ((pair=0;pair<N;pair++)); do
         if [[ "$COOL_EACH" == true ]] && (( NUM<TOTAL )); then
             resfriamento_adaptativo
             BLOCK=$((BLOCK+1))
-            if [[ "$SHORT" == true ]]; then "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; else "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; fi
+            preflight_bloco "$DATASET/ambiente-$BLOCK.log"
             CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
         elif (( NUM%4==0 && NUM<TOTAL )); then
             resfriamento_adaptativo
             BLOCK=$((BLOCK+1))
-            if [[ "$SHORT" == true ]]; then "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; else "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; fi
+            preflight_bloco "$DATASET/ambiente-$BLOCK.log"
             CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
         fi
     done
