@@ -160,6 +160,42 @@ fi
 SAMPLES="$DATASET/amostras.jsonl"; ORDER="$DATASET/ordem.txt"
 : > "$SAMPLES"; : > "$ORDER"
 swap_bytes() { sysctl vm.swapusage | python3 -c 'import re,sys; m=re.search(r"used = ([0-9.]+)([KMG])",sys.stdin.read()); f={"K":1024,"M":1024**2,"G":1024**3}; print(int(float(m.group(1))*f[m.group(2)]) if m else 0)' ; }
+resfriamento_adaptativo() {
+    local alerta segundos motivo seguro
+    alerta="$(pmset -g therm | /usr/bin/grep -Ei 'warning|serious|critical|throttl' | /usr/bin/grep -Ev 'No (thermal|performance) warning level' || true)"
+    if [[ -n "$alerta" ]]; then
+        segundos=120
+        motivo="aviso térmico; ampliar resfriamento"
+    else
+        seguro="$(python3 - "$SAMPLES" <<'PY'
+import json,sys
+try:
+    registros=[json.loads(linha) for linha in open(sys.argv[1],encoding="utf-8") if linha.strip()]
+except (OSError,json.JSONDecodeError):
+    registros=[]
+ultimos=registros[-2:]
+def nominal(registro):
+    metricas=registro.get("metricas",{})
+    estados=metricas.get("thermal_states",[])
+    return (registro.get("status")=="ok"
+        and not registro.get("contaminada_swap")
+        and not registro.get("contaminada_thermal")
+        and bool(estados) and set(estados)=={"nominal"})
+print("sim" if len(ultimos)==2 and all(nominal(r) for r in ultimos) else "nao")
+PY
+        )"
+        if [[ "$seguro" == sim ]]; then
+            segundos=60
+            motivo="thermal state nominal, sem alerta e sem crescimento de swap"
+        else
+            segundos=90
+            motivo="telemetria térmica/swap incompleta ou fora do estado nominal"
+        fi
+    fi
+    printf '%s\t%ss\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$segundos" "$motivo" >>"$DATASET/resfriamento.log"
+    printf 'Resfriamento adaptativo: %s s (%s)\n' "$segundos" "$motivo"
+    sleep "$segundos"
+}
 
 SEED_TEMPLATE=""
 if (( SEED_COUNT > 0 )); then
@@ -179,7 +215,7 @@ if (( SEED_COUNT > 0 )); then
     SEED_PID=$!
     printf 'seed pid=%s log=%s\n' "$SEED_PID" "$SEED_LOG"
     if wait "$SEED_PID"; then :; else SEED_STATUS=$?; cat "$SEED_LOG" >&2; exit "$SEED_STATUS"; fi
-    sleep 90
+    resfriamento_adaptativo
     if [[ "$SHORT" == true ]]; then "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-seed.log"; else "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-seed.log"; fi
     CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 fi
@@ -238,7 +274,7 @@ run_one() {
     leaks_status=not-run; leaks_log="$DATASET/leaks-$classe-$side-$index.log"; leaks_pid=""
     before="$(swap_bytes)"; start="$(python3 -c 'import time;print(time.monotonic_ns())')"
     /usr/bin/nohup /usr/bin/perl -e 'alarm shift;exec @ARGV' "$TIMEOUT" /usr/bin/open -n -F -W \
-        --env PAPAGAIO_TEST_MODE=1 "$app" --args "${args[@]}" >"$log" 2>&1 &
+        --env PAPAGAIO_TEST_MODE=1 --env "OMU_PERF_DIR=$OMU_PERF_DIR" "$app" --args "${args[@]}" >"$log" 2>&1 &
     local pid=$!; status=ok
     ( while kill -0 "$pid" 2>/dev/null; do swap_bytes; sleep 1; done ) >"$swap_log" &
     local monitor_pid=$!
@@ -269,6 +305,23 @@ run_one() {
         fi
     fi
     if wait "$pid"; then :; else status="falhou:$?"; fi
+    if [[ "$SCENARIO_UPPER" == L1 && "$status" == ok ]]; then
+        if ! python3 - "$events" <<'PY'
+import json,sys
+path=sys.argv[1]
+try:
+    eventos={json.loads(line).get("evento") for line in open(path,encoding="utf-8")}
+except (OSError,json.JSONDecodeError) as erro:
+    raise SystemExit(f"não foi possível ler eventos L1: {erro}")
+obrigatorios={"process.start","ui.first_frame","ui.interactive","terminate.scheduled"}
+faltando=sorted(obrigatorios-eventos)
+if faltando:
+    raise SystemExit("eventos L1 ausentes: "+", ".join(faltando))
+PY
+        then
+            status=probe-events-missing
+        fi
+    fi
     if [[ -n "$leaks_pid" ]]; then
         if wait "$leaks_pid"; then
             leaks_status=ok
@@ -410,13 +463,13 @@ if fixture_paths and os.path.isfile(manifest_path):
 with open(out,"a",encoding="utf-8") as f: f.write(json.dumps(record,ensure_ascii=False,sort_keys=True)+"\n")
 print(json.dumps(record,ensure_ascii=False,sort_keys=True))
 PY
-    [[ "$status" == ok && -f "$events" ]] || { echo "Falha ($status); log: $log" >&2; return 1; }
+    [[ "$status" == ok && -s "$events" ]] || { echo "Falha ($status); log: $log" >&2; return 1; }
 }
 
 echo "Cenário=$SCENARIO n=$N/lado; dados=$DATASET"
 run_one A "$APP_A" 0 l1 L3
 run_one B "$APP_B" 0 l1 L3
-sleep 90
+resfriamento_adaptativo
 if [[ "$SHORT" == true ]]; then "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-1.log"; else "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-1.log"; fi
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 TOTAL=$((N*2)); NUM=0; IA=0; IB=0
@@ -429,12 +482,12 @@ for ((pair=0;pair<N;pair++)); do
         printf '%s\t%s\t%s\n' "$side" "$index" "$SCENARIO" >> "$ORDER"
         run_one "$side" "$app" "$index" "$SCENARIO" amostra
         if [[ "$COOL_EACH" == true ]] && (( NUM<TOTAL )); then
-            sleep 90
+            resfriamento_adaptativo
             BLOCK=$((BLOCK+1))
             if [[ "$SHORT" == true ]]; then "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; else "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; fi
             CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
         elif (( NUM%4==0 && NUM<TOTAL )); then
-            sleep 90
+            resfriamento_adaptativo
             BLOCK=$((BLOCK+1))
             if [[ "$SHORT" == true ]]; then "$SCRIPT_DIR/ambiente.sh" --short 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; else "$SCRIPT_DIR/ambiente.sh" 2>&1 | tee "$DATASET/ambiente-$BLOCK.log"; fi
             CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"

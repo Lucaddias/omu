@@ -41,7 +41,8 @@ CAFFEINATE_PID="$(cat "$OMU_PERF_DIR/estado/caffeinate.pid")"
 if [[ "$KIND" == "--launch" ]]; then
     /usr/bin/nohup /usr/bin/perl -e 'alarm shift; exec @ARGV' 7200 \
         xcrun xctrace record --template "$TEMPLATE" --output "$TRACE" --time-limit "$DURATION" \
-        --no-prompt --env PAPAGAIO_TEST_MODE=1 --launch -- "$TARGET" "$@" >"$LOG" 2>&1 &
+        --no-prompt --env PAPAGAIO_TEST_MODE=1 --env "OMU_PERF_DIR=$OMU_PERF_DIR" \
+        --launch -- "$TARGET" "$@" >"$LOG" 2>&1 &
 else
     /usr/bin/nohup /usr/bin/perl -e 'alarm shift; exec @ARGV' 7200 \
         xcrun xctrace record --template "$TEMPLATE" --output "$TRACE" --time-limit "$DURATION" \

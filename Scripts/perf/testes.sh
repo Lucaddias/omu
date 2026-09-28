@@ -58,6 +58,7 @@ if run_limitado 900 "$APP_LOG" env PAPAGAIO_TEST_MODE=1 \
     -parallel-testing-enabled NO \
     -resultBundlePath "$RESULTADO" \
     -derivedDataPath "$DERIVED_APP_TEST" \
+    'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) OMU_PERF' \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO; then
     :

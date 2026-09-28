@@ -16,6 +16,27 @@ struct ConfiguracaoPerf: Sendable {
 
     var fixture: URL? { fixtures.first }
 
+    static func homeDoUsuario(ambiente: [String: String], fallback: URL) -> URL {
+        guard let caminho = ambiente["HOME"], caminho.hasPrefix("/") else {
+            return fallback.standardizedFileURL
+        }
+        return URL(fileURLWithPath: caminho, isDirectory: true).standardizedFileURL
+    }
+
+    static func diretorioDoLoop(home: URL, ambiente: [String: String]) -> URL {
+        let padrao = home.appendingPathComponent("OmuPerf", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard let caminhoSolicitado = ambiente["OMU_PERF_DIR"], !caminhoSolicitado.isEmpty else {
+            return padrao
+        }
+
+        let solicitado = URL(fileURLWithPath: caminhoSolicitado, isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL
+        let pertenceAoLoop = solicitado.path == padrao.path
+            || solicitado.path.hasPrefix(padrao.path + "/")
+        return pertenceAoLoop ? solicitado : padrao
+    }
+
     static func ler() -> ConfiguracaoPerf? {
         let argumentos = Array(ProcessInfo.processInfo.arguments.dropFirst())
         var valores: [String: String] = [:]
@@ -36,8 +57,13 @@ struct ConfiguracaoPerf: Sendable {
         }
 
         guard let cenario = valores["--perf-cenario"] else { return nil }
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let raizDeRuns = home.appendingPathComponent("OmuPerf/runs", isDirectory: true)
+        let ambiente = ProcessInfo.processInfo.environment
+        let home = Self.homeDoUsuario(
+            ambiente: ambiente,
+            fallback: FileManager.default.homeDirectoryForCurrentUser
+        )
+        let diretorioDoLoop = Self.diretorioDoLoop(home: home, ambiente: ambiente)
+        let raizDeRuns = diretorioDoLoop.appendingPathComponent("runs", isDirectory: true)
             .resolvingSymlinksInPath().standardizedFileURL
         let raizPadrao = raizDeRuns.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let raizSolicitada = URL(
@@ -47,8 +73,8 @@ struct ConfiguracaoPerf: Sendable {
         let raizPermitida = raizSolicitada.path == raizDeRuns.path
             || raizSolicitada.path.hasPrefix(raizDeRuns.path + "/")
         let raiz = raizPermitida ? raizSolicitada : raizPadrao
-        let modelosPadrao = home
-            .appendingPathComponent("OmuPerf/fixtures/modelos-nao-configurados", isDirectory: true)
+        let modelosPadrao = diretorioDoLoop
+            .appendingPathComponent("fixtures/modelos-nao-configurados", isDirectory: true)
         let modelosSolicitados = URL(
             fileURLWithPath: valores["--perf-modelos"] ?? modelosPadrao.path,
             isDirectory: true
@@ -56,7 +82,7 @@ struct ConfiguracaoPerf: Sendable {
         let modelosDoApp = home
             .appendingPathComponent("Library/Application Support/Papagaio/Models", isDirectory: true)
             .resolvingSymlinksInPath().standardizedFileURL
-        let raizDeFixtures = home.appendingPathComponent("OmuPerf/fixtures", isDirectory: true)
+        let raizDeFixtures = diretorioDoLoop.appendingPathComponent("fixtures", isDirectory: true)
             .resolvingSymlinksInPath().standardizedFileURL
         let modelosPermitidos = modelosSolicitados.path == modelosDoApp.path
             || modelosSolicitados.path.hasPrefix(raizDeFixtures.path + "/")
