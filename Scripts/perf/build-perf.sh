@@ -77,6 +77,12 @@ EOF_BUILD
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.papagaio.Papagaio.perf' "$DESTINO/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Ōmu Perf' "$DESTINO/Contents/Info.plist"
 /usr/bin/xattr -cr "$DESTINO"
+# Com identidade Apple Development, embute o profile local do bundle `.perf` (se houver)
+# para a assinatura ficar idêntica à que já abriu pelo `open` neste Mac.
+PROFILE="${OMU_PERF_PROFILE:-$OMU_PERF_DIR/profiles/TestsPapagaio.provisionprofile}"
+if [[ "$SIGNING_IDENTITY" != "-" && -f "$PROFILE" ]]; then
+    /bin/cp "$PROFILE" "$DESTINO/Contents/embedded.provisionprofile"
+fi
 
 FRAMEWORKS="$DESTINO/Contents/Frameworks"
 if [[ -d "$FRAMEWORKS" ]]; then

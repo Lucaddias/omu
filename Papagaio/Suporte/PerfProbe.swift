@@ -23,6 +23,16 @@ struct ConfiguracaoPerf: Sendable {
         return URL(fileURLWithPath: caminho, isDirectory: true).standardizedFileURL
     }
 
+    /// No App Sandbox, `HOME` e `homeDirectoryForCurrentUser` apontam para o container;
+    /// as exceções home-relative dos entitlements usam o home real da conta, que só o
+    /// `getpwuid` devolve. Sem isso a sonda recusava `OMU_PERF_DIR` e gravava no container.
+    static func homeDaConta() -> URL? {
+        guard let registro = getpwuid(getuid()), let diretorio = registro.pointee.pw_dir else {
+            return nil
+        }
+        return URL(fileURLWithPath: String(cString: diretorio), isDirectory: true).standardizedFileURL
+    }
+
     static func diretorioDoLoop(home: URL, ambiente: [String: String]) -> URL {
         let padrao = home.appendingPathComponent("OmuPerf", isDirectory: true)
             .resolvingSymlinksInPath().standardizedFileURL
@@ -58,7 +68,7 @@ struct ConfiguracaoPerf: Sendable {
 
         guard let cenario = valores["--perf-cenario"] else { return nil }
         let ambiente = ProcessInfo.processInfo.environment
-        let home = Self.homeDoUsuario(
+        let home = Self.homeDaConta() ?? Self.homeDoUsuario(
             ambiente: ambiente,
             fallback: FileManager.default.homeDirectoryForCurrentUser
         )
