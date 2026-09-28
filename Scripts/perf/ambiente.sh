@@ -77,7 +77,7 @@ else
 AMOSTRA_TOP="$(top -l 2 -s 1 -o cpu -n 50 -stats pid,cpu,command)"
 PROCESSOS_PESADOS="$(echo "$AMOSTRA_TOP" | awk '
     /^[[:space:]]*PID[[:space:]]+%CPU/ { amostra++; next }
-    amostra == 2 && ($2 + 0) >= 10 && tolower($0) ~ /(xcodebuild|xcode|swift-|swiftc|swift-frontend|sourcekit|mds_stores|mdworker|fileproviderd|backupd|papagaio|omu)/ { print }
+    amostra == 2 && ($2 + 0) >= 10 && tolower($0) ~ /(xcodebuild|xcode|swift-|swiftc|swift-frontend|sourcekit|mds_stores|mdworker|fileproviderd|backupd|mediaanalysisd|photoanalysisd|searchpartyuse|papagaio|omu)/ { print }
     amostra == 2 && ($2 + 0) >= 60 && tolower($0) ~ /(chrome|terminal|zoom|windowserver|finder|chatgpt|claude|codex|opencode|cursor|zed|notion)/ { print }
 ')"
 OCIOSA="$(echo "$AMOSTRA_TOP" | awk '/^CPU usage/ { n++; if (n == 2) { for (i = 1; i <= NF; i++) if ($i ~ /idle/) { v = $(i-1); gsub(/%/, "", v); print int(v) } } }')"

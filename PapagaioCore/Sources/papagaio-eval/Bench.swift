@@ -94,13 +94,16 @@ enum Medidor {
         iteracoes: Int = 3,
         unidade: String? = nil,
         detalhes: [String: String]? = nil,
+        aquecimento: (() async throws -> Void)? = nil,
         _ corpo: () async throws -> Void
-    ) async rethrows -> ResultadoBench {
+    ) async throws -> ResultadoBench {
         let quantidade = max(1, iteracoes)
         var tempos: [Double] = []
         tempos.reserveCapacity(quantidade)
 
-        try await corpo() // warm-up
+        // Warm-up (descartado). Um aquecimento curto pelo mesmo caminho basta para
+        // compilar kernels e aquecer o cache sem pagar de novo os ~3 min do Qwen.
+        if let aquecimento { try await aquecimento() } else { try await corpo() }
 
         for _ in 0..<quantidade {
             let relogio = ContinuousClock()

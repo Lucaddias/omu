@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
         *) echo "Argumento desconhecido: $1" >&2; exit 2 ;;
     esac
 done
-[[ "$SCENARIO" == C1 || "$SCENARIO" == C2 || "$SCENARIO" == P7 ]] || { echo "Use C1, C2 ou P7." >&2; exit 2; }
+[[ "$SCENARIO" == C1 || "$SCENARIO" == C2 || "$SCENARIO" == Q2 || "$SCENARIO" == P7 ]] || { echo "Use C1, C2, Q2 ou P7." >&2; exit 2; }
 [[ "$N" =~ ^[1-9][0-9]{0,2}$ && "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || { echo "n/timeout inválido." >&2; exit 2; }
 (( N <= 100 )) || { echo "n acima do limite de segurança (100)." >&2; exit 2; }
 APPS_ROOT="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$OMU_PERF_DIR/apps")"
@@ -40,7 +40,7 @@ for BIN in "$BIN_A" "$BIN_B"; do
     case "$BIN" in "$APPS_ROOT"/core-*/papagaio-eval) ;; *) echo "CLI precisa estar em ~/OmuPerf/apps/core-*/papagaio-eval." >&2; exit 2 ;; esac
     [[ -x "$BIN" && -f "$(dirname "$BIN")/PerfBuild.json" ]] || { echo "Build do core ausente: $BIN" >&2; exit 2; }
 done
-if [[ "$SCENARIO" == C2 ]]; then
+if [[ "$SCENARIO" == C2 || "$SCENARIO" == Q2 ]]; then
     FIXROOT="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$OMU_PERF_DIR/fixtures")/"
     AUDIO="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$AUDIO")"
     case "$AUDIO" in "$FIXROOT"*) ;; *) echo "Fixture C2 precisa estar em ~/OmuPerf/fixtures/." >&2; exit 2 ;; esac
@@ -120,6 +120,9 @@ run_one() {
         args+=(--somente-caso aec.processarBlocos)
     elif [[ "$SCENARIO" == C1 ]]; then
         args+=(--so-micro)
+    elif [[ "$SCENARIO" == Q2 ]]; then
+        # Q2: só resumo/tradução do Qwen, aquecimento curto (A/B do LlamaRuntime).
+        args+=(--modelos "$MODELS" --audio "$AUDIO" --somente-qwen)
     else
         args+=(--modelos "$MODELS" --audio "$AUDIO")
     fi
@@ -159,12 +162,17 @@ elif scenario=="C2":
     missing=required-{item.get("nome") for item in results}
     if missing: raise SystemExit("faltam macros do C2: "+", ".join(sorted(missing)))
     results=[item for item in results if item.get("nome","").startswith("macro.")]
+elif scenario=="Q2":
+    required={"macro.qwen.cicloCargaDescarga","macro.qwen.resumir","macro.qwen.traduzir"}
+    missing=required-{item.get("nome") for item in results}
+    if missing: raise SystemExit("faltam macros do Q2: "+", ".join(sorted(missing)))
+    results=[item for item in results if item.get("nome","") in required]
 with open(out,"a",encoding="utf-8") as stream:
     for result in results:
         name=result.get("nome","unknown")
         details=result.get("detalhes") or {}
         artifact_path=None
-        if scenario=="C2" and name in ("macro.whisper.transcrever","macro.qwen.resumir","macro.qwen.traduzir"):
+        if scenario in ("C2","Q2") and name in ("macro.whisper.transcrever","macro.qwen.resumir","macro.qwen.traduzir"):
             import base64
             artifact_dir=os.path.join(os.path.dirname(out),"quality-artifacts")
             os.makedirs(artifact_dir,exist_ok=True)
@@ -223,7 +231,7 @@ for ((pair=0;pair<N;pair++)); do
         printf '%s\t%s\n' "$side" "$index" >> "$ORDER"
         run_one "$side" "$binary" "$index"
         if (( COUNT<TOTAL )); then
-            if [[ "$SCENARIO" == P7 || "$SCENARIO" == C2 ]] || (( COUNT%4==0 )); then
+            if [[ "$SCENARIO" == P7 || "$SCENARIO" == C2 || "$SCENARIO" == Q2 ]] || (( COUNT%4==0 )); then
                 sleep 90
                 BLOCK=$((BLOCK+1))
                 preflight_bloco "$DATASET/ambiente-$BLOCK.log"
@@ -255,5 +263,20 @@ PY
 fi
 if [[ "$SCENARIO" == C2 ]]; then
     python3 "$SCRIPT_DIR/validar-c2.py" "$SAMPLES" "$DATASET"
+fi
+if [[ "$SCENARIO" == Q2 ]]; then
+    # Portão EXATO: resumo e tradução byte a byte iguais em todas as amostras A e B.
+    python3 - "$DATASET/quality-artifacts" "$DATASET/qualidade-q2.json" <<'PY'
+import glob,hashlib,json,os,sys
+pasta,destino=sys.argv[1:]
+relatorio={}
+for prefixo in ("qwen-summary","qwen-translation"):
+    hashes={os.path.basename(f):hashlib.sha256(open(f,"rb").read()).hexdigest() for f in sorted(glob.glob(f"{pasta}/{prefixo}-*.json"))}
+    relatorio[prefixo]={"arquivos":hashes,"identicos":len(set(hashes.values()))==1 and len(hashes)>1}
+relatorio["aceito"]=all(v["identicos"] for v in relatorio.values() if isinstance(v,dict))
+json.dump(relatorio,open(destino,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
+print(json.dumps({k:(v["identicos"] if isinstance(v,dict) else v) for k,v in relatorio.items()}))
+if not relatorio["aceito"]: raise SystemExit("Q2: saídas do Qwen divergem entre amostras (portão EXATO)")
+PY
 fi
 printf 'Concluído: %s\nAmostras: %s\nOrdem: %s\n' "$DATASET" "$SAMPLES" "$ORDER"

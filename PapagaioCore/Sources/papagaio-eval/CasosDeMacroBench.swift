@@ -15,6 +15,9 @@ enum CasosDeMacroBench {
         var incluirResumo: Bool = true
         var incluirTraducao: Bool = true
         var incluirDiarizacao: Bool = false
+        /// Só as macros do Qwen, com aquecimento curto: A/B de mudanças no LlamaRuntime
+        /// sem o custo dos micro-casos, do Whisper e de um segundo resumo completo.
+        var somenteQwen: Bool = false
     }
 
     /// Confirma acesso de leitura antes de abrir os pesos informados explicitamente.
@@ -79,7 +82,7 @@ enum CasosDeMacroBench {
         }
 
         // —— Carga/descarga do Whisper (o custo que a fila paga por arquivo) ——
-        do {
+        if !opcoes.somenteQwen { do {
             let r = try await Medidor.medirAsync(
                 nome: "macro.whisper.cicloCargaDescarga",
                 iteracoes: 2,
@@ -92,10 +95,10 @@ enum CasosDeMacroBench {
             resultados.append(r)
         } catch {
             print("AVISO: falha no ciclo Whisper: \(error)")
-        }
+        } }
 
         // —— Transcrição de áudio real (se fornecido) ——
-        if let audio = opcoes.audio,
+        if !opcoes.somenteQwen, let audio = opcoes.audio,
            FileManager.default.fileExists(atPath: audio.path) {
             do {
                 let duracao = try await duracaoDoAudio(audio)
@@ -173,7 +176,10 @@ enum CasosDeMacroBench {
                     detalhes: [
                         "tokens_entrada": String(tokens),
                         "modo": tokens <= ContextoLlama.tetoDeEntrada ? "passe-unico" : "map-reduce",
-                    ]
+                    ],
+                    aquecimento: opcoes.somenteQwen
+                        ? { _ = try await engine.summarize(sintetizarTrechos(quantidade: 8)) }
+                        : nil
                 ) {
                     ultimoResumo = try await engine.summarize(trechos)
                 }
@@ -204,7 +210,10 @@ enum CasosDeMacroBench {
                     nome: "macro.qwen.traduzir",
                     iteracoes: 1,
                     unidade: "40 trechos pt→en",
-                    detalhes: ["lotes_tokens": String(QwenEngine.tokensPorLoteDeTraducao)]
+                    detalhes: ["lotes_tokens": String(QwenEngine.tokensPorLoteDeTraducao)],
+                    aquecimento: opcoes.somenteQwen
+                        ? { _ = try await engine.traduzir(sintetizarTrechos(quantidade: 2), para: .ingles) }
+                        : nil
                 ) {
                     ultimaTraducao = try await engine.traduzir(trechos, para: .ingles)
                 }

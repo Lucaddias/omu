@@ -497,6 +497,7 @@ case "bench":
     var saida: String?
     var compararCom: String?
     var somenteCaso: String?
+    var somenteQwen = false
 
     var i = 1
     while i < argumentos.count {
@@ -515,6 +516,8 @@ case "bench":
             compararCom = argumentos[i + 1]; i += 2
         case "--somente-caso" where i + 1 < argumentos.count:
             somenteCaso = argumentos[i + 1]; i += 2
+        case "--somente-qwen":
+            somenteQwen = true; i += 1
         default:
             print("argumento desconhecido: \(argumentos[i])")
             exit(2)
@@ -579,7 +582,7 @@ case "bench":
         soMicro = true
         print("\n--- micro-benchmark isolado: \(somenteCaso) ---")
         todos.append(CasosDeMicroBench.rodarAEC(iteracoes: iteracoes))
-    } else {
+    } else if !somenteQwen {
         print("\n--- micro-benchmarks (sem modelos) ---")
         todos += await CasosDeMicroBench.rodar(iteracoes: iteracoes)
     }
@@ -590,7 +593,8 @@ case "bench":
             let macro = CasosDeMacroBench.Opcoes(
                 pastaDeModelos: modelos,
                 audio: audio,
-                iteracoes: max(1, min(iteracoes, 3))
+                iteracoes: max(1, min(iteracoes, 3)),
+                somenteQwen: somenteQwen
             )
             todos += await CasosDeMacroBench.rodar(macro)
         } else {
