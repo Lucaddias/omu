@@ -32,7 +32,7 @@ limpar() {
 }
 trap limpar EXIT INT TERM
 
-"$SCRIPT_DIR/ambiente.sh" --short >"$OMU_PERF_DIR/runs/build-core-$ROTULO-environment.log" 2>&1
+"$SCRIPT_DIR/ambiente.sh" --infra >"$OMU_PERF_DIR/runs/build-core-$ROTULO-environment.log" 2>&1
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 OMU_PERF_BUILD=1 /usr/bin/nohup /usr/bin/perl -e 'alarm shift; exec @ARGV' 7200 \
     swift build \

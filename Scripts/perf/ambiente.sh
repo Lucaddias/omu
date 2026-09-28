@@ -5,7 +5,10 @@ set -euo pipefail
 OMU_PERF_DIR="${OMU_PERF_DIR:-$HOME/OmuPerf}"
 STATE_DIR="$OMU_PERF_DIR/estado"
 SHORT=false
+INFRA=false
 [[ "${1:-}" == "--short" ]] && SHORT=true
+# Build/teste não são medição: só exigem energia, térmica, disco e memória.
+[[ "${1:-}" == "--infra" ]] && { SHORT=true; INFRA=true; }
 
 [[ -d "$STATE_DIR" ]] || { echo "Estado do loop ausente: $STATE_DIR" >&2; exit 2; }
 
@@ -63,6 +66,10 @@ if (( ATIVIDADE_S < 120 )) && [[ "$SHORT" != true ]]; then
     exit 13
 fi
 
+if [[ "$INFRA" == true ]]; then
+    PROCESSOS_PESADOS=""
+    OCIOSA=""
+else
 # Build/indexação/backup competem pelos mesmos núcleos: limite de 10%.
 # Apps interativos (compositor, terminal, agente, navegador) ficam sempre um pouco ativos
 # enquanto o loop roda na sessão gráfica; o A/B intercalado absorve esse ruído de fundo,
@@ -78,6 +85,7 @@ echo "CPU ociosa: ${OCIOSA:-?}%"
 if [[ "$OCIOSA" =~ ^[0-9]+$ ]] && (( OCIOSA < 70 )); then
     echo "PAUSA: CPU ociosa global abaixo de 70%."
     exit 14
+fi
 fi
 if [[ -n "$PROCESSOS_PESADOS" ]]; then
     echo "PAUSA: processo pesado ou Ōmu detectado:"
