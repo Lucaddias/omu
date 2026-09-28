@@ -23,7 +23,7 @@ limpar() {
     rmdir "$STATE_DIR/infra.lock" 2>/dev/null || true
 }
 trap limpar EXIT INT TERM
-"$SCRIPT_DIR/ambiente.sh" >"$RUNS_DIR/testes-$RUN_ID-environment.log" 2>&1
+"$SCRIPT_DIR/ambiente.sh" --short >"$RUNS_DIR/testes-$RUN_ID-environment.log" 2>&1
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 
 run_limitado() {
