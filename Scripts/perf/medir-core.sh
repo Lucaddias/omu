@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
         *) echo "Argumento desconhecido: $1" >&2; exit 2 ;;
     esac
 done
-[[ "$SCENARIO" == C1 || "$SCENARIO" == C2 || "$SCENARIO" == Q2 || "$SCENARIO" == P7 ]] || { echo "Use C1, C2, Q2 ou P7." >&2; exit 2; }
+[[ "$SCENARIO" == C1 || "$SCENARIO" == C2 || "$SCENARIO" == Q2 || "$SCENARIO" == T2 || "$SCENARIO" == P7 ]] || { echo "Use C1, C2, Q2, T2 ou P7." >&2; exit 2; }
 [[ "$N" =~ ^[1-9][0-9]{0,2}$ && "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || { echo "n/timeout inválido." >&2; exit 2; }
 (( N <= 100 )) || { echo "n acima do limite de segurança (100)." >&2; exit 2; }
 APPS_ROOT="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$OMU_PERF_DIR/apps")"
@@ -40,7 +40,7 @@ for BIN in "$BIN_A" "$BIN_B"; do
     case "$BIN" in "$APPS_ROOT"/core-*/papagaio-eval) ;; *) echo "CLI precisa estar em ~/OmuPerf/apps/core-*/papagaio-eval." >&2; exit 2 ;; esac
     [[ -x "$BIN" && -f "$(dirname "$BIN")/PerfBuild.json" ]] || { echo "Build do core ausente: $BIN" >&2; exit 2; }
 done
-if [[ "$SCENARIO" == C2 || "$SCENARIO" == Q2 ]]; then
+if [[ "$SCENARIO" == C2 || "$SCENARIO" == Q2 || "$SCENARIO" == T2 ]]; then
     FIXROOT="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$OMU_PERF_DIR/fixtures")/"
     AUDIO="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$AUDIO")"
     case "$AUDIO" in "$FIXROOT"*) ;; *) echo "Fixture C2 precisa estar em ~/OmuPerf/fixtures/." >&2; exit 2 ;; esac
@@ -120,6 +120,9 @@ run_one() {
         args+=(--somente-caso aec.processarBlocos)
     elif [[ "$SCENARIO" == C1 ]]; then
         args+=(--so-micro)
+    elif [[ "$SCENARIO" == T2 ]]; then
+        # T2: triagem de ~256 tokens com gramática; só descarta ideias, nunca aceita.
+        args+=(--modelos "$MODELS" --audio "$AUDIO" --triagem-qwen)
     elif [[ "$SCENARIO" == Q2 ]]; then
         # Q2: só resumo/tradução do Qwen, aquecimento curto (A/B do LlamaRuntime).
         args+=(--modelos "$MODELS" --audio "$AUDIO" --somente-qwen)
@@ -162,6 +165,9 @@ elif scenario=="C2":
     missing=required-{item.get("nome") for item in results}
     if missing: raise SystemExit("faltam macros do C2: "+", ".join(sorted(missing)))
     results=[item for item in results if item.get("nome","").startswith("macro.")]
+elif scenario=="T2":
+    if not any(item.get("nome")=="macro.qwen.triagem" for item in results):
+        raise SystemExit("falta macro.qwen.triagem no T2")
 elif scenario=="Q2":
     required={"macro.qwen.cicloCargaDescarga","macro.qwen.resumir","macro.qwen.traduzir"}
     missing=required-{item.get("nome") for item in results}
@@ -172,7 +178,7 @@ with open(out,"a",encoding="utf-8") as stream:
         name=result.get("nome","unknown")
         details=result.get("detalhes") or {}
         artifact_path=None
-        if scenario in ("C2","Q2") and name in ("macro.whisper.transcrever","macro.qwen.resumir","macro.qwen.traduzir"):
+        if scenario in ("C2","Q2","T2") and name in ("macro.whisper.transcrever","macro.qwen.resumir","macro.qwen.traduzir","macro.qwen.triagem"):
             import base64
             artifact_dir=os.path.join(os.path.dirname(out),"quality-artifacts")
             os.makedirs(artifact_dir,exist_ok=True)
@@ -194,7 +200,7 @@ with open(out,"a",encoding="utf-8") as stream:
                 encoded=details.get("traducao_trechos_json_base64")
                 if not encoded: raise SystemExit("C2 sem saída de tradução")
                 arquivo["trechos"]=json.loads(base64.b64decode(encoded))
-                filename="qwen-translation"
+                filename="qwen-triage" if name=="macro.qwen.triagem" else "qwen-translation"
             artifact_path=os.path.join(artifact_dir,f"{filename}-{side}-{index}.json")
             with open(artifact_path,"w",encoding="utf-8") as artifact:
                 json.dump(arquivo,artifact,ensure_ascii=False,separators=(",",":"))
@@ -222,6 +228,18 @@ PY
     [[ "$status" == ok && -f "$report" ]] || { echo "Falha ($status); log: $log" >&2; return 1; }
 }
 
+# 60 s quando a última amostra saiu limpa (sem swap crescendo, sem alerta térmico);
+# 90 s caso contrário. Registrado em resfriamento.log.
+resfriamento_adaptativo() {
+    local segundos=90 motivo="última amostra contaminada ou ausente"
+    if [[ -s "$SAMPLES" ]] && python3 -c 'import json,sys; r=json.loads(open(sys.argv[1]).read().splitlines()[-1]); sys.exit(0 if r.get("status")=="ok" and not r.get("contaminada_swap") and not r.get("contaminada_thermal") else 1)' "$SAMPLES" \
+        && [[ -z "$(pmset -g therm | /usr/bin/grep -Ei 'warning|serious|critical|throttl' | /usr/bin/grep -Ev 'No (thermal|performance) warning level' || true)" ]]; then
+        segundos=60; motivo="térmica nominal e swap estável"
+    fi
+    printf '%s\t%ss\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$segundos" "$motivo" >>"$DATASET/resfriamento.log"
+    sleep "$segundos"
+}
+
 TOTAL=$((N*2)); COUNT=0; INDEX_A=0; INDEX_B=0; BLOCK=0
 for ((pair=0;pair<N;pair++)); do
     if (( pair%2==0 )); then ORDEM=(A B); else ORDEM=(B A); fi
@@ -231,8 +249,8 @@ for ((pair=0;pair<N;pair++)); do
         printf '%s\t%s\n' "$side" "$index" >> "$ORDER"
         run_one "$side" "$binary" "$index"
         if (( COUNT<TOTAL )); then
-            if [[ "$SCENARIO" == P7 || "$SCENARIO" == C2 || "$SCENARIO" == Q2 ]] || (( COUNT%4==0 )); then
-                sleep 90
+            if [[ "$SCENARIO" == P7 || "$SCENARIO" == C2 || "$SCENARIO" == Q2 || "$SCENARIO" == T2 ]] || (( COUNT%4==0 )); then
+                resfriamento_adaptativo
                 BLOCK=$((BLOCK+1))
                 preflight_bloco "$DATASET/ambiente-$BLOCK.log"
                 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
@@ -264,14 +282,15 @@ fi
 if [[ "$SCENARIO" == C2 ]]; then
     python3 "$SCRIPT_DIR/validar-c2.py" "$SAMPLES" "$DATASET"
 fi
-if [[ "$SCENARIO" == Q2 ]]; then
+if [[ "$SCENARIO" == Q2 || "$SCENARIO" == T2 ]]; then
     # Portão EXATO: resumo e tradução byte a byte iguais em todas as amostras A e B.
     python3 - "$DATASET/quality-artifacts" "$DATASET/qualidade-q2.json" <<'PY'
 import glob,hashlib,json,os,sys
 pasta,destino=sys.argv[1:]
 relatorio={}
-for prefixo in ("qwen-summary","qwen-translation"):
+for prefixo in ("qwen-summary","qwen-translation","qwen-triage"):
     hashes={os.path.basename(f):hashlib.sha256(open(f,"rb").read()).hexdigest() for f in sorted(glob.glob(f"{pasta}/{prefixo}-*.json"))}
+    if not hashes: continue
     relatorio[prefixo]={"arquivos":hashes,"identicos":len(set(hashes.values()))==1 and len(hashes)>1}
 relatorio["aceito"]=all(v["identicos"] for v in relatorio.values() if isinstance(v,dict))
 json.dump(relatorio,open(destino,"w",encoding="utf-8"),ensure_ascii=False,indent=2)

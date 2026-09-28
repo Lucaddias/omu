@@ -498,6 +498,7 @@ case "bench":
     var compararCom: String?
     var somenteCaso: String?
     var somenteQwen = false
+    var somenteTriagem = false
 
     var i = 1
     while i < argumentos.count {
@@ -518,6 +519,8 @@ case "bench":
             somenteCaso = argumentos[i + 1]; i += 2
         case "--somente-qwen":
             somenteQwen = true; i += 1
+        case "--triagem-qwen":
+            somenteQwen = true; somenteTriagem = true; i += 1
         default:
             print("argumento desconhecido: \(argumentos[i])")
             exit(2)
@@ -594,7 +597,8 @@ case "bench":
                 pastaDeModelos: modelos,
                 audio: audio,
                 iteracoes: max(1, min(iteracoes, 3)),
-                somenteQwen: somenteQwen
+                somenteQwen: somenteQwen,
+                somenteTriagem: somenteTriagem
             )
             todos += await CasosDeMacroBench.rodar(macro)
         } else {

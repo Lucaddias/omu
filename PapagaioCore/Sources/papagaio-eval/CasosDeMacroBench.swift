@@ -18,6 +18,9 @@ enum CasosDeMacroBench {
         /// Só as macros do Qwen, com aquecimento curto: A/B de mudanças no LlamaRuntime
         /// sem o custo dos micro-casos, do Whisper e de um segundo resumo completo.
         var somenteQwen: Bool = false
+        /// Triagem: ~256 tokens gerados com gramática, para descartar ideias ruins em
+        /// minutos. Não serve para aceitar nada (sem prefill longo nem gramática funda).
+        var somenteTriagem: Bool = false
     }
 
     /// Confirma acesso de leitura antes de abrir os pesos informados explicitamente.
@@ -78,6 +81,62 @@ enum CasosDeMacroBench {
         guard temModelos(pasta) else {
             print("AVISO: Whisper não encontrado em \(pasta.path) — pulando macro-benchmarks.")
             print("       Rode Scripts/bootstrap-runtimes.sh ou baixe os pesos.")
+            return resultados
+        }
+
+        if opcoes.somenteTriagem {
+            if temQwen(pasta) {
+                let trechos = sintetizarTrechos(quantidade: 4)
+                do {
+                    let engine = QwenEngine(modelo: modeloQwen(pasta))
+                    var ultimaTraducao: [Trecho] = []
+                    let r = try await Medidor.medirAsync(
+                        nome: "macro.qwen.triagem",
+                        iteracoes: 2,
+                        unidade: "4 trechos pt→en (~256 tokens gerados)",
+                        aquecimento: { _ = try await engine.traduzir(sintetizarTrechos(quantidade: 1), para: .ingles) }
+                    ) {
+                        ultimaTraducao = try await engine.traduzir(trechos, para: .ingles)
+                    }
+                    var detalhes: [String: String] = [:]
+                    if let saida = Self.codificarBase64(ultimaTraducao) {
+                        detalhes["traducao_trechos_json_base64"] = saida
+                    }
+                    resultados.append(Self.anexarDetalhes(detalhes, a: r))
+                    await engine.descarregar()
+                } catch {
+                    print("AVISO: falha na triagem: \(error)")
+                }
+                // Prefill isolado: ~6k tokens de prompt e só 16 gerados, para
+                // hipóteses que mexem no prefill (lotes, micro-lotes, atenção).
+                do {
+                    let contexto = ContextoLlama(modelo: modeloQwen(pasta))
+                    let prompt = """
+                    <|im_start|>user
+                    Resuma a reunião abaixo.
+
+                    \(QwenEngine.formatar(sintetizarTrechos(quantidade: 80)))<|im_end|>
+                    <|im_start|>assistant
+                    <think>
+
+                    </think>\n
+
+                    """
+                    var saidaCurta = ""
+                    let r = try await Medidor.medirAsync(
+                        nome: "macro.qwen.triagemPrefill",
+                        iteracoes: 2,
+                        unidade: "prompt de 80 trechos, 16 tokens gerados",
+                        aquecimento: { _ = try await contexto.completar(prompt: prompt, maxTokens: 16) }
+                    ) {
+                        saidaCurta = try await contexto.completar(prompt: prompt, maxTokens: 16)
+                    }
+                    resultados.append(Self.anexarDetalhes(["saida_texto": saidaCurta], a: r))
+                    await contexto.descarregar()
+                } catch {
+                    print("AVISO: falha na triagem de prefill: \(error)")
+                }
+            }
             return resultados
         }
 
@@ -252,7 +311,9 @@ enum CasosDeMacroBench {
                     confianca: 0.85 + Float(j % 10) * 0.01
                 )
             }
+            // ID fixo por índice: as saídas de A e B ficam comparáveis byte a byte.
             return Trecho(
+                id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012ld", i))!,
                 start: start,
                 end: start + 38,
                 texto: texto,
