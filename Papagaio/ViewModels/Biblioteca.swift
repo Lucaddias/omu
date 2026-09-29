@@ -19,6 +19,14 @@ enum EstadoDaSincronizacaoCloudKit: Equatable {
 @MainActor
 @Observable
 final class Biblioteca {
+    private enum ErroDeReidratacao: LocalizedError {
+        case arquivoAusente
+
+        var errorDescription: String? {
+            "A conversa não está mais disponível na biblioteca.".localized
+        }
+    }
+
     private(set) var arquivos: [Arquivo] = []
     /// Arquivos removidos da listagem principal, mas ainda recuperáveis. A
     /// mídia continua no container até a exclusão definitiva.
@@ -284,8 +292,8 @@ final class Biblioteca {
         let carga = UUID()
         cargaAtual = carga
         do {
-            let ativos = try await repositorio.listar(espaco: espacoDaCarga)
-            let excluidos = try await repositorio.listarNaLixeira(espaco: espacoDaCarga)
+            let ativos = try await repositorio.listarParaBiblioteca(espaco: espacoDaCarga)
+            let excluidos = try await repositorio.listarNaLixeiraParaBiblioteca(espaco: espacoDaCarga)
             guard contexto == contextoDoEspaco, carga == cargaAtual,
                   !Task.isCancelled else { return }
             arquivos = ativos
@@ -446,10 +454,13 @@ final class Biblioteca {
         defer { operacoesDeLixeiraEmAndamento.remove(arquivo.id) }
 
         do {
+            // A lista contém previews sem arrays de Palavra. Buscar o registro
+            // completo também garante que a sincronização não envie um objeto
+            // parcial ao mover a conversa para a lixeira.
+            var movido = try await exigirArquivoCompleto(arquivo.id)
             try await repositorio.moverParaLixeira(arquivo.id)
             arquivos.removeAll { $0.id == arquivo.id }
 
-            var movido = arquivo
             movido.apagadoEm = Date()
             arquivosNaLixeira.removeAll { $0.id == arquivo.id }
             arquivosNaLixeira.insert(movido, at: 0)
@@ -484,10 +495,10 @@ final class Biblioteca {
         defer { operacoesDeLixeiraEmAndamento.remove(arquivo.id) }
 
         do {
+            var restaurado = try await exigirArquivoCompleto(arquivo.id)
             try await repositorio.restaurar(arquivo.id)
             arquivosNaLixeira.removeAll { $0.id == arquivo.id }
 
-            var restaurado = arquivo
             restaurado.apagadoEm = nil
             arquivos.removeAll { $0.id == arquivo.id }
             arquivos.append(restaurado)
@@ -638,19 +649,18 @@ final class Biblioteca {
               !operacoesDeLixeiraEmAndamento.contains(arquivo.id)
         else { return }
 
-        var editado = arquivo
-        editado.titulo = tituloLimpo
-        if let resumo = arquivo.resumo {
-            editado.resumo = Resumo(
-                titulo: tituloLimpo,
-                visaoGeral: resumo.visaoGeral,
-                temas: resumo.temas,
-                citacoes: resumo.citacoes,
-                proximosPassos: resumo.proximosPassos
-            )
-        }
-
         do {
+            var editado = try await exigirArquivoCompleto(arquivo.id)
+            editado.titulo = tituloLimpo
+            if let resumo = editado.resumo {
+                editado.resumo = Resumo(
+                    titulo: tituloLimpo,
+                    visaoGeral: resumo.visaoGeral,
+                    temas: resumo.temas,
+                    citacoes: resumo.citacoes,
+                    proximosPassos: resumo.proximosPassos
+                )
+            }
             try await repositorio.salvar(editado)
             substituir(editado)
             await sincronizar(editado)
@@ -670,21 +680,20 @@ final class Biblioteca {
               !operacoesDeLixeiraEmAndamento.contains(arquivo.id)
         else { return }
 
-        var editado = arquivo
-        editado.titulo = tituloLimpo
-        editado.criadoEm = criadoEm
-        editado.duracao = max(0, duracao)
-        if let resumo = arquivo.resumo {
-            editado.resumo = Resumo(
-                titulo: tituloLimpo,
-                visaoGeral: resumo.visaoGeral,
-                temas: resumo.temas,
-                citacoes: resumo.citacoes,
-                proximosPassos: resumo.proximosPassos
-            )
-        }
-
         do {
+            var editado = try await exigirArquivoCompleto(arquivo.id)
+            editado.titulo = tituloLimpo
+            editado.criadoEm = criadoEm
+            editado.duracao = max(0, duracao)
+            if let resumo = editado.resumo {
+                editado.resumo = Resumo(
+                    titulo: tituloLimpo,
+                    visaoGeral: resumo.visaoGeral,
+                    temas: resumo.temas,
+                    citacoes: resumo.citacoes,
+                    proximosPassos: resumo.proximosPassos
+                )
+            }
             try await repositorio.salvar(editado)
             substituir(editado)
             await sincronizar(editado)
@@ -696,10 +705,9 @@ final class Biblioteca {
     func atualizarNotas(_ notas: [NotaDaConversa], de arquivo: Arquivo) async {
         guard !operacoesDeLixeiraEmAndamento.contains(arquivo.id) else { return }
 
-        var editado = arquivo
-        editado.notas = notas
-
         do {
+            var editado = try await exigirArquivoCompleto(arquivo.id)
+            editado.notas = notas
             try await repositorio.salvar(editado)
             substituir(editado)
             await sincronizar(editado)
@@ -716,10 +724,9 @@ final class Biblioteca {
     func atualizarTrechos(_ trechos: [Trecho], de arquivo: Arquivo) async {
         guard !operacoesDeLixeiraEmAndamento.contains(arquivo.id) else { return }
 
-        var editado = arquivo
-        editado.trechos = trechos
-
         do {
+            var editado = try await exigirArquivoCompleto(arquivo.id)
+            editado.trechos = trechos
             try await repositorio.salvar(editado)
             substituir(editado)
             await sincronizar(editado)
@@ -732,9 +739,17 @@ final class Biblioteca {
     func duplicar(_ arquivo: Arquivo) async -> Arquivo? {
         guard !operacoesDeLixeiraEmAndamento.contains(arquivo.id) else { return nil }
 
+        let origemCompleta: Arquivo
+        do {
+            origemCompleta = try await exigirArquivoCompleto(arquivo.id)
+        } catch {
+            erros[arquivo.id.rawValue] = "Não foi possível duplicar: %@".localized(error.localizedDescription)
+            return nil
+        }
+
         let novoID = ArquivoID()
         let pastaNovaRelativa = Armazenamento.caminhoRelativo(id: novoID.rawValue)
-        let origem = armazenamento.resolver(relativo: arquivo.pastaRelativa)
+        let origem = armazenamento.resolver(relativo: origemCompleta.pastaRelativa)
         let destino = armazenamento.resolver(relativo: pastaNovaRelativa)
 
         do {
@@ -747,22 +762,22 @@ final class Biblioteca {
 
             var copia = Arquivo(
                 id: novoID,
-                titulo: "%@ cópia".localized(arquivo.titulo),
+                titulo: "%@ cópia".localized(origemCompleta.titulo),
                 criadoEm: Date(),
-                duracao: arquivo.duracao,
+                duracao: origemCompleta.duracao,
                 pastaRelativa: pastaNovaRelativa,
                 espaco: espaco,
-                trechos: arquivo.trechos.map {
+                trechos: origemCompleta.trechos.map {
                     Trecho(start: $0.start, end: $0.end, texto: $0.texto, speaker: $0.speaker, palavras: $0.palavras)
                 },
-                notas: arquivo.notas.map {
+                notas: origemCompleta.notas.map {
                     NotaDaConversa(texto: $0.texto, start: $0.start, critica: $0.critica, tipo: $0.tipo)
                 },
-                resumo: arquivo.resumo,
-                engineTranscricao: arquivo.engineTranscricao,
-                engineResumo: arquivo.engineResumo
+                resumo: origemCompleta.resumo,
+                engineTranscricao: origemCompleta.engineTranscricao,
+                engineResumo: origemCompleta.engineResumo
             )
-            if let resumo = arquivo.resumo {
+            if let resumo = origemCompleta.resumo {
                 copia.resumo = Resumo(
                     titulo: "%@ cópia".localized(resumo.titulo),
                     visaoGeral: resumo.visaoGeral,
@@ -774,7 +789,7 @@ final class Biblioteca {
 
             if origemExiste {
                 let anexosCopiados = try MidiasDaConversa.anexosCopiados(
-                    de: arquivo.id,
+                    de: origemCompleta.id,
                     da: origem,
                     para: destino
                 )
@@ -782,7 +797,7 @@ final class Biblioteca {
                     try MidiasDaConversa.salvar(anexosCopiados, para: novoID)
                 }
             }
-            TarefasGeraisStore.duplicar(arquivo, para: copia)
+            TarefasGeraisStore.duplicar(origemCompleta, para: copia)
             try await repositorio.salvar(copia)
             arquivos.insert(copia, at: 0)
             await sincronizar(copia)
@@ -795,9 +810,9 @@ final class Biblioteca {
             TarefasGeraisStore.remover(novoID)
             do {
                 try armazenamento.removerGravacao(relativa: pastaNovaRelativa)
-                erros[arquivo.id.rawValue] = "Não foi possível duplicar: %@".localized(error.localizedDescription)
+                erros[origemCompleta.id.rawValue] = "Não foi possível duplicar: %@".localized(error.localizedDescription)
             } catch {
-                erros[arquivo.id.rawValue] = "Não foi possível duplicar: %@. A cópia incompleta permaneceu no armazenamento para não apagar dados de forma insegura.".localized(error.localizedDescription)
+                erros[origemCompleta.id.rawValue] = "Não foi possível duplicar: %@. A cópia incompleta permaneceu no armazenamento para não apagar dados de forma insegura.".localized(error.localizedDescription)
             }
             return nil
         }
@@ -909,8 +924,16 @@ final class Biblioteca {
     private func executarProcessamento(_ arquivo: Arquivo, execucao: UUID) async {
         let chave = arquivo.id.rawValue
         defer { finalizarProcessamento(chave, execucao: execucao) }
+
+        let arquivoCompleto: Arquivo
+        do {
+            arquivoCompleto = try await exigirArquivoCompleto(arquivo.id)
+        } catch {
+            erros[chave] = "Não foi possível abrir a conversa para processamento: %@".localized(error.localizedDescription)
+            return
+        }
 #if OMU_PERF
-        PerfProbe.shared.registrarPipelineInicio(arquivo)
+        PerfProbe.shared.registrarPipelineInicio(arquivoCompleto)
 #endif
 
         // Sem os pesos, o Whisper falharia lá dentro com um erro de carga. Dizer
@@ -927,11 +950,11 @@ final class Biblioteca {
 #if OMU_PERF
         // Reusa a normalização real do prompt com nomes sintéticos, sem consultar Contatos ou Calendário.
         let promptDeEntidades = await PromptDeEntidades.construir(
-            para: arquivo,
+            para: arquivoCompleto,
             termosSinteticos: PerfProbe.termosDeEntidades
         )
 #else
-        let promptDeEntidades = await PromptDeEntidades.construir(para: arquivo)
+        let promptDeEntidades = await PromptDeEntidades.construir(para: arquivoCompleto)
 #endif
         // Criado por execução, e descarregado no fim: os dois modelos somam
         // Eles não podem ficar residentes entre gravações num Mac de 18 GB.
@@ -974,7 +997,7 @@ final class Biblioteca {
 
         await OperacaoComLimpeza.executar {
             do {
-                let final = try await pipeline.processar(arquivo) { fase in
+                let final = try await pipeline.processar(arquivoCompleto) { fase in
                     let instante = DispatchTime.now().uptimeNanoseconds
                     Task { @MainActor [weak self] in
                         guard self?.identificadorDaExecucao == execucao else { return }
@@ -985,7 +1008,7 @@ final class Biblioteca {
                     }
                 }
                 guard identificadorDaExecucao == execucao,
-                      arquivos.contains(where: { $0.id == arquivo.id })
+                      arquivos.contains(where: { $0.id == arquivoCompleto.id })
                 else { return }
                 substituir(final)
                 await sincronizar(final)
@@ -1008,7 +1031,7 @@ final class Biblioteca {
                 erros[chave] = "\(error)"
                 aoNotificar?(
                     "Transcrição falhou".localized,
-                    "\(arquivo.titulo): \(error.localizedDescription)",
+                    "\(arquivoCompleto.titulo): \(error.localizedDescription)",
                     .erro
                 )
             }
@@ -1034,6 +1057,14 @@ final class Biblioteca {
               !operacoesDeLixeiraEmAndamento.contains(arquivo.id) else { return }
         let chave = arquivo.id.rawValue
         guard fases[chave] == nil else { return }
+
+        let arquivoCompleto: Arquivo
+        do {
+            arquivoCompleto = try await exigirArquivoCompleto(arquivo.id)
+        } catch {
+            erros[chave] = "Não foi possível abrir a transcrição: %@".localized(error.localizedDescription)
+            return
+        }
 
         let diarizacao = GerenciadorDeModelosDeDiarizacao.embutido()
         guard diarizacao.disponivel else {
@@ -1070,8 +1101,8 @@ final class Biblioteca {
         )
 
         await OperacaoComLimpeza.executar {
-            let diarizado = await pipeline.diarizarExistente(arquivo)
-            guard arquivos.contains(where: { $0.id == arquivo.id }) else { return }
+            let diarizado = await pipeline.diarizarExistente(arquivoCompleto)
+            guard arquivos.contains(where: { $0.id == arquivoCompleto.id }) else { return }
             do {
                 try await repositorio.salvar(diarizado)
                 substituir(diarizado)
@@ -1243,6 +1274,17 @@ final class Biblioteca {
 
     func arquivo(id: UUID) -> Arquivo? {
         arquivos.first { $0.id.rawValue == id }
+    }
+
+    func buscarArquivoCompleto(id: UUID) async throws -> Arquivo? {
+        try await repositorio.buscarCompleto(id: ArquivoID(rawValue: id))
+    }
+
+    private func exigirArquivoCompleto(_ id: ArquivoID) async throws -> Arquivo {
+        guard let arquivo = try await repositorio.buscarCompleto(id: id) else {
+            throw ErroDeReidratacao.arquivoAusente
+        }
+        return arquivo
     }
 
     /// Canal principal para reprodução, na nova convenção: `microfone.wav`.

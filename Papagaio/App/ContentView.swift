@@ -630,8 +630,10 @@ struct ContentView: View {
 
     @ViewBuilder
     private func destinoDaConversa(_ id: UUID) -> some View {
-        if let biblioteca, let arquivo = biblioteca.arquivo(id: id) {
-            detalheDaConversa(arquivo, na: biblioteca)
+        if let biblioteca, biblioteca.arquivo(id: id) != nil {
+            ArquivoCompletoCarregado(id: id, biblioteca: biblioteca) { arquivo in
+                self.detalheDaConversa(arquivo, na: biblioteca)
+            }
         }
     }
 
@@ -1188,6 +1190,64 @@ struct ContentView: View {
     private func sincronizarPastaDeModelos() {
         guard let modelos else { return }
         biblioteca?.pastaDeModelos = modelos.pasta
+    }
+}
+
+/// O cartão usa um preview sem timestamps de palavra. O detalhe só é criado
+/// depois que o repositório reidrata a conversa completa.
+private struct ArquivoCompletoCarregado<Conteudo: View>: View {
+    let id: UUID
+    let biblioteca: Biblioteca
+    let conteudo: (Arquivo) -> Conteudo
+
+    @State private var arquivo: Arquivo?
+    @State private var erro: String?
+
+    init(
+        id: UUID,
+        biblioteca: Biblioteca,
+        @ViewBuilder conteudo: @escaping (Arquivo) -> Conteudo
+    ) {
+        self.id = id
+        self.biblioteca = biblioteca
+        self.conteudo = conteudo
+    }
+
+    var body: some View {
+        Group {
+            if let arquivo {
+                conteudo(arquivo)
+            } else if let erro {
+                VStack(spacing: 12) {
+                    Text(erro)
+                        .multilineTextAlignment(.center)
+                    Button("Tentar novamente") {
+                        Task { @MainActor in await carregar() }
+                    }
+                }
+                .padding()
+            } else {
+                ProgressView()
+            }
+        }
+        .task(id: id) { await carregar() }
+    }
+
+    @MainActor
+    private func carregar() async {
+        arquivo = nil
+        erro = nil
+        do {
+            guard let completo = try await biblioteca.buscarArquivoCompleto(id: id) else {
+                erro = "A conversa não está mais disponível na biblioteca.".localized
+                return
+            }
+            guard !Task.isCancelled else { return }
+            arquivo = completo
+        } catch {
+            guard !Task.isCancelled else { return }
+            erro = "Não foi possível abrir a conversa: %@".localized(error.localizedDescription)
+        }
     }
 }
 

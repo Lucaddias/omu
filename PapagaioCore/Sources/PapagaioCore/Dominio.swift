@@ -458,6 +458,9 @@ public struct Arquivo: Sendable, Identifiable, Codable, Equatable {
     public var pastaRelativa: String
     public var espaco: EspacoID
     public var trechos: [Trecho]
+    /// Preview da biblioteca: indica que há timestamps de palavra persistidos
+    /// sem materializar os arrays `Palavra` até abrir o detalhe.
+    public var possuiPalavrasComTimestamp: Bool?
     /// Anotações e marcadores criados durante a gravação, ancorados no áudio.
     public var notas: [NotaDaConversa]
     public var resumo: Resumo?
@@ -520,7 +523,8 @@ public struct Arquivo: Sendable, Identifiable, Codable, Equatable {
         apagadoEm: Date? = nil,
         idExterno: String? = nil,
         importadoEm: Date? = nil,
-        usavaFones: Bool? = nil
+        usavaFones: Bool? = nil,
+        possuiPalavrasComTimestamp: Bool? = nil
     ) {
         self.id = id
         self.titulo = titulo
@@ -529,6 +533,7 @@ public struct Arquivo: Sendable, Identifiable, Codable, Equatable {
         self.pastaRelativa = pastaRelativa
         self.espaco = espaco
         self.trechos = trechos
+        self.possuiPalavrasComTimestamp = possuiPalavrasComTimestamp
         self.notas = notas
         self.resumo = resumo
         self.engineTranscricao = engineTranscricao

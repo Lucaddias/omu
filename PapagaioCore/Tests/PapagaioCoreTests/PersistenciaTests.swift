@@ -90,6 +90,60 @@ func persistenciaRoundTrip() async throws {
     #expect(volta.resumo?.proximosPassos.first?.responsavel == "Luca")
 }
 
+@Test("Preview da biblioteca adia palavras e busca o arquivo completo no detalhe")
+func previewDaBibliotecaAdiaPalavras() async throws {
+    let repo = try repositorioDeTeste()
+    let espaco = EspacoID()
+    let original = arquivoDeExemplo(
+        titulo: "Busca preservada",
+        espaco: espaco,
+        trechos: [
+            Trecho(
+                start: 4,
+                end: 9,
+                texto: "decisão sobre o prazo",
+                speaker: Speaker.eu,
+                palavras: [
+                    Palavra(start: 4, end: 6, texto: "decisão", falanteAcustico: "S1"),
+                    Palavra(start: 7, end: 9, texto: "prazo", falanteAcustico: "S1"),
+                ]
+            ),
+            Trecho(start: 12, end: 15, texto: "próxima etapa", speaker: Speaker.interlocutor),
+        ]
+    )
+
+    try await repo.salvar(original)
+
+    let preview = try #require(try await repo.listarParaBiblioteca(espaco: espaco).first)
+    #expect(preview.id == original.id)
+    #expect(preview.trechos.map(\.texto) == ["decisão sobre o prazo", "próxima etapa"])
+    #expect(preview.trechos.map(\.start) == [4, 12])
+    #expect(preview.trechos[0].speaker == Speaker.eu)
+    #expect(preview.trechos.allSatisfy { $0.palavras.isEmpty })
+    #expect(preview.possuiPalavrasComTimestamp == true)
+
+    var previewRejeitado = false
+    do {
+        try await repo.salvar(preview)
+    } catch {
+        previewRejeitado = true
+    }
+    #expect(previewRejeitado)
+
+    let detalhe = try #require(try await repo.buscarCompleto(id: original.id))
+    #expect(detalhe.trechos[0].palavras.map(\.texto) == ["decisão", "prazo"])
+    #expect(detalhe.trechos[0].palavras.map(\.falanteAcustico) == ["S1", "S1"])
+    #expect(detalhe.possuiPalavrasComTimestamp == nil)
+
+    try await repo.moverParaLixeira(original.id)
+    let previewDaLixeira = try #require(
+        try await repo.listarNaLixeiraParaBiblioteca(espaco: espaco).first
+    )
+    #expect(previewDaLixeira.trechos.allSatisfy { $0.palavras.isEmpty })
+    #expect(previewDaLixeira.possuiPalavrasComTimestamp == true)
+    #expect(try await repo.buscarCompleto(id: original.id)?.trechos[0].palavras.count == 2)
+}
+
 @Test("Round-trip preserva o falante acústico da diarização")
 func persistenciaPreservaFalanteAcustico() async throws {
     // Regressão: o `paraDominio` reconstruía cada palavra sem o

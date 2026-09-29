@@ -125,7 +125,8 @@ struct CartaoDeConversa: View {
     /// timestamp, mas sem falante acústico: dá para distingui-los sem
     /// re-transcrever. Sem palavras não há o que alinhar.
     private var podeDiarizar: Bool {
-        arquivo.trechos.contains { !$0.palavras.isEmpty }
+        arquivo.possuiPalavrasComTimestamp
+            ?? arquivo.trechos.contains { !$0.palavras.isEmpty }
     }
 
     /// Altura de todo cartão da biblioteca, independente dos campos ligados.

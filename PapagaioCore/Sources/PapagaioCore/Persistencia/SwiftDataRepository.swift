@@ -14,6 +14,14 @@ public actor SwiftDataRepository: ArquivoRepository {
     /// silenciosas (ex.: palavras que não codificaram para JSON).
     private static let logger = Logger(subsystem: "PapagaioCore", category: "Persistencia")
 
+    private enum ErroDeSalvamento: LocalizedError {
+        case previewIncompleto
+
+        var errorDescription: String? {
+            "A conversa precisa ser carregada por completo antes de ser salva."
+        }
+    }
+
     /// Container local, com o schema completo do app.
     public static func containerLocal(
         nome: String = "Papagaio",
@@ -58,6 +66,13 @@ public actor SwiftDataRepository: ArquivoRepository {
     // MARK: - ArquivoRepository
 
     public func salvar(_ a: Arquivo) async throws {
+        // Um preview pode ter `palavras=[]` apenas porque a lista adiou o
+        // decode. Recusá-lo protege os timestamps caso algum chamador esqueça
+        // de reidratar o arquivo antes de uma edição.
+        guard a.possuiPalavrasComTimestamp != true else {
+            throw ErroDeSalvamento.previewIncompleto
+        }
+
         let existente = try buscarPersistido(id: a.id)
         let persistido = existente ?? ArquivoPersistido(id: a.id.rawValue)
 
@@ -232,7 +247,7 @@ public actor SwiftDataRepository: ArquivoRepository {
         // passado — resultado de busca deve vir ordenado por quando entrou
         // na biblioteca, não por quando foi gravado.
         porCorpo.sort { ($0.importadoEm ?? $0.criadoEm) > ($1.importadoEm ?? $1.criadoEm) }
-        return (bucketA + porCorpo).map(Self.paraDominio)
+        return (bucketA + porCorpo).map { Self.paraDominio($0) }
     }
 
     public func listar(espaco: EspacoID) async throws -> [Arquivo] {
@@ -242,7 +257,21 @@ public actor SwiftDataRepository: ArquivoRepository {
             sortBy: [SortDescriptor(\.criadoEm, order: .reverse)]
         )
         descritor.relationshipKeyPathsForPrefetching = [\.trechos, \.insights, \.notas]
-        return try modelContext.fetch(descritor).map(Self.paraDominio)
+        return try modelContext.fetch(descritor).map { Self.paraDominio($0) }
+    }
+
+    /// Preview dos cartões: conserva texto e timeline para a busca local, mas
+    /// adia o decode de `palavrasJSON` até a conversa ser aberta.
+    public func listarParaBiblioteca(espaco: EspacoID) async throws -> [Arquivo] {
+        let alvo = espaco.rawValue
+        var descritor = FetchDescriptor<ArquivoPersistido>(
+            predicate: #Predicate { $0.espaco?.id == alvo && $0.apagadoEm == nil },
+            sortBy: [SortDescriptor(\.criadoEm, order: .reverse)]
+        )
+        descritor.relationshipKeyPathsForPrefetching = [\.trechos, \.insights, \.notas]
+        return try modelContext.fetch(descritor).map {
+            Self.paraDominio($0, decodificarPalavras: false)
+        }
     }
 
     /// Itens removidos da biblioteca continuam persistidos e com o áudio no
@@ -256,7 +285,30 @@ public actor SwiftDataRepository: ArquivoRepository {
 
         return try modelContext.fetch(descritor)
             .sorted { ($0.apagadoEm ?? .distantPast) > ($1.apagadoEm ?? .distantPast) }
-            .map(Self.paraDominio)
+            .map { Self.paraDominio($0) }
+    }
+
+    /// Cartões da lixeira sem materializar arrays de palavras.
+    public func listarNaLixeiraParaBiblioteca(espaco: EspacoID) async throws -> [Arquivo] {
+        let alvo = espaco.rawValue
+        var descritor = FetchDescriptor<ArquivoPersistido>(
+            predicate: #Predicate { $0.espaco?.id == alvo && $0.apagadoEm != nil }
+        )
+        descritor.relationshipKeyPathsForPrefetching = [\.trechos, \.insights, \.notas]
+        return try modelContext.fetch(descritor)
+            .sorted { ($0.apagadoEm ?? .distantPast) > ($1.apagadoEm ?? .distantPast) }
+            .map { Self.paraDominio($0, decodificarPalavras: false) }
+    }
+
+    /// Busca todos os timestamps de palavra apenas quando o detalhe os exige.
+    public func buscarCompleto(id: ArquivoID) async throws -> Arquivo? {
+        let alvo = id.rawValue
+        var descritor = FetchDescriptor<ArquivoPersistido>(
+            predicate: #Predicate { $0.id == alvo }
+        )
+        descritor.relationshipKeyPathsForPrefetching = [\.trechos, \.insights, \.notas]
+        guard let persistido = try modelContext.fetch(descritor).first else { return nil }
+        return Self.paraDominio(persistido)
     }
 
     /// Move o registro para a lixeira sem alterar `pastaRelativa`. Mover a
@@ -441,44 +493,46 @@ public actor SwiftDataRepository: ArquivoRepository {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    static func paraDominio(_ p: ArquivoPersistido) -> Arquivo {
-        let trechos = (p.trechos ?? [])
-            .sorted { $0.start < $1.start }
-            .map { pTrecho in
-                Trecho(
-                    id: pTrecho.id,
-                    start: pTrecho.start,
-                    end: pTrecho.fim,
-                    texto: pTrecho.texto,
-                    speaker: pTrecho.speaker,
-                    // `nil` (ou JSON corrompido) = transcrição legada: a UI
-                    // volta ao `Text` inteiro em vez de quebrar o detalhe.
-                    // Transcrições da primeira versão vazaram o id dos tokens
-                    // especiais (`[_BEG_]`, `[_TT_88]`) para as palavras — e o
-                    // `[_TT_…]` do fim do segmento foi **mesclado à última
-                    // palavra real** (sem espaço), o que faria o filtro por
-                    // `contains("[")` apagar a palavra inteira junto. Aqui a
-                    // cura arranca só o código e mantém a fala. O
-                    // `falanteAcustico` vem junto: sem ele a atribuição da
-                    // diarização sumia em todo reload do banco:
-                    palavras: (try? JSONDecoder().decode([Palavra].self, from: pTrecho.palavrasJSON ?? Data()))?
-                        .map {
-                            Palavra(
-                                id: $0.id,
-                                start: $0.start,
-                                end: $0.end,
-                                texto: curarTextoDePalavraLegada($0.texto),
-                                confianca: $0.confianca,
-                                noSpeechProb: $0.noSpeechProb,
-                                // A diarização sobrevive ao round-trip: sem isto
-                                // os falantes somiam ao reabrir o app (o init com
-                                // default apagava o campo).
-                                falanteAcustico: $0.falanteAcustico
-                            )
-                        }
-                        .filter { !$0.texto.isEmpty } ?? []
-                )
+    static func paraDominio(
+        _ p: ArquivoPersistido,
+        decodificarPalavras: Bool = true
+    ) -> Arquivo {
+        let trechosPersistidos = (p.trechos ?? []).sorted { $0.start < $1.start }
+        let possuiPalavrasComTimestamp = trechosPersistidos.contains {
+            Self.possuiPalavrasCodificadas($0.palavrasJSON)
+        }
+        let trechos = trechosPersistidos.map { pTrecho in
+            let palavras: [Palavra]
+            if decodificarPalavras {
+                palavras = (try? JSONDecoder().decode([Palavra].self, from: pTrecho.palavrasJSON ?? Data()))?
+                    .map {
+                        Palavra(
+                            id: $0.id,
+                            start: $0.start,
+                            end: $0.end,
+                            texto: curarTextoDePalavraLegada($0.texto),
+                            confianca: $0.confianca,
+                            noSpeechProb: $0.noSpeechProb,
+                            // A diarização sobrevive ao round-trip: sem isto
+                            // os falantes somiam ao reabrir o app (o init com
+                            // default apagava o campo).
+                            falanteAcustico: $0.falanteAcustico
+                        )
+                    }
+                    .filter { !$0.texto.isEmpty } ?? []
+            } else {
+                palavras = []
             }
+
+            return Trecho(
+                id: pTrecho.id,
+                start: pTrecho.start,
+                end: pTrecho.fim,
+                texto: pTrecho.texto,
+                speaker: pTrecho.speaker,
+                palavras: palavras
+            )
+        }
 
         let insights = (p.insights ?? []).sorted { $0.ordem < $1.ordem }
         let notas = (p.notas ?? [])
@@ -525,8 +579,25 @@ public actor SwiftDataRepository: ArquivoRepository {
             apagadoEm: p.apagadoEm,
             idExterno: p.idExterno,
             importadoEm: p.importadoEm,
-            usavaFones: p.usavaFones
+            usavaFones: p.usavaFones,
+            possuiPalavrasComTimestamp: decodificarPalavras ? nil : possuiPalavrasComTimestamp
         )
+    }
+
+    /// Reconhece `[]` sem instanciar `Palavra`; o encoder do app serializa
+    /// arrays sem espaços, e os espaços em branco são aceitos para legado.
+    private static func possuiPalavrasCodificadas(_ json: Data?) -> Bool {
+        guard let json else { return false }
+        var indice = json.startIndex
+        while indice < json.endIndex, [9, 10, 13, 32].contains(json[indice]) {
+            indice = json.index(after: indice)
+        }
+        guard indice < json.endIndex, json[indice] == 91 else { return false }
+        indice = json.index(after: indice)
+        while indice < json.endIndex, [9, 10, 13, 32].contains(json[indice]) {
+            indice = json.index(after: indice)
+        }
+        return indice < json.endIndex && json[indice] != 93
     }
 }
 
