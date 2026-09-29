@@ -47,9 +47,11 @@ case "$SCENARIO_UPPER" in
     *) echo "Cenário não implementado ou inválido: $SCENARIO" >&2; exit 2 ;;
 esac
 for APP in "$APP_A" "$APP_B"; do
+    [[ "$APP" == *.app ]] || { echo "O caminho de medição precisa terminar em .app para o LaunchServices." >&2; exit 2; }
     APP_REAL="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$APP")"
     APPS_ROOT="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$OMU_PERF_DIR/apps")/"
     case "$APP_REAL" in "$APPS_ROOT"*) ;; *) echo "App precisa estar dentro de ~/OmuPerf/apps/." >&2; exit 2 ;; esac
+    [[ "$APP_REAL" == *.app ]] || { echo "O bundle real precisa manter a extensão .app." >&2; exit 2; }
     if [[ "$APP" == "$APP_A" ]]; then APP_A="$APP_REAL"; else APP_B="$APP_REAL"; fi
     ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")
     [[ "$ID" == "com.papagaio.Papagaio.perf" ]] || { echo "Bundle ID inválido: $ID" >&2; exit 2; }
