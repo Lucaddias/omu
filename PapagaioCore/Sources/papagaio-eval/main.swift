@@ -16,7 +16,7 @@ func formatarBytes(_ bytes: Int64) -> String {
 
 func uso() {
 #if OMU_PERF
-    let linhaSeed = "      papagaio-eval seed-library --raiz <dir> --quantidade N [--trechos N] [--catalogo JSON]"
+    let linhaSeed = "      papagaio-eval seed-library --raiz <dir> --quantidade N [--trechos N] [--palavras-por-trecho N] [--catalogo JSON]"
 #else
     let linhaSeed = ""
 #endif
@@ -625,6 +625,7 @@ case "seed-library":
     var catalogo: URL?
     var quantidade = 0
     var trechosPorArquivo = 32
+    var palavrasPorTrecho = 0
     var i = 1
     while i < argumentos.count {
         switch argumentos[i] {
@@ -636,13 +637,17 @@ case "seed-library":
             quantidade = Int(argumentos[i + 1]) ?? -1; i += 2
         case "--trechos" where i + 1 < argumentos.count:
             trechosPorArquivo = Int(argumentos[i + 1]) ?? -1; i += 2
+        case "--palavras-por-trecho" where i + 1 < argumentos.count:
+            palavrasPorTrecho = Int(argumentos[i + 1]) ?? -1; i += 2
         default:
             FileHandle.standardError.write(Data("argumento desconhecido: \(argumentos[i])\n".utf8))
             exit(2)
         }
     }
-    guard let raiz, quantidade >= 0, (0...500).contains(trechosPorArquivo) else {
-        FileHandle.standardError.write(Data("uso: seed-library --raiz <dir> --quantidade N [--trechos 0...500]\n".utf8))
+    guard let raiz, quantidade >= 0, (0...500).contains(trechosPorArquivo),
+          (0...500).contains(palavrasPorTrecho)
+    else {
+        FileHandle.standardError.write(Data("uso: seed-library --raiz <dir> --quantidade N [--trechos 0...500] [--palavras-por-trecho 0...500]\n".utf8))
         exit(2)
     }
 
@@ -681,6 +686,7 @@ case "seed-library":
         }
         conversas = Array(itens.prefix(quantidade))
     }
+    var totalPalavras = 0
     for indice in 0..<quantidade {
         let item = conversas.indices.contains(indice) ? conversas[indice] : [:]
         let textosCatalogados = item["trechos"] as? [String]
@@ -693,7 +699,21 @@ case "seed-library":
                 ? textos[ordem]
                 : "Decisão sintética \(indice) etapa \(ordem): revisar prazo, orçamento e próximos passos."
             let texto = ordem == 0 && !termoDeBusca.isEmpty ? "\(base) \(termoDeBusca)" : base
-            return Trecho(start: inicio, end: inicio + 4, texto: texto)
+            let tokens = Array(texto.split(whereSeparator: \.isWhitespace).prefix(palavrasPorTrecho))
+            let duracaoPorPalavra = tokens.isEmpty ? 0 : 4 / Double(tokens.count)
+            let palavras = tokens.enumerated().map { posicao, token in
+                let ordinal = (indice * trechosPorArquivo + ordem) * max(1, palavrasPorTrecho) + posicao + 1
+                let idPalavra = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012X", ordinal))!
+                let inicioPalavra = inicio + Double(posicao) * duracaoPorPalavra
+                return Palavra(
+                    id: idPalavra,
+                    start: inicioPalavra,
+                    end: inicioPalavra + duracaoPorPalavra,
+                    texto: String(token)
+                )
+            }
+            totalPalavras += palavras.count
+            return Trecho(start: inicio, end: inicio + 4, texto: texto, palavras: palavras)
         }
         let idArquivo = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012X", indice + 1))!
         let arquivo = Arquivo(
@@ -709,7 +729,7 @@ case "seed-library":
         )
         try await repositorio.salvar(arquivo)
     }
-    print("seed-library: \(quantidade) conversas, \(trechosPorArquivo) trechos cada, store em \(raiz.path)")
+    print("seed-library: \(quantidade) conversas, \(trechosPorArquivo) trechos cada, \(palavrasPorTrecho) palavras por trecho, \(totalPalavras) palavras no total, store em \(raiz.path)")
 #endif
 
 case "run":

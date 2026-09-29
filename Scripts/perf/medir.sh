@@ -9,7 +9,7 @@ SCENARIO="${1:-}"; APP_A="${2:-}"; APP_B="${3:-}"; N="${4:-}"
 shift 4 || true
 FIXTURES=(); MODELS="$HOME/Library/Application Support/Papagaio/Models"; TIMEOUT=7200
 GABARITOS=(); QUALITY_BASELINES=(); BASELINE_ARQUIVOS=(); EXIGIR_IDENTICA=false
-SEED_COUNT=0; SEED_TRECHOS=32; EVAL_BIN=""; REQUIRE_IDLE=false
+SEED_COUNT=0; SEED_TRECHOS=32; SEED_PALAVRAS=0; EVAL_BIN=""; REQUIRE_IDLE=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --fixture) FIXTURES+=("$2"); shift 2 ;;
@@ -17,6 +17,7 @@ while [[ $# -gt 0 ]]; do
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --seed-count) SEED_COUNT="$2"; shift 2 ;;
         --seed-trechos) SEED_TRECHOS="$2"; shift 2 ;;
+        --seed-palavras-por-trecho) SEED_PALAVRAS="$2"; shift 2 ;;
         --eval-bin) EVAL_BIN="$2"; shift 2 ;;
         --gabarito) GABARITOS+=("$2"); shift 2 ;;
         --quality-baseline) QUALITY_BASELINES+=("$2"); shift 2 ;;
@@ -33,8 +34,12 @@ SCENARIO_UPPER="$(printf '%s' "$SCENARIO" | tr '[:lower:]' '[:upper:]')"
     echo "seed-count/seed-trechos precisam ser inteiros não negativos." >&2
     exit 2
 }
-(( SEED_COUNT <= 1000 && SEED_TRECHOS <= 500 )) || {
-    echo "Seed acima do limite do catálogo (1000 conversas, 500 trechos)." >&2
+[[ "$SEED_PALAVRAS" =~ ^(0|[1-9][0-9]{0,2})$ ]] || {
+    echo "seed-palavras-por-trecho precisa ser um inteiro não negativo." >&2
+    exit 2
+}
+(( SEED_COUNT <= 1000 && SEED_TRECHOS <= 500 && SEED_PALAVRAS <= 500 )) || {
+    echo "Seed acima do limite do catálogo (1000 conversas, 500 trechos e 500 palavras por trecho)." >&2
     exit 2
 }
 case "$SCENARIO_UPPER" in
@@ -64,7 +69,10 @@ case "$SCENARIO_UPPER" in
         ;;
     P4) (( ${#FIXTURES[@]-0} == 3 )) || { echo "P4 exige exatamente três --fixture." >&2; exit 2; } ;;
     S1) (( ${#FIXTURES[@]-0} == 10 )) || { echo "S1 exige dez fixtures sintéticas (--fixture repetido dez vezes)." >&2; exit 2; } ;;
-    L2) [[ "$SEED_COUNT" == 200 || "$SEED_COUNT" == 1000 ]] || { echo "L2 exige --seed-count 200 ou 1000." >&2; exit 2; } ;;
+    L2)
+        [[ "$SEED_COUNT" == 200 || "$SEED_COUNT" == 1000 ]] || { echo "L2 exige --seed-count 200 ou 1000." >&2; exit 2; }
+        (( SEED_PALAVRAS > 0 )) || { echo "L2 exige --seed-palavras-por-trecho maior que zero." >&2; exit 2; }
+        ;;
     U1) [[ "$SEED_COUNT" == 200 ]] || { echo "U1 exige --seed-count 200." >&2; exit 2; } ;;
     U2) [[ "$SEED_COUNT" == 1000 ]] || { echo "U2 exige --seed-count 1000." >&2; exit 2; } ;;
 esac
@@ -226,7 +234,8 @@ if (( SEED_COUNT > 0 )); then
     mkdir -p "$SEED_TEMPLATE"
     /usr/bin/nohup /usr/bin/perl -e 'alarm shift;exec @ARGV' 3600 \
         "$EVAL_BIN" seed-library --raiz "$SEED_TEMPLATE" --quantidade "$SEED_COUNT" \
-        --trechos "$SEED_TRECHOS" --catalogo "$CATALOGO" >"$SEED_LOG" 2>&1 &
+        --trechos "$SEED_TRECHOS" --palavras-por-trecho "$SEED_PALAVRAS" \
+        --catalogo "$CATALOGO" >"$SEED_LOG" 2>&1 &
     SEED_PID=$!
     printf 'seed pid=%s log=%s\n' "$SEED_PID" "$SEED_LOG"
     if wait "$SEED_PID"; then :; else SEED_STATUS=$?; cat "$SEED_LOG" >&2; exit "$SEED_STATUS"; fi
