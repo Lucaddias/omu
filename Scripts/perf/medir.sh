@@ -274,7 +274,7 @@ run_one() {
     [[ "$SCENARIO_UPPER" == S1 && "$classe" == amostra ]] && app_scenario=s1-import
     local -a args=(--perf-cenario "$app_scenario" --perf-raiz "$root" --perf-modelos "$MODELS" --perf-saida "$events" --perf-timeout "$TIMEOUT"
         -AppleLanguages '(pt-BR)' -AppleLocale pt_BR -processamentoAutomatico "$automatic"
-        -traducaoAutomatica YES -exibirFichaAutomaticamente NO -painelFlutuanteDuranteGravacao NO
+        -exibirFichaAutomaticamente NO -painelFlutuanteDuranteGravacao NO
         -contextoDaConta perfil -equipeAtiva '' -aparenciaDoApp sistema
         -camposVisiveisDoCartao 1023 -modeloDeCartao 1
         -mostrarConfiancaTranscricao NO -mostrarPorcentagemConfianca YES
