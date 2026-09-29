@@ -6,9 +6,6 @@ import SwiftUI
 struct ConfiguracoesView: View {
     @Binding var processamentoAutomatico: Bool
     @Binding var exibirFichaAutomaticamente: Bool
-    /// Quando ligado, texto falado em idioma diferente do sistema é traduzido
-    /// localmente antes do resumo. Desligado preserva o idioma falado.
-    @Binding var traducaoAutomatica: Bool
     @Binding var aparencia: AparenciaDoApp
     /// A conexão Granola viva do app. Quem a cria e a observa é a `ContentView`.
     var granola: GranolaViewModel?
@@ -160,22 +157,6 @@ struct ConfiguracoesView: View {
                 }
             }
             .toggleStyle(.switch)
-
-            Toggle(isOn: $traducaoAutomatica) {
-                VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text("Traduzir automaticamente para o idioma do sistema".localized)
-                        .font(PapagaioTema.Tipo.corpo.weight(.semibold))
-                        .foregroundStyle(PapagaioTema.texto)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text("Quando ligado, transcrições e resumos em outro idioma são traduzidos localmente para português ou inglês. Quando desligado, o idioma falado é preservado.".localized)
-                        .font(PapagaioTema.Tipo.apoio)
-                        .foregroundStyle(PapagaioTema.textoSecundario)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-            .tint(PapagaioTema.preenchimentoPrimario)
 
             Toggle(isOn: $painelFlutuante) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {

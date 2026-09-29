@@ -62,11 +62,6 @@ final class Biblioteca {
     /// continua sendo o único caminho para qualquer processamento manual ou
     /// automático, mantendo um único par de modelos carregado por vez.
     var processamentoAutomatico = true
-    /// Preferência de saída capturada quando a execução entra na fila. O
-    /// Whisper ainda detecta o idioma falado; isto só governa a tradução local
-    /// posterior e o idioma que o resumo deve usar.
-    var traducaoAutomatica = true
-    var idiomaPadraoDeProcessamento = IdiomaDeProcessamento(locale: .autoupdatingCurrent)
     var aoNotificar: (@MainActor (_ titulo: String, _ mensagem: String, _ tipo: NotificacaoDoApp.Tipo) -> Void)?
     var aoConcluirProcessamento: (@MainActor (_ arquivo: Arquivo) -> Void)?
 
@@ -938,11 +933,6 @@ final class Biblioteca {
 #else
         let promptDeEntidades = await PromptDeEntidades.construir(para: arquivo)
 #endif
-        let configuracaoDeTraducao = ConfiguracaoDeTraducaoAutomatica(
-            habilitada: traducaoAutomatica,
-            idiomaPadrao: idiomaPadraoDeProcessamento
-        )
-
         // Criado por execução, e descarregado no fim: os dois modelos somam
         // Eles não podem ficar residentes entre gravações num Mac de 18 GB.
         let motores = criarMotoresLocais()
@@ -972,10 +962,8 @@ final class Biblioteca {
             resumirNoIdioma: { [motores] trechos, idiomaDeSaida in
                 try await motores.resumir(trechos, idiomaDeSaida: idiomaDeSaida)
             },
-            traducaoAutomatica: configuracaoDeTraducao,
-            traduzir: { [motores] trechos, idiomaDeDestino in
-                try await motores.traduzir(trechos, para: idiomaDeDestino)
-            },
+            // Sem tradução: o Whisper detecta o idioma falado e a transcrição e o
+            // resumo ficam nesse idioma (inglês → inglês, português → português).
             diarizar: { [diarizacao] url in
                 try await diarizacao.diarizar(url)
             },

@@ -97,7 +97,6 @@ struct ContentView: View {
     @State private var pastaDaBibliotecaSelecionada: String?
     @AppStorage("processamentoAutomatico") private var processamentoAutomatico = true
     @AppStorage("exibirFichaAutomaticamente") private var exibirFichaAutomaticamente = true
-    @AppStorage("traducaoAutomatica") private var traducaoAutomatica = true
     @AppStorage("contextoDaConta") private var contextoDaContaRaw = ContextoDaConta.perfil.rawValue
     @AppStorage("equipeAtiva") private var equipeAtivaID = ""
     @AppStorage("aparenciaDoApp") private var aparenciaRaw = AparenciaDoApp.sistema.rawValue
@@ -287,12 +286,6 @@ struct ContentView: View {
         .onChange(of: processamentoAutomatico) { _, novoValor in
             biblioteca?.processamentoAutomatico = novoValor
         }
-        .onChange(of: traducaoAutomatica) { _, novoValor in
-            biblioteca?.traducaoAutomatica = novoValor
-            biblioteca?.idiomaPadraoDeProcessamento = IdiomaDeProcessamento(
-                locale: .autoupdatingCurrent
-            )
-        }
         .onChange(of: biblioteca?.arquivosComFichaPendente) { _, novoValor in
             abrirFichaPendenteSeNecessario(novoValor)
         }
@@ -449,7 +442,7 @@ struct ContentView: View {
         case .midias:
             MidiasView(biblioteca: biblioteca, consulta: consulta)
         case .configuracoes:
-            ConfiguracoesView(processamentoAutomatico: $processamentoAutomatico, exibirFichaAutomaticamente: $exibirFichaAutomaticamente, traducaoAutomatica: $traducaoAutomatica, aparencia: aparencia,
+            ConfiguracoesView(processamentoAutomatico: $processamentoAutomatico, exibirFichaAutomaticamente: $exibirFichaAutomaticamente, aparencia: aparencia,
                               granola: granola, googleCalendar: googleCalendar, biblioteca: biblioteca)
         case .perfil:
             PerfilPessoalView(perfil: perfil, equipeAtiva: equipeAtiva, equipes: equipes,
@@ -474,8 +467,6 @@ struct ContentView: View {
         do {
             let nova = try Biblioteca()
             nova.processamentoAutomatico = processamentoAutomatico
-            nova.traducaoAutomatica = traducaoAutomatica
-            nova.idiomaPadraoDeProcessamento = IdiomaDeProcessamento(locale: .autoupdatingCurrent)
             if politicaDeInicializacaoExterna.permiteServicosExternos {
                 nova.aoNotificar = { titulo, mensagem, tipo in
                     notificacoes.registrar(titulo: titulo, mensagem: mensagem, tipo: tipo)
