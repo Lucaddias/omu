@@ -356,7 +356,7 @@ PY
     local quality_result="$DATASET/qualidade-$classe-$side-$index"
     case "$SCENARIO_UPPER" in
         P1|P2|P3|P4|P5|P6|Q1)
-            if [[ "$status" == ok ]]; then
+            if [[ "$classe" == amostra && "$status" == ok ]]; then
                 local -a output_dumps=()
                 while IFS= read -r output_json; do output_dumps+=("$output_json"); done < <(python3 - "$events" <<'PY'
 import json,sys
