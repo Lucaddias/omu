@@ -289,7 +289,7 @@ run_one() {
     leaks_status=not-run; leaks_log="$DATASET/leaks-$classe-$side-$index.log"; leaks_pid=""
     before="$(swap_bytes)"; start="$(python3 -c 'import time;print(time.monotonic_ns())')"
     /usr/bin/nohup /usr/bin/perl -e 'alarm shift;exec @ARGV' "$TIMEOUT" /usr/bin/open -n -F -W \
-        --env PAPAGAIO_TEST_MODE=1 --env "OMU_PERF_DIR=$OMU_PERF_DIR" "$app" --args "${args[@]}" >"$log" 2>&1 &
+        --env PAPAGAIO_TEST_MODE=1 --env "OMU_PERF_DIR=$OMU_PERF_DIR" -a "$app" --args "${args[@]}" >"$log" 2>&1 &
     local pid=$!; status=ok
     ( while kill -0 "$pid" 2>/dev/null; do swap_bytes; sleep 1; done ) >"$swap_log" &
     local monitor_pid=$!
