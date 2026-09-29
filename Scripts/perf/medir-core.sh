@@ -169,7 +169,8 @@ elif scenario=="T2":
     if not any(item.get("nome")=="macro.qwen.triagem" for item in results):
         raise SystemExit("falta macro.qwen.triagem no T2")
 elif scenario=="Q2":
-    required={"macro.qwen.cicloCargaDescarga","macro.qwen.resumir","macro.qwen.traduzir"}
+    # Sem tradução no app desde 4411410: o Q2 mede o resumo curto (passe único) e o longo.
+    required={"macro.qwen.cicloCargaDescarga","macro.qwen.resumirCurto","macro.qwen.resumir"}
     missing=required-{item.get("nome") for item in results}
     if missing: raise SystemExit("faltam macros do Q2: "+", ".join(sorted(missing)))
     results=[item for item in results if item.get("nome","") in required]
@@ -178,7 +179,7 @@ with open(out,"a",encoding="utf-8") as stream:
         name=result.get("nome","unknown")
         details=result.get("detalhes") or {}
         artifact_path=None
-        if scenario in ("C2","Q2","T2") and name in ("macro.whisper.transcrever","macro.qwen.resumir","macro.qwen.traduzir","macro.qwen.triagem"):
+        if scenario in ("C2","Q2","T2") and name in ("macro.whisper.transcrever","macro.qwen.resumir","macro.qwen.resumirCurto","macro.qwen.traduzir","macro.qwen.triagem"):
             import base64
             artifact_dir=os.path.join(os.path.dirname(out),"quality-artifacts")
             os.makedirs(artifact_dir,exist_ok=True)
@@ -189,18 +190,18 @@ with open(out,"a",encoding="utf-8") as stream:
                 if not encoded: raise SystemExit("C2 sem saída de transcrição")
                 arquivo["trechos"]=json.loads(base64.b64decode(encoded))
                 filename="whisper"
-            elif name=="macro.qwen.resumir":
+            elif name in ("macro.qwen.resumir","macro.qwen.resumirCurto","macro.qwen.triagem"):
                 encoded_source=details.get("source_trechos_json_base64")
                 encoded_summary=details.get("resumo_json_base64")
                 if not encoded_source or not encoded_summary: raise SystemExit("C2 sem saída de resumo")
                 arquivo["trechos"]=json.loads(base64.b64decode(encoded_source))
                 arquivo["resumo"]=json.loads(base64.b64decode(encoded_summary))
-                filename="qwen-summary"
+                filename={"macro.qwen.resumir":"qwen-summary","macro.qwen.resumirCurto":"qwen-short","macro.qwen.triagem":"qwen-triage"}[name]
             else:
                 encoded=details.get("traducao_trechos_json_base64")
                 if not encoded: raise SystemExit("C2 sem saída de tradução")
                 arquivo["trechos"]=json.loads(base64.b64decode(encoded))
-                filename="qwen-triage" if name=="macro.qwen.triagem" else "qwen-translation"
+                filename="qwen-translation"
             artifact_path=os.path.join(artifact_dir,f"{filename}-{side}-{index}.json")
             with open(artifact_path,"w",encoding="utf-8") as artifact:
                 json.dump(arquivo,artifact,ensure_ascii=False,separators=(",",":"))
@@ -288,7 +289,7 @@ if [[ "$SCENARIO" == Q2 || "$SCENARIO" == T2 ]]; then
 import glob,hashlib,json,os,sys
 pasta,destino=sys.argv[1:]
 relatorio={}
-for prefixo in ("qwen-summary","qwen-translation","qwen-triage"):
+for prefixo in ("qwen-summary","qwen-short","qwen-translation","qwen-triage"):
     hashes={os.path.basename(f):hashlib.sha256(open(f,"rb").read()).hexdigest() for f in sorted(glob.glob(f"{pasta}/{prefixo}-*.json"))}
     if not hashes: continue
     relatorio[prefixo]={"arquivos":hashes,"identicos":len(set(hashes.values()))==1 and len(hashes)>1}

@@ -86,21 +86,26 @@ enum CasosDeMacroBench {
 
         if opcoes.somenteTriagem {
             if temQwen(pasta) {
-                let trechos = sintetizarTrechos(quantidade: 4)
+                // O app não traduz mais: a triagem exercita o caminho real, um resumo
+                // curto em passe único com a gramática GBNF em toda a saída.
+                let trechos = sintetizarTrechos(quantidade: 6)
                 do {
                     let engine = QwenEngine(modelo: modeloQwen(pasta))
-                    var ultimaTraducao: [Trecho] = []
+                    var ultimoResumo: Resumo?
                     let r = try await Medidor.medirAsync(
                         nome: "macro.qwen.triagem",
                         iteracoes: 2,
-                        unidade: "4 trechos pt→en (~256 tokens gerados)",
-                        aquecimento: { _ = try await engine.traduzir(sintetizarTrechos(quantidade: 1), para: .ingles) }
+                        unidade: "resumo de 6 trechos, passe único com gramática",
+                        aquecimento: { _ = try await engine.summarize(sintetizarTrechos(quantidade: 2)) }
                     ) {
-                        ultimaTraducao = try await engine.traduzir(trechos, para: .ingles)
+                        ultimoResumo = try await engine.summarize(trechos)
                     }
                     var detalhes: [String: String] = [:]
-                    if let saida = Self.codificarBase64(ultimaTraducao) {
-                        detalhes["traducao_trechos_json_base64"] = saida
+                    if let entrada = Self.codificarBase64(trechos) {
+                        detalhes["source_trechos_json_base64"] = entrada
+                    }
+                    if let ultimoResumo, let resumo = Self.codificarBase64(ultimoResumo) {
+                        detalhes["resumo_json_base64"] = resumo
                     }
                     resultados.append(Self.anexarDetalhes(detalhes, a: r))
                     await engine.descarregar()
@@ -218,6 +223,34 @@ enum CasosDeMacroBench {
             }
         }
 
+        // —— Resumo de reunião curta (passe único com gramática: o caso comum do app) ——
+        if opcoes.somenteQwen, temQwen(pasta) {
+            let trechos = sintetizarTrechos(quantidade: 60)
+            do {
+                let engine = QwenEngine(modelo: modeloQwen(pasta))
+                var ultimoResumo: Resumo?
+                let r = try await Medidor.medirAsync(
+                    nome: "macro.qwen.resumirCurto",
+                    iteracoes: 1,
+                    unidade: "60 trechos, passe único",
+                    aquecimento: { _ = try await engine.summarize(sintetizarTrechos(quantidade: 2)) }
+                ) {
+                    ultimoResumo = try await engine.summarize(trechos)
+                }
+                var detalhes: [String: String] = [:]
+                if let entrada = Self.codificarBase64(trechos) {
+                    detalhes["source_trechos_json_base64"] = entrada
+                }
+                if let ultimoResumo, let resumo = Self.codificarBase64(ultimoResumo) {
+                    detalhes["resumo_json_base64"] = resumo
+                }
+                resultados.append(Self.anexarDetalhes(detalhes, a: r))
+                await engine.descarregar()
+            } catch {
+                print("AVISO: falha no resumo curto: \(error)")
+            }
+        }
+
         // —— Sumarização Qwen ——
         if opcoes.incluirResumo, temQwen(pasta) {
             // Gera trechos sintéticos longos o suficiente para forçar o prefill.
@@ -257,7 +290,8 @@ enum CasosDeMacroBench {
         }
 
         // —— Tradução local (mesmo Qwen; só quando há divergência de idioma) ——
-        if opcoes.incluirTraducao, temQwen(pasta) {
+        // O app não traduz mais; o Q2 (somenteQwen) não gasta tempo medindo tradução.
+        if opcoes.incluirTraducao, !opcoes.somenteQwen, temQwen(pasta) {
             // Lote curto: a gramática GBNF de tradução exige JSON com exatamente
             // N saídas; 200 trechos sintéticos longos estouram maxTokens e o
             // llama.cpp recusa a gramática. 40 trechos cabe no teto de 4096.

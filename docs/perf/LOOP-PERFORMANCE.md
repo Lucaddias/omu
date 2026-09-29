@@ -8,9 +8,18 @@ Este arquivo é a especificação completa e vale para qualquer agente.
 - **Claude Code:** `/loop /omu-perf`.
 - **Parar com segurança:** `touch ~/OmuPerf/estado/STOP`.
 
+## Decisão de produto fixa (28/09/2026): sem tradução
+
+O Ōmu **não traduz**. A transcrição e o resumo ficam no idioma falado no áudio: inglês → inglês, português → português (o Whisper detecta o idioma sozinho). A tradução automática foi removida do app no commit `4411410` (branch `perf/loop-20260924`). Isso vale para **todos os testes daqui para frente**:
+
+- Nenhum experimento, build, script ou cenário religa ou mede a tradução no app. O `medir.sh` não passa `-traducaoAutomatica`, e o Q2/T2 do `papagaio-eval` medem resumo curto (passe único) e longo, não tradução.
+- Toda baseline e todo A/B partem de um commit que já contém `4411410`. A referência de "voltar à baseline" é a tag `perf/base-sem-traducao` (ou uma `perf/aceito-*` posterior), **nunca** `perf/original`, que ainda tem tradução.
+- `apps/aceito` é a build sem tradução. A build antiga ficou em `apps/aceito-com-traducao-20260928` só como histórico: não use em A/B.
+- Na reunião em inglês (fixture `en_30s`), o portão de qualidade exige transcrição e resumo em inglês.
+
 ## 0. Missão
 
-Você é o engenheiro de performance do **Ōmu**, app macOS que grava ou importa áudio de reuniões e o processa localmente: transcrição (Whisper) → diarização → resolução de falantes → tradução → resumo (Qwen) → salvamento. O objetivo é deixar o app o mais rápido e leve possível **de ponta a ponta** (abrir, importar, processar, navegar e fechar) **sem perder qualidade nem estabilidade**, num ciclo científico sem fim:
+Você é o engenheiro de performance do **Ōmu**, app macOS que grava ou importa áudio de reuniões e o processa localmente: transcrição (Whisper) → diarização → resolução de falantes → resumo (Qwen), sempre no idioma falado → salvamento. O objetivo é deixar o app o mais rápido e leve possível **de ponta a ponta** (abrir, importar, processar, navegar e fechar) **sem perder qualidade nem estabilidade**, num ciclo científico sem fim:
 
 **medir → formular UMA hipótese → aplicar → medir A/B → manter se melhorou → se piorou, desfazer e testar de novo para confirmar que a baseline voltou → registrar → próxima hipótese.**
 
@@ -86,7 +95,7 @@ Logo no início, confirme que o agente consegue escrever em `~/OmuPerf`, abrir a
 
 Tudo fica sob `#if OMU_PERF` (não existe na build normal) e é ligado por `--perf-cenario <nome>`.
 
-- **Isolamento:** `Armazenamento(raiz:)` e o store SwiftData dentro de `--perf-raiz <dir>` (em `~/OmuPerf/runs/…`), serviços externos desligados e modelos lidos de `--perf-modelos`. Preferências e idioma são fixados por argumentos, que não persistem (ex.: `-processamentoAutomatico YES -traducaoAutomatica YES -AppleLanguages '(pt-BR)' -AppleLocale pt_BR`).
+- **Isolamento:** `Armazenamento(raiz:)` e o store SwiftData dentro de `--perf-raiz <dir>` (em `~/OmuPerf/runs/…`), serviços externos desligados e modelos lidos de `--perf-modelos`. Preferências e idioma são fixados por argumentos, que não persistem (ex.: `-processamentoAutomatico YES -AppleLanguages '(pt-BR)' -AppleLocale pt_BR`).
 - **Eventos** vão em JSONL para o arquivo `--perf-saida`, uma linha por evento com `evento`, `t_ns` (relógio monotônico), hora de parede e dados:
   - início do processo (`sysctl` com `KERN_PROC_PID`), `App.init`, primeiro frame desenhado e "interativo" (biblioteca carregada e main thread livre por 100 ms);
   - início e fim da importação, de cada `PipelineDeArquivo.Fase`, de cada carga ou descarga de modelo e de cada salvamento, e o fim do processamento;
@@ -105,7 +114,7 @@ Tudo fica sob `#if OMU_PERF` (não existe na build normal) e é ligado por `--pe
 - **Reuniões em pt-BR** com 2 a 4 vozes (`say -v Luciana`, `Eddy`, `Flo`, `Reed`…), com roteiro realista cheio de decisões e tarefas (para o resumo ter conteúdo), pausas e falas curtas. O gabarito JSON guarda o texto e os turnos (início, fim, falante).
 - **Durações:** 30 s, 5 min, 30 min, 60 min e 3 h (esta última só para memória e escala).
 - **Todos os formatos que o app aceita:** wav 16 kHz mono, wav 48 kHz estéreo, m4a (AAC e ALAC), mp3, flac, aiff, caf e mp4/mov com trilha de áudio (via `ffmpeg` e `afconvert`).
-- **Uma reunião em inglês** (vozes en_US), para exercitar a tradução automática, que vem ligada por padrão.
+- **Uma reunião em inglês** (vozes en_US), para verificar que a transcrição e o resumo saem em inglês (sem tradução).
 - **Casos de borda:** 0,5 s, 5 min de silêncio, só ruído, arquivo truncado, arquivo de 0 byte e extensão errada.
 - **Dois canais** (microfone + sistema) com eco sintético de atraso e atenuação conhecidos, para o caminho de AEC.
 - **Bibliotecas-semente** com 0, 200 e 1.000 conversas sintéticas (só texto), para abertura e busca.
@@ -176,7 +185,7 @@ O nível 1 roda em toda rodada (portão rápido, ~15 min). O nível 2 roda quand
 | P2 | Processar 5 min | idem | 2 · 5 |
 | P3 | Processar 60 min (3 h só para memória) | idem + crescimento de memória | 3 · 3 |
 | P4 | Fila de 3 arquivos importados juntos | total, cargas e descargas de modelo | 2 · 3 |
-| P5 | Reunião em inglês (com tradução) | fase `traduzindo`, total | 3 · 3 |
+| P5 | Reunião em inglês (sem tradução) | total; transcrição e resumo em inglês | 3 · 3 |
 | P6 | Processar com a janela em segundo plano | total (efeito do App Nap) | 3 · 3 |
 | P7 | Dois canais com eco (gravação sintética injetada no modo perf ou via `papagaio-eval`) | etapa de AEC, pico | 2 · 3 |
 | U1 | Navegar por Biblioteca, Tarefas, Mídias, Configurações e Detalhe | tempo até desenhar, hitches | 2 · 10 |
@@ -225,7 +234,7 @@ São pistas dos relatórios de 22 e 23/09. Arquivos e linhas podem ter mudado: c
 | H05 | AEC em blocos e fora do pool cooperativo. Hoje ele materializa os dois canais inteiros e grava um PCM intermediário | `PipelineDeArquivo.aplicarAEC`, `CanceladorDeEco` | P7, pico em P3 | exata |
 | H06 | AEC block-LMS com vDSP (hoje ≈ 10× mais lento que o tempo real) | `CanceladorDeEco.swift:58-103` | `aec.processarBlocos` | aproximada (ERLE) |
 | H07 | Em `ContextoLlama.completar`: medir prefill × decode, não limpar o KV cache quando o reprompt é prefixo, revisar batch/ubatch e flash attention | `ContextoLlama.swift`, `QwenEngine.swift` | `macro.qwen.resumir` | exata se a saída for idêntica |
-| H08 | Tradução com lotes maiores e menos limpezas de contexto | tradução no `QwenEngine` | P5 | exata ou aproximada |
+| H08 | ~~Tradução com lotes maiores~~ — descartada: o app não traduz mais | — | — | — |
 | H09 | Whisper com threads ajustadas ao M5 (4P + 6E), flash attention e GPU. O encoder em Core ML exige modelo novo: só como proposta | `ContextoWhisper.swift`, `WhisperEngine.swift` | `macro.whisper.transcrever`, P2 | exata ou aproximada |
 | H10 | Diarizar o microfone enquanto o sistema ainda transcreve, sem dois Whisper simultâneos | `PipelineDeArquivo.swift:127` | P7 | exata |
 | H11 | Silero VAD com inferência em lote e menos cópias de tensor | `DetectorDeAtividadeDeVoz.swift:142-160`, `SessaoOnnx.swift:132-153` | `vad.*` | exata |
