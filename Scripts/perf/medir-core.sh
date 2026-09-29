@@ -284,15 +284,25 @@ if [[ "$SCENARIO" == C2 ]]; then
     python3 "$SCRIPT_DIR/validar-c2.py" "$SAMPLES" "$DATASET"
 fi
 if [[ "$SCENARIO" == Q2 || "$SCENARIO" == T2 ]]; then
-    # Portão EXATO: resumo e tradução byte a byte iguais em todas as amostras A e B.
+    # Portão EXATO: após remover apenas IDs voláteis, o JSON canônico do conteúdo
+    # Qwen tem de ser byte a byte igual em todas as amostras A e B.
     python3 - "$DATASET/quality-artifacts" "$DATASET/qualidade-q2.json" <<'PY'
 import glob,hashlib,json,os,sys
 pasta,destino=sys.argv[1:]
+def sem_ids(valor):
+    if isinstance(valor,dict): return {chave:sem_ids(item) for chave,item in valor.items() if chave!="id"}
+    if isinstance(valor,list): return [sem_ids(item) for item in valor]
+    return valor
 relatorio={}
 for prefixo in ("qwen-summary","qwen-short","qwen-translation","qwen-triage"):
-    hashes={os.path.basename(f):hashlib.sha256(open(f,"rb").read()).hexdigest() for f in sorted(glob.glob(f"{pasta}/{prefixo}-*.json"))}
+    hashes={}
+    for arquivo in sorted(glob.glob(f"{pasta}/{prefixo}-*.json")):
+        conteudo=sem_ids(json.load(open(arquivo,encoding="utf-8")))
+        canonico=json.dumps(conteudo,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+        hashes[os.path.basename(arquivo)]=hashlib.sha256(canonico.encode()).hexdigest()
     if not hashes: continue
-    relatorio[prefixo]={"arquivos":hashes,"identicos":len(set(hashes.values()))==1 and len(hashes)>1}
+    lados={nome.rsplit("-",2)[-2] for nome in hashes}
+    relatorio[prefixo]={"arquivos":hashes,"lados":sorted(lados),"identicos":len(set(hashes.values()))==1 and lados=={"A","B"}}
 relatorio["aceito"]=all(v["identicos"] for v in relatorio.values() if isinstance(v,dict))
 json.dump(relatorio,open(destino,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
 print(json.dumps({k:(v["identicos"] if isinstance(v,dict) else v) for k,v in relatorio.items()}))
