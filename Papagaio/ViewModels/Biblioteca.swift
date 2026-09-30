@@ -992,6 +992,9 @@ final class Biblioteca {
             },
             resolverFalantes: { [motores] arquivo in
                 try await motores.resolverFalantes(arquivo)
+            },
+            liberarTranscricao: { [motores] in
+                await motores.descarregarTranscricao()
             }
         )
 

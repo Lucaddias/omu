@@ -33,6 +33,8 @@ public struct PipelineDeArquivo: Sendable {
     }
 
     public typealias Transcrever = @Sendable (URL, String?) async throws -> [Trecho]
+    /// Libera o modelo de transcrição depois que todos os canais deste arquivo foram processados.
+    public typealias LiberarTranscricao = @Sendable () async -> Void
     public typealias Resumir = @Sendable ([Trecho]) async throws -> Resumo
     /// Variante que permite ao runtime pedir ao resumidor o idioma de saída.
     /// Mantemos `Resumir` para preservar os testes e os chamadores legados.
@@ -53,6 +55,7 @@ public struct PipelineDeArquivo: Sendable {
 
     private let armazenamento: Armazenamento
     private let transcrever: Transcrever
+    private let liberarTranscricao: LiberarTranscricao?
     private let resumir: Resumir
     private let resumirNoIdioma: ResumirNoIdioma?
     private let traducaoAutomatica: ConfiguracaoDeTraducaoAutomatica
@@ -77,13 +80,15 @@ public struct PipelineDeArquivo: Sendable {
         ),
         traduzir: Traduzir? = nil,
         diarizar: Diarizar? = nil,
-        resolverFalantes: ResolverFalantes? = nil
+        resolverFalantes: ResolverFalantes? = nil,
+        liberarTranscricao: LiberarTranscricao? = nil
     ) {
         self.armazenamento = armazenamento
         self.repositorio = repositorio
         self.idTranscricao = idTranscricao
         self.idResumo = idResumo
         self.transcrever = transcrever
+        self.liberarTranscricao = liberarTranscricao
         self.resumir = resumir
         self.resumirNoIdioma = resumirNoIdioma
         self.traducaoAutomatica = traducaoAutomatica
@@ -113,8 +118,16 @@ public struct PipelineDeArquivo: Sendable {
         try Task.checkCancellation()
 
         aoProgredir(.transcrevendo)
-        atualizado.trechos = try await transcrever(arquivo)
+        do {
+            atualizado.trechos = try await transcrever(arquivo)
+        } catch {
+            await liberarTranscricao?()
+            throw error
+        }
         atualizado.engineTranscricao = idTranscricao
+        // A closure acima já terminou todos os canais; a diarização não usa Whisper.
+        // Liberar aqui reduz a sobreposição com os modelos acústicos da próxima fase.
+        await liberarTranscricao?()
 
         try Task.checkCancellation()
 

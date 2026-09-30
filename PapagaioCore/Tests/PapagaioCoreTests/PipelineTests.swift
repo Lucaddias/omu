@@ -19,6 +19,13 @@ private actor RepositorioEspiao: ArquivoRepository {
     func apagar(_ id: ArquivoID) async throws {}
 }
 
+private actor EventosDoPipeline {
+    private var registrados: [String] = []
+
+    func registrar(_ evento: String) { registrados.append(evento) }
+    func todos() -> [String] { registrados }
+}
+
 private func montarGravacao(
     microfone: Bool,
     sistema: Bool,
@@ -87,6 +94,40 @@ func pipelineMesclaOsCanais() async throws {
     #expect(final.engineTranscricao == "whisper-falso")
     #expect(final.engineResumo == "qwen-falso")
     #expect(final.resumo?.titulo == "Resumo")
+}
+
+@Test("Libera Whisper depois de transcrever os dois canais e antes da diarização")
+func pipelineLiberaWhisperEntreTranscricaoEDiarizacao() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: true, sistema: true, mixagem: true
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let eventos = EventosDoPipeline()
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "whisper-falso",
+        idResumo: "qwen-falso",
+        transcrever: { _, _ in
+            await eventos.registrar("transcrever")
+            return [Trecho(start: 0, end: 1, texto: "fala")]
+        },
+        resumir: { _ in resumoDeMentira },
+        diarizar: { _ in
+            await eventos.registrar("diarizar")
+            return []
+        },
+        liberarTranscricao: {
+            await eventos.registrar("liberar")
+        }
+    )
+
+    _ = try await pipeline.processar(arquivo)
+
+    #expect(await eventos.todos() == [
+        "transcrever", "transcrever", "liberar", "diarizar", "diarizar"
+    ])
 }
 
 @Test("Arquivo importado (só mixagem) transcreve sem inventar falante")
