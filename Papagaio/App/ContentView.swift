@@ -566,7 +566,7 @@ struct ContentView: View {
                         } else {
 #if OMU_PERF
                             switch PerfProbe.configuracao?.cenario.lowercased() {
-                            case "i1": return
+                            case "i1", "s1-import": return
                             case "u3":
                                 PerfProbe.shared.registrarNavegacaoSolicitada("detalhe")
                                 conversaAberta.append(arquivo.id.rawValue)

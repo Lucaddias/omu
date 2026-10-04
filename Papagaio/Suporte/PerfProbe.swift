@@ -125,13 +125,22 @@ struct ConfiguracaoPerf: Sendable {
 /// Sonda existe apenas na build Release explicitamente compilada com OMU_PERF.
 @MainActor
 final class PerfProbe {
-    static let termosDeEntidades = [
-        "Projeto Aurora", "Marina Costa", "João Martins", "Lívia Nascimento",
-        "Equipe de Pesquisa", "Plano Beta", "Instituto Horizonte", "Rafael Lima",
-        "Acessibilidade", "Comitê de Produto", "Projeto Atlas", "Camila Rocha",
-        "Felipe Santos", "Núcleo de Design", "Orçamento Trimestral", "Ana Ribeiro",
-        "Equipe Aurora", "Lucas Ferreira", "Plano de Entrega", "Estúdio Sabiá"
-    ]
+    static var termosDeEntidades: [String] {
+        if configuracao?.cenario.lowercased() == "p5" {
+            return [
+                "Aurora", "Tuesday", "noon", "prototype", "participants",
+                "Friday", "findings", "four thousand dollars", "accessibility",
+                "testing", "schedule", "consent form", "legal review"
+            ]
+        }
+        return [
+            "Projeto Aurora", "Marina Costa", "João Martins", "Lívia Nascimento",
+            "Equipe de Pesquisa", "Plano Beta", "Instituto Horizonte", "Rafael Lima",
+            "Acessibilidade", "Comitê de Produto", "Projeto Atlas", "Camila Rocha",
+            "Felipe Santos", "Núcleo de Design", "Orçamento Trimestral", "Ana Ribeiro",
+            "Equipe Aurora", "Lucas Ferreira", "Plano de Entrega", "Estúdio Sabiá"
+        ]
+    }
     static let espacoPadrao = EspacoID(
         rawValue: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     )

@@ -61,7 +61,9 @@ echo "Backup: $(tmutil status 2>/dev/null | head -n 4 || true)"
 ATIVIDADE_NS="$(ioreg -c IOHIDSystem -d 4 | awk -F'= ' '/HIDIdleTime/ {gsub(/[^0-9]/, "", $2); print $2; exit}')"
 ATIVIDADE_S=$(( ${ATIVIDADE_NS:-0} / 1000000000 ))
 echo "Inatividade de entrada: ${ATIVIDADE_S}s"
-if (( ATIVIDADE_S < 120 )) && [[ "$SHORT" != true ]]; then
+if [[ -f "$STATE_DIR/ALLOW_ACTIVE_SESSION" ]]; then
+    echo "Gate de inatividade desativado por autorização para a campanha E005; demais verificações continuam ativas."
+elif (( ATIVIDADE_S < 120 )) && [[ "$SHORT" != true ]]; then
     echo "PAUSA: a sessão está ativa; só cenários curtos podem medir com n maior."
     exit 13
 fi

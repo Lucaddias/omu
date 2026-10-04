@@ -1,6 +1,12 @@
-Execute sem fim o loop de otimização de performance do Ōmu descrito em "/Users/lucadias/Documents/Academy/Challenges/Challenge 3/Projeto principal/Papagaio/docs/perf/LOOP-PERFORMANCE.md". Leia o arquivo inteiro antes de começar e de novo após qualquer retomada ou compactação de contexto; nas demais rodadas, releia as seções 2 e 4. Ele é a especificação e prevalece sobre este resumo.
+Execute sem fim o loop de otimização de performance do Ōmu descrito em `~/OmuPerf/repo/docs/perf/LOOP-PERFORMANCE.md`. Leia o arquivo inteiro antes de começar e de novo após qualquer retomada ou compactação de contexto; nas demais rodadas, releia as seções 2 e 4. Ele é a especificação e prevalece sobre este resumo.
 
 Cada rodada: medir → UMA hipótese pré-registrada no DIARIO.md → aplicar → portões de correção (testes e qualidade) → A/B intercalado contra a build aceita → manter só se melhorar com significância; se piorar, ficar neutro ou quebrar, desfazer, recompilar e medir de novo para confirmar que a baseline voltou → registrar → próxima rodada. Se ~/OmuPerf/estado/ESTADO.md não existir, comece pela Fase 0 (seção 3).
+
+Na retomada, concilie HEAD, diff, DIARIO.md, ESTADO.md e runs. Se um experimento sem veredito tiver commit e artefatos íntegros, retome o portão pendente; não o desfaça pela interrupção. Toda comparação usa `perf/base-sem-traducao` ou uma `perf/aceito-*` posterior, nunca `perf/original`. Não meça tradução.
+
+Na campanha E005, não aguarde `HIDIdleTime` atingir 120 s. Reaproveite amostras limpas de E004 quando fixture, configuração e instrumentação coincidirem; não reexecute o lado A só para reconfirmar a baseline. Faça A nova apenas se ela estiver ausente, insuficiente, contaminada ou invalidada.
+
+Foco desta fase: melhorar a performance geral priorizando a redução reproduzível do pico de RAM, especialmente no resumo do Qwen. Termine primeiro qualquer hipótese já pré-registrada. Depois investigue a RAM por fase e teste uma variável por rodada, incluindo formatos/quantizações dos pesos do Qwen que sejam compatíveis e estejam disponíveis localmente. Registre RSS e phys_footprint separadamente; confirme qualquer ganho no app ponta a ponta. Não baixe modelos. Só aceite redução de RAM com efeito ≥ MDE, p ≤ 0,05, sem regressão nos guardrails de tempo e qualidade da especificação. Variantes que alterem o resumo exigem um portão semântico confiável; sem ele, registre o bloqueio em PROPOSTAS.md.
 
 Única condição de parada: existir ~/OmuPerf/estado/STOP. Aí faça o encerramento seguro da seção 9 e só então marque o objetivo como concluído. Ganho atingido, backlog vazio, ideias esgotadas, contexto longo ou tempo de execução NÃO concluem o objetivo: perfile de novo, gere hipóteses e continue.
 

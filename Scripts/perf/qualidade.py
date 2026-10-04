@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import itertools
 import json
 import math
@@ -49,14 +50,28 @@ def wer_por_janelas_silenciosas(
     quantidade = max(1, int(math.ceil(duracao / janela)))
     ref_por_janela: list[list[str]] = [[] for _ in range(quantidade)]
     hyp_por_janela: list[list[str]] = [[] for _ in range(quantidade)]
-    for segmentos, grupos, nome_inicio, alternativo in (
-        (ref, ref_por_janela, "inicio_s", "start"),
-        (hyp, hyp_por_janela, "start", "inicio_s"),
-    ):
-        for segmento in segmentos:
-            inicio = campo_tempo(segmento, nome_inicio, alternativo)
+    for segmento in ref:
+        inicio = campo_tempo(segmento, "inicio_s", "start")
+        indice = min(quantidade - 1, max(0, int(inicio // janela)))
+        ref_por_janela[indice].extend(tokens(texto_trecho(segmento)))
+
+    for segmento in hyp:
+        palavras = [
+            palavra for palavra in segmento.get("palavras", [])
+            if isinstance(palavra, dict) and texto_trecho(palavra).strip()
+        ]
+        if palavras:
+            # O pipeline pode agrupar palavras de ciclos de 30 s num só
+            # Trecho. Distribua cada palavra pelo timestamp próprio para que
+            # um segmento que atravesse a fronteira não infle o WER da janela.
+            for palavra in palavras:
+                inicio = campo_tempo(palavra, "start", "inicio_s")
+                indice = min(quantidade - 1, max(0, int(inicio // janela)))
+                hyp_por_janela[indice].extend(tokens(texto_trecho(palavra)))
+        else:
+            inicio = campo_tempo(segmento, "start", "inicio_s")
             indice = min(quantidade - 1, max(0, int(inicio // janela)))
-            grupos[indice].extend(tokens(texto_trecho(segmento)))
+            hyp_por_janela[indice].extend(tokens(texto_trecho(segmento)))
     erros = 0
     total_referencia = 0
     for palavras_ref, palavras_hyp in zip(ref_por_janela, hyp_por_janela):
@@ -76,6 +91,65 @@ def campo_tempo(trecho: dict[str, Any], nome: str, alternativo: str) -> float:
 def alinhar_timestamps(ref: list[dict[str, Any]], hyp: list[dict[str, Any]]) -> dict[str, Any]:
     if not ref:
         return {"max_desvio_ms": 0.0, "pares": 0, "desvios_ms": []}
+
+    # O pipeline pode agrupar todas as palavras de uma fala num único Trecho.
+    # Quando os dois lados têm palavras temporizadas, alinhe cada frase do
+    # gabarito às palavras por conteúdo e compare os limites acústicos delas.
+    palavras = [
+        palavra
+        for trecho in hyp
+        for palavra in trecho.get("palavras", [])
+        if isinstance(palavra, dict) and texto_trecho(palavra).strip()
+    ]
+    if palavras:
+        desvios: list[float] = []
+        cursor = 0
+        for esperado in ref:
+            inicio_ref = campo_tempo(esperado, "inicio_s", "start")
+            fim_ref = campo_tempo(esperado, "fim_s", "end")
+            while cursor < len(palavras) and campo_tempo(palavras[cursor], "end", "fim_s") < inicio_ref - 2.0:
+                cursor += 1
+            fim_candidatos = cursor
+            while (
+                fim_candidatos < len(palavras)
+                and campo_tempo(palavras[fim_candidatos], "start", "inicio_s") <= fim_ref + 2.0
+            ):
+                fim_candidatos += 1
+
+            ref_tokens = tokens(texto_trecho(esperado))
+            hyp_tokens: list[str] = []
+            origem_palavra: list[int] = []
+            for indice in range(cursor, fim_candidatos):
+                tokens_palavra = tokens(texto_trecho(palavras[indice]))
+                hyp_tokens.extend(tokens_palavra)
+                origem_palavra.extend([indice] * len(tokens_palavra))
+
+            matches = difflib.SequenceMatcher(
+                a=ref_tokens, b=hyp_tokens, autojunk=False
+            ).get_matching_blocks()
+            indices_alinhados = sorted({
+                origem_palavra[posicao]
+                for bloco in matches
+                for posicao in range(bloco.b, bloco.b + bloco.size)
+            })
+            if not indices_alinhados:
+                continue
+
+            primeira = palavras[indices_alinhados[0]]
+            ultima = palavras[indices_alinhados[-1]]
+            inicio_hyp = campo_tempo(primeira, "start", "inicio_s")
+            fim_hyp = campo_tempo(ultima, "end", "fim_s")
+            desvios.extend((abs(inicio_ref - inicio_hyp) * 1000, abs(fim_ref - fim_hyp) * 1000))
+            cursor = indices_alinhados[-1] + 1
+
+        return {
+            "max_desvio_ms": max(desvios, default=0.0),
+            "pares": len(desvios) // 2,
+            "desvios_ms": desvios,
+            "nivel": "palavra",
+        }
+
+    # Compatibilidade com dumps antigos sem metadados temporais por palavra.
     desvios = []
     cursor = 0
     for esperado in ref:
@@ -104,6 +178,7 @@ def alinhar_timestamps(ref: list[dict[str, Any]], hyp: list[dict[str, Any]]) -> 
         "max_desvio_ms": max(desvios, default=0.0),
         "pares": len(desvios) // 2,
         "desvios_ms": desvios,
+        "nivel": "trecho",
     }
 
 
@@ -118,6 +193,26 @@ def der_aproximado(ref: list[dict[str, Any]], hyp: list[dict[str, Any]], duracao
     passos = max(1, int(duracao * 10))
     def frames_por_falante(segmentos: list[dict[str, Any]], referencia: bool) -> list[Optional[str]]:
         frames: list[Optional[str]] = [None] * passos
+        if not referencia:
+            palavras = [
+                palavra
+                for trecho in segmentos
+                for palavra in trecho.get("palavras", [])
+                if isinstance(palavra, dict)
+                and palavra.get("falanteAcustico") not in (None, "")
+            ]
+            if palavras:
+                for palavra in palavras:
+                    voz = str(palavra["falanteAcustico"])
+                    inicio = campo_tempo(palavra, "start", "inicio_s")
+                    fim = campo_tempo(palavra, "end", "fim_s")
+                    primeiro = max(0, int(inicio * 10))
+                    ultimo = min(passos, int(math.ceil(fim * 10)))
+                    for indice in range(primeiro, ultimo):
+                        if frames[indice] is None:
+                            frames[indice] = voz
+                return frames
+
         for segmento in segmentos:
             voz = falante(segmento)
             if voz is None:

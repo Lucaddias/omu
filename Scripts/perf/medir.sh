@@ -1,5 +1,5 @@
 #!/bin/bash
-# A/B intercalado, em um processo novo por amostra.
+# A/B intercalado ou extensão de um lado, em um processo novo por amostra.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -8,7 +8,7 @@ STATE_DIR="$OMU_PERF_DIR/estado"
 SCENARIO="${1:-}"; APP_A="${2:-}"; APP_B="${3:-}"; N="${4:-}"
 shift 4 || true
 FIXTURES=(); MODELS="$HOME/Library/Application Support/Papagaio/Models"; TIMEOUT=7200
-GABARITOS=(); QUALITY_BASELINES=(); BASELINE_ARQUIVOS=(); EXIGIR_IDENTICA=false
+GABARITOS=(); QUALITY_BASELINES=(); BASELINE_ARQUIVOS=(); EXIGIR_IDENTICA=false; ONLY_SIDE=""
 SEED_COUNT=0; SEED_TRECHOS=32; SEED_PALAVRAS=0; EVAL_BIN=""; REQUIRE_IDLE=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -22,12 +22,14 @@ while [[ $# -gt 0 ]]; do
         --gabarito) GABARITOS+=("$2"); shift 2 ;;
         --quality-baseline) QUALITY_BASELINES+=("$2"); shift 2 ;;
         --baseline-arquivo) BASELINE_ARQUIVOS+=("$2"); shift 2 ;;
+        --only-side) ONLY_SIDE="$(printf '%s' "$2" | tr '[:lower:]' '[:upper:]')"; shift 2 ;;
         --require-idle) REQUIRE_IDLE=true; shift ;;
         --exigir-identica) EXIGIR_IDENTICA=true; shift ;;
         *) echo "Argumento desconhecido: $1" >&2; exit 2 ;;
     esac
 done
-[[ -n "$SCENARIO" && -d "$APP_A" && -d "$APP_B" ]] || { echo "Uso: medir.sh <cenario> <A.app> <B.app> <n> [--fixture PATH]" >&2; exit 2; }
+[[ -n "$SCENARIO" && -d "$APP_A" && -d "$APP_B" ]] || { echo "Uso: medir.sh <cenario> <A.app> <B.app> <n> [--only-side A|B] [--fixture PATH]" >&2; exit 2; }
+[[ -z "$ONLY_SIDE" || "$ONLY_SIDE" == A || "$ONLY_SIDE" == B ]] || { echo "--only-side aceita A ou B." >&2; exit 2; }
 SCENARIO_UPPER="$(printf '%s' "$SCENARIO" | tr '[:lower:]' '[:upper:]')"
 [[ "$N" =~ ^[1-9][0-9]{0,3}$ && "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || { echo "n/timeout inválido." >&2; exit 2; }
 [[ "$SEED_COUNT" =~ ^(0|[1-9][0-9]{0,3})$ && "$SEED_TRECHOS" =~ ^(0|[1-9][0-9]{0,2})$ ]] || {
@@ -178,7 +180,7 @@ if [[ "$SEED_COUNT" != 0 ]]; then SHORT="$SHORT_ORIGINAL"; fi
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
 IDLE_NS="$(ioreg -c IOHIDSystem -d 4 | awk -F'= ' '/HIDIdleTime/ {gsub(/[^0-9]/, "", $2); print $2; exit}')"
 IDLE_S=$(( ${IDLE_NS:-0} / 1000000000 ))
-if (( IDLE_S < 120 )); then
+if (( IDLE_S < 120 )) && [[ ! -f "$STATE_DIR/ALLOW_ACTIVE_SESSION" ]]; then
     [[ "$SHORT" == true ]] || { echo "PAUSA: usuário ativo em cenário longo." >&2; exit 13; }
     N=$((N*2))
 fi
@@ -252,7 +254,7 @@ encerrar_app_desta_amostra() {
     executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
     local binary="$app/Contents/MacOS/$executable"
     local pid
-    pid="$(ps -ww -axo pid=,command= | awk -v bin="$binary" -v raiz="--perf-raiz $root" 'index($0,bin)>0 && index($0,raiz)>0 {print $1; exit}')"
+    pid="$(ps -ww -axo pid=,command= | awk -v bin="$binary" -v raiz="--perf-raiz $root" 'index($0,bin)>0 && index($0,raiz)>0 && !encontrado {print $1; encontrado=1}')"
     [[ "$pid" =~ ^[0-9]+$ ]] || return 0
     local comando
     comando="$(ps -ww -p "$pid" -o command=)"
@@ -297,19 +299,50 @@ run_one() {
     done
     if [[ "$SCENARIO_UPPER" == U1 ]]; then args+=(--perf-detalhe-id "00000000-0000-0000-0000-000000000001"); fi
     local before after start finish wall status leaks_status leaks_log leaks_pid target_pid
+    local top_monitor_pid top_status top_target_pid top_log top_metrics_path
     leaks_status=not-run; leaks_log="$DATASET/leaks-$classe-$side-$index.log"; leaks_pid=""
+    top_monitor_pid=""; top_status=not-run; top_target_pid=""
+    top_log="$DATASET/top-$classe-$side-$index.log"
+    top_metrics_path="$DATASET/top-metrics-$classe-$side-$index.json"
     before="$(swap_bytes)"; start="$(python3 -c 'import time;print(time.monotonic_ns())')"
     /usr/bin/nohup /usr/bin/perl -e 'alarm shift;exec @ARGV' "$TIMEOUT" /usr/bin/open -n -F -W \
         --env PAPAGAIO_TEST_MODE=1 --env "OMU_PERF_DIR=$OMU_PERF_DIR" -a "$app" --args "${args[@]}" >"$log" 2>&1 &
     local pid=$!; status=ok
     ( while kill -0 "$pid" 2>/dev/null; do swap_bytes; sleep 1; done ) >"$swap_log" &
     local monitor_pid=$!
+    if [[ "$SCENARIO_UPPER" == O1 && "$classe" == amostra ]]; then
+        for ((probe=0; probe<120; probe++)); do
+            top_target_pid="$(python3 - "$events" <<'PY'
+import json,sys
+try:
+    for line in open(sys.argv[1],encoding="utf-8"):
+        event=json.loads(line)
+        if event.get("evento")=="process.start":
+            print(event.get("pid", ""))
+            break
+except (OSError,json.JSONDecodeError):
+    pass
+PY
+            )"
+            [[ "$top_target_pid" =~ ^[0-9]+$ ]] && break
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 0.25
+        done
+        if [[ "$top_target_pid" =~ ^[0-9]+$ ]]; then
+            /usr/bin/top -l 61 -s 1 -pid "$top_target_pid" -stats pid,cpu,idlew >"$top_log" 2>&1 &
+            top_monitor_pid=$!
+            top_status=running
+        else
+            top_status=pid-missing
+            status=o1-pid-missing
+        fi
+    fi
     if [[ "$SCENARIO_UPPER" == S1 && "$classe" == amostra ]]; then
         local executable="$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")"
         target_pid=""
         for ((probe=0;probe<120;probe++)); do
             if [[ -f "$events" ]] && /usr/bin/grep -Fq '"evento":"terminate.scheduled"' "$events"; then
-                target_pid="$(ps -ww -axo pid=,command= | awk -v bin="$executable" -v raiz="--perf-raiz $root" 'index($0,bin)>0 && index($0,raiz)>0 {print $1; exit}')"
+                target_pid="$(ps -ww -axo pid=,command= | awk -v bin="$executable" -v raiz="--perf-raiz $root" 'index($0,bin)>0 && index($0,raiz)>0 && !encontrado {print $1; encontrado=1}')"
                 [[ "$target_pid" =~ ^[0-9]+$ ]] && break
             fi
             kill -0 "$pid" 2>/dev/null || break
@@ -330,7 +363,75 @@ run_one() {
             leaks_status=target-missing
         fi
     fi
+    if [[ "$SCENARIO_UPPER" == S1 && "$classe" == amostra && "$target_pid" =~ ^[0-9]+$ ]]; then
+        local s1_executable="$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")"
+        local s1_exit_seen=false s1_processo=""
+        # The probe requests termination 60 s after the tenth import. Give AppKit
+        # another 120 s to finish its close path, then stop only this synthetic PID.
+        for ((probe=0; probe<180; probe++)); do
+            s1_processo="$(ps -ww -p "$target_pid" -o command= 2>/dev/null || true)"
+            if [[ "$s1_processo" != *"$s1_executable"* || "$s1_processo" != *"--perf-raiz $root"* ]]; then
+                s1_exit_seen=true
+                break
+            fi
+            sleep 1
+        done
+        if [[ "$s1_exit_seen" != true ]]; then
+            status=s1-termination-timeout
+            echo "S1: app permaneceu aberta após terminate.request; encerrar PID sintético $target_pid após 180 s." >&2
+            encerrar_app_desta_amostra "$app" "$root"
+        fi
+    fi
     if wait "$pid"; then :; else status="falhou:$?"; fi
+    if [[ "$SCENARIO_UPPER" == O1 && "$classe" == amostra ]]; then
+        if [[ -n "$top_monitor_pid" ]]; then
+            if wait "$top_monitor_pid"; then top_status=ok; else top_status="failed:$?"; fi
+        fi
+        if [[ "$top_status" == ok ]]; then
+            if ! python3 - "$top_log" "$top_target_pid" "$top_metrics_path" <<'PY'
+import json,math,re,sys
+log_path,pid,destination=sys.argv[1:]
+rows=[]
+with open(log_path,encoding="utf-8",errors="replace") as log:
+    for line in log:
+        fields=line.split()
+        if len(fields)<3 or fields[0]!=pid:
+            continue
+        try:
+            cpu=float(fields[1].rstrip("%"))
+            contador=re.match(r"[0-9][0-9,]*",fields[2])
+            if contador is None:
+                continue
+            idlew=int(contador.group().replace(",", ""))
+        except ValueError:
+            continue
+        rows.append((cpu,idlew))
+if len(rows)<50:
+    raise SystemExit(f"top registrou apenas {len(rows)} amostras para PID {pid}")
+cpus=[row[0] for row in rows[1:]] or [rows[0][0]]
+ordenados=sorted(cpus)
+p95=ordenados[max(0,math.ceil(len(ordenados)*0.95)-1)]
+resultado={
+    "o1_top_pid":int(pid),
+    "o1_top_samples":len(rows),
+    "o1_idlew_start":rows[0][1],
+    "o1_idlew_end":rows[-1][1],
+    "o1_idlew_wakeups":max(0,rows[-1][1]-rows[0][1]),
+    "o1_cpu_mean_pct":sum(cpus)/len(cpus),
+    "o1_cpu_p95_pct":p95,
+}
+with open(destination,"w",encoding="utf-8") as output:
+    json.dump(resultado,output,ensure_ascii=False,indent=2,sort_keys=True)
+    output.write("\n")
+PY
+            then
+                top_status=invalid
+                status=o1-top-invalid
+            fi
+        else
+            [[ "$status" != ok ]] || status="o1-top-$top_status"
+        fi
+    fi
     if [[ "$SCENARIO_UPPER" == L1 && "$status" == ok ]]; then
         if ! python3 - "$events" <<'PY'
 import json,sys
@@ -349,10 +450,19 @@ PY
         fi
     fi
     if [[ -n "$leaks_pid" ]]; then
-        if wait "$leaks_pid"; then
+        if wait "$leaks_pid"; then LEAKS_EXIT=0; else LEAKS_EXIT=$?; fi
+        if python3 - "$leaks_log" <<'PY'
+import re,sys
+try:
+    text=open(sys.argv[1],encoding="utf-8",errors="replace").read()
+except OSError:
+    raise SystemExit(1)
+raise SystemExit(0 if re.search(r"\d+\s+leaks?\s+for\s+[\d,]+\s+total leaked bytes",text,re.IGNORECASE) else 1)
+PY
+        then
+            # leaks exits 1 when it reports leaks; a recognized summary means the scan completed.
             leaks_status=ok
         else
-            LEAKS_EXIT=$?
             leaks_status="failed:$LEAKS_EXIT"
             status=leaks-failed
         fi
@@ -403,7 +513,7 @@ PY
             fi
             ;;
     esac
-    if [[ "$SCENARIO_UPPER" == S1 && "$status" == ok ]]; then
+    if [[ "$SCENARIO_UPPER" == S1 && "$classe" == amostra && "$status" == ok ]]; then
         local import_count
         import_count="$(python3 - "$events" <<'PY'
 import json,sys
@@ -416,10 +526,10 @@ PY
         [[ "$import_count" == 10 ]] || status=import-fail
     fi
     if (( ${#FIXTURES[@]-0} > 0 )); then set -- "${FIXTURES[@]}"; else set --; fi
-    python3 - "$events" "$SAMPLES" "$SCENARIO" "$cenario" "$side" "$index" "$classe" "$status" "$wall" "$finish" "$before" "$after" "$swap_max" "$log" "$quality_result" "$app" "$app_label" "$app_version" "$MODELS" "$app_commit" "$OMU_PERF_DIR/fixtures/manifest.json" "$leaks_log" "$leaks_status" "$@" <<'PY'
+    python3 - "$events" "$SAMPLES" "$SCENARIO" "$cenario" "$side" "$index" "$classe" "$status" "$wall" "$finish" "$before" "$after" "$swap_max" "$log" "$quality_result" "$app" "$app_label" "$app_version" "$MODELS" "$app_commit" "$OMU_PERF_DIR/fixtures/manifest.json" "$leaks_log" "$leaks_status" "$top_log" "$top_metrics_path" "$top_status" "$top_target_pid" "$@" <<'PY'
 import json,os,re,sys
 (path,out,scenario,app_scenario,side,index,kind,status,wall,exit_ns,before,after,swap_peak,log,quality_path,
- app_path,app_label,app_version,models_path,commit,manifest_path,leaks_path,leaks_status,*fixture_paths)=sys.argv[1:]
+ app_path,app_label,app_version,models_path,commit,manifest_path,leaks_path,leaks_status,top_log,top_metrics_path,top_status,top_target_pid,*fixture_paths)=sys.argv[1:]
 events=[]
 if os.path.isfile(path):
     for line in open(path,encoding="utf-8"):
@@ -466,6 +576,13 @@ metrics={"ttff_s":(frame["t_ns"]-origin)/1e9 if frame and start else None,
 "model_unloads":{name:sum(x.get("evento")=="model.unload.start" and x.get("modelo")==name for x in events) for name in ("whisper","qwen","silero")},
 "model_load_seconds":{name:sum(x.get("duracao_s",0) for x in events if x.get("evento")=="model.load.end" and x.get("modelo")==name) for name in ("whisper","qwen","silero")},
 "search_key_latency_s":[x.get("latencia_s") for x in events if x.get("evento")=="search.response"]}
+if scenario.upper()=="O1" and kind=="amostra":
+    metrics["o1_top_status"]=top_status
+    metrics["o1_top_log"]=top_log
+    metrics["o1_top_metrics_file"]=top_metrics_path
+    metrics["o1_duration_s"]=elapsed("scenario.start","terminate.request")
+    if os.path.isfile(top_metrics_path):
+        metrics.update(json.load(open(top_metrics_path,encoding="utf-8")))
 leaks_text=""
 if leaks_status=="ok" and os.path.isfile(leaks_path):
     leaks_text=open(leaks_path,encoding="utf-8",errors="replace").read()
@@ -489,19 +606,37 @@ if fixture_paths and os.path.isfile(manifest_path):
 with open(out,"a",encoding="utf-8") as f: f.write(json.dumps(record,ensure_ascii=False,sort_keys=True)+"\n")
 print(json.dumps(record,ensure_ascii=False,sort_keys=True))
 PY
+    if [[ "$SCENARIO_UPPER" == S1 && "$classe" == amostra && "$status" == s1-termination-timeout && -s "$events" ]]; then
+        echo "S1 termination timeout registrada para comparação com a baseline." >&2
+        return 0
+    fi
     [[ "$status" == ok && -s "$events" ]] || { echo "Falha ($status); log: $log" >&2; return 1; }
 }
 
-echo "Cenário=$SCENARIO n=$N/lado; dados=$DATASET"
-run_one A "$APP_A" 0 l1 L3
-run_one B "$APP_B" 0 l1 L3
+echo "Cenário=$SCENARIO n=$N/lado${ONLY_SIDE:+; somente=$ONLY_SIDE}; dados=$DATASET"
+if [[ "$ONLY_SIDE" == A ]]; then
+    run_one A "$APP_A" 0 l1 L3
+elif [[ "$ONLY_SIDE" == B ]]; then
+    run_one B "$APP_B" 0 l1 L3
+else
+    run_one A "$APP_A" 0 l1 L3
+    run_one B "$APP_B" 0 l1 L3
+fi
 resfriamento_adaptativo
 preflight_bloco "$DATASET/ambiente-1.log"
 CAFFEINATE_PID="$(cat "$STATE_DIR/caffeinate.pid")"
-TOTAL=$((N*2)); NUM=0; IA=0; IB=0
+TOTAL=$((N*2))
+if [[ -n "$ONLY_SIDE" ]]; then TOTAL=$N; fi
+NUM=0; IA=0; IB=0
 BLOCK=1
 for ((pair=0;pair<N;pair++)); do
-    if (( pair%2==0 )); then ORDEM=(A B); else ORDEM=(B A); fi
+    if [[ -n "$ONLY_SIDE" ]]; then
+        ORDEM=("$ONLY_SIDE")
+    elif (( pair%2==0 )); then
+        ORDEM=(A B)
+    else
+        ORDEM=(B A)
+    fi
     for side in "${ORDEM[@]}"; do
         NUM=$((NUM+1))
         if [[ "$side" == A ]]; then app="$APP_A"; IA=$((IA+1)); index="$IA"; else app="$APP_B"; IB=$((IB+1)); index="$IB"; fi
@@ -520,7 +655,9 @@ for ((pair=0;pair<N;pair++)); do
         fi
     done
 done
-if [[ "$SCENARIO_UPPER" == S1 ]]; then
+if [[ "$SCENARIO_UPPER" == S1 && -z "$ONLY_SIDE" ]]; then
     python3 "$SCRIPT_DIR/validar-stress.py" "$SAMPLES" "$DATASET/qualidade-stress.json" "$N"
+elif [[ "$SCENARIO_UPPER" == S1 ]]; then
+    echo "S1 parcial somente lado $ONLY_SIDE; agregue com o outro lado antes de validar-stress.py."
 fi
 printf 'Concluído: %s\nAmostras: %s\nOrdem: %s\n' "$DATASET" "$SAMPLES" "$ORDER"
