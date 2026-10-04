@@ -129,7 +129,7 @@ public enum DetectorDeAtividadeDeVoz {
             duracaoDoQuadro: TimeInterval = 0.032,
             limiarDeEnergia: Float = 0.008,
             limiarDeFala: Float = 0.5,
-            silencioMinimoParaCortar: TimeInterval = 0.6,
+            silencioMinimoParaCortar: TimeInterval = 3.0,
             margem: TimeInterval = 0.2,
             limiteDaJanela: TimeInterval = 60
         ) {
@@ -162,35 +162,35 @@ public enum DetectorDeAtividadeDeVoz {
             proximaAmostra = Int((bloco.inicio * taxa).rounded())
             let quantidadeDeQuadros = (bloco.amostras.count + tamanhoDoQuadro - 1) / tamanhoDoQuadro
             var falaPorQuadro = Array(repeating: false, count: quantidadeDeQuadros)
-            var indicesComEnergia: [Int] = []
 
             for indice in 0..<quantidadeDeQuadros {
                 let inicio = indice * tamanhoDoQuadro
                 let fim = min(inicio + tamanhoDoQuadro, bloco.amostras.count)
                 let quadro = bloco.amostras[inicio..<fim]
                 let energia = sqrt(quadro.reduce(Float.zero) { $0 + $1 * $1 } / Float(max(1, quadro.count)))
-                if energia >= limiarDeEnergia {
-                    falaPorQuadro[indice] = true
-                    indicesComEnergia.append(indice)
-                }
+                falaPorQuadro[indice] = energia >= limiarDeEnergia
             }
 
-            if usaSilero, !indicesComEnergia.isEmpty {
+            if usaSilero, quantidadeDeQuadros > 0 {
+                // Silero é recorrente. Até quadros de silêncio têm de avançar
+                // o estado; omiti-los comprime o tempo e faz a probabilidade
+                // oscilar durante fala contínua, cortando sílabas inteiras.
+                // A porta de energia continua vetando silêncio depois da
+                // inferência. Mantemos no máximo 128 quadros temporários.
                 var inicioDoLote = 0
-                while inicioDoLote < indicesComEnergia.count {
+                while inicioDoLote < quantidadeDeQuadros {
                     let fimDoLote = min(
                         inicioDoLote + DetectorDeAtividadeDeVoz.quadrosPorLoteDoSilero,
-                        indicesComEnergia.count
+                        quantidadeDeQuadros
                     )
-                    let indices = indicesComEnergia[inicioDoLote..<fimDoLote]
-                    let candidatos = indices.map { indice in
+                    let candidatos = (inicioDoLote..<fimDoLote).map { indice in
                         let inicio = indice * tamanhoDoQuadro
                         return Array(bloco.amostras[inicio..<min(inicio + tamanhoDoQuadro, bloco.amostras.count)])
                     }
                     let probabilidades = try await DetectorDeAtividadeDeVoz.sileroVAD
                         .probabilidadesDeFala(quadros: candidatos)
-                    for (indice, probabilidade) in zip(indices, probabilidades) {
-                        falaPorQuadro[indice] = probabilidade >= limiarDeFala
+                    for (indice, probabilidade) in zip(inicioDoLote..<fimDoLote, probabilidades) {
+                        falaPorQuadro[indice] = falaPorQuadro[indice] && probabilidade >= limiarDeFala
                     }
                     inicioDoLote = fimDoLote
                 }
@@ -338,7 +338,7 @@ public enum DetectorDeAtividadeDeVoz {
         duracaoDoQuadro: TimeInterval = 0.032,
         limiarDeEnergia: Float = 0.008,
         limiarDeFala: Float = 0.5,
-        silencioMinimoParaCortar: TimeInterval = 0.6,
+        silencioMinimoParaCortar: TimeInterval = 3.0,
         margem: TimeInterval = 0.2
     ) async throws -> [JanelaDeFala] {
         guard !amostras.isEmpty else { return [] }
@@ -363,36 +363,32 @@ public enum DetectorDeAtividadeDeVoz {
 
             var quadros: [Bool] = []
             quadros.reserveCapacity(amostras.count / tamanhoDoQuadro + 1)
-            // Energia primeiro em todos os quadros (filtro barato). Os que
-            // passam seguem para o Silero em lotes limitados: um lote com 128
-            // quadros ocupa no máximo ~256 KiB, em vez de duplicar todos os
-            // candidatos de uma hora de áudio na memória.
-            var indicesComEnergia: [Int] = []
+            // Energia é calculada para todos os quadros. O Silero também recebe
+            // todos em ordem porque seu estado é recorrente; a energia veta
+            // silêncio na decisão final, mas não pode comprimir o tempo do VAD.
             var inicio = 0
             while inicio < amostras.count {
                 let fim = min(inicio + tamanhoDoQuadro, amostras.count)
                 let quadro = amostras[inicio..<fim]
                 let energia = sqrt(quadro.reduce(Float.zero) { $0 + $1 * $1 } / Float(max(1, quadro.count)))
-                let temFala = energia >= limiarDeEnergia
-                quadros.append(temFala)
-                if temFala { indicesComEnergia.append(quadros.count - 1) }
+                quadros.append(energia >= limiarDeEnergia)
                 inicio = fim
             }
-            if usaSilero, !indicesComEnergia.isEmpty {
+            if usaSilero, !quadros.isEmpty {
                 var inicioDoLote = 0
-                while inicioDoLote < indicesComEnergia.count {
+                while inicioDoLote < quadros.count {
                     let fimDoLote = min(
                         inicioDoLote + quadrosPorLoteDoSilero,
-                        indicesComEnergia.count
+                        quadros.count
                     )
-                    let indicesDoLote = indicesComEnergia[inicioDoLote..<fimDoLote]
+                    let indicesDoLote = inicioDoLote..<fimDoLote
                     let candidatos = indicesDoLote.map {
                         let ini = $0 * tamanhoDoQuadro
                         return Array(amostras[ini..<min(ini + tamanhoDoQuadro, amostras.count)])
                     }
                     let probabilidades = try await sileroVAD.probabilidadesDeFala(quadros: candidatos)
                     for (indice, probabilidade) in zip(indicesDoLote, probabilidades) {
-                        quadros[indice] = probabilidade >= limiarDeFala
+                        quadros[indice] = quadros[indice] && probabilidade >= limiarDeFala
                     }
                     inicioDoLote = fimDoLote
                 }

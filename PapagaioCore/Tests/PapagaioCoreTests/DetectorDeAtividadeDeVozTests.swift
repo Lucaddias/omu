@@ -171,6 +171,32 @@ struct IsolamentoDeSessoesDoVADTests {
 
 @Suite("VAD em fluxo")
 struct VADEmFluxoTests {
+    @Test("Mantém a mesma fala através de pausas naturais de até três segundos")
+    func pausaNaturalNaoFragmentaFala() async throws {
+        let fala = [Float](repeating: 0.02, count: 16_000)
+        let silencio = [Float](repeating: 0, count: 32_000)
+        let amostras = fala + silencio + fala
+
+        let emLote = try await DetectorDeAtividadeDeVoz.janelasDeFala(
+            nas: amostras,
+            limiarDeFala: -1
+        )
+        #expect(emLote.count == 1)
+        #expect(emLote[0].inicio == 0)
+        #expect(emLote[0].fim == 4)
+
+        let sessao = DetectorDeAtividadeDeVoz.SessaoEmFluxo(
+            limiarDeFala: -1,
+            margem: 0
+        )
+        await sessao.iniciar()
+        var emFluxo = try await sessao.receber(.init(inicio: 0, amostras: amostras))
+        emFluxo += await sessao.finalizar()
+        #expect(emFluxo.count == 1)
+        #expect(emFluxo[0].inicio == 0)
+        #expect(Double(emFluxo[0].amostras.count) / 16_000 == 4)
+    }
+
     @Test("Corte forçado não cria uma segunda janela só com overlap e silêncio")
     func overlapSemFalaNovaEhDescartado() async throws {
         let sessao = DetectorDeAtividadeDeVoz.SessaoEmFluxo(
