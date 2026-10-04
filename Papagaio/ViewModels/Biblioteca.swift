@@ -947,6 +947,16 @@ final class Biblioteca {
         erros[chave] = nil
         fases[chave] = .transcrevendo
         iniciadoEm[chave] = Date()
+
+        // O usuário iniciou explicitamente a transcrição. Mantém o trabalho
+        // elegível para execução em segundo plano sem depender do App Nap;
+        // o defer libera a asserção também em erro, retorno antecipado ou
+        // cancelamento, depois da descarga garantida dos modelos.
+        let atividadeDeProcessamento = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiated,
+            reason: "Processando uma reunião solicitada pelo usuário"
+        )
+        defer { ProcessInfo.processInfo.endActivity(atividadeDeProcessamento) }
 #if OMU_PERF
         // Reusa a normalização real do prompt com nomes sintéticos, sem consultar Contatos ou Calendário.
         let promptDeEntidades = await PromptDeEntidades.construir(
