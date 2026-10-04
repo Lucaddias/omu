@@ -557,6 +557,9 @@ func decisaoDeTraducaoAutomatica() {
     #expect(!DetectorDeIdiomaDaTranscricao.deveTraduzir(
         idiomaDetectado: nil, configuracao: portugues
     ))
+    #expect(DetectorDeIdiomaDaTranscricao.idiomaDeProcessamento("en-US") == .ingles)
+    #expect(DetectorDeIdiomaDaTranscricao.idiomaDeProcessamento("pt-BR") == .portugues)
+    #expect(DetectorDeIdiomaDaTranscricao.idiomaDeProcessamento("es") == nil)
 }
 
 @Test("Pipeline traduz antes de salvar e resume no idioma de destino")
@@ -661,7 +664,7 @@ func pipelineMantemIdiomaQueJaEoPadrao() async throws {
     #expect(idiomaDoResumo.withLock { $0 } == .ingles)
 }
 
-@Test("Toggle desligado mantém a fonte e pede resumo sem idioma forçado")
+@Test("Toggle desligado mantém a fonte e resume no idioma detectado")
 func pipelineComTraducaoDesligadaMantemFonte() async throws {
     let (armazenamento, arquivo) = try montarGravacao(
         microfone: false, sistema: false, mixagem: true
@@ -692,7 +695,34 @@ func pipelineComTraducaoDesligadaMantemFonte() async throws {
     let final = try await pipeline.processar(arquivo)
     #expect(!chamouTraducao.withLock { $0 })
     #expect(final.trechos[0].texto == "The notes must remain in English.")
-    #expect(idiomaDoResumo.withLock { $0 } == nil)
+    #expect(idiomaDoResumo.withLock { $0 } == .ingles)
+}
+
+@Test("Toggle desligado pede resumo em português quando a transcrição é portuguesa")
+func pipelineComTraducaoDesligadaResumePortuguesNoIdiomaDetectado() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: false, sistema: false, mixagem: true
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let idiomaDoResumo = Mutex<IdiomaDeProcessamento?>(nil)
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            [Trecho(start: 0, end: 2, texto: "Vamos revisar o cronograma na sexta-feira.")]
+        },
+        resumir: { _ in resumoDeMentira },
+        resumirNoIdioma: { _, idioma in
+            idiomaDoResumo.withLock { $0 = idioma }
+            return resumoDeMentira
+        },
+        traducaoAutomatica: .init(habilitada: false, idiomaPadrao: .ingles)
+    )
+
+    _ = try await pipeline.processar(arquivo)
+    #expect(idiomaDoResumo.withLock { $0 } == .portugues)
 }
 
 @Test("Pipeline traduz português para inglês quando o sistema usa inglês")

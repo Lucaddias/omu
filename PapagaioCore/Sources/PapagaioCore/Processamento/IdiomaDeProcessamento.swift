@@ -70,6 +70,19 @@ public enum DetectorDeIdiomaDaTranscricao {
         return reconhecedor.dominantLanguage?.rawValue.lowercased()
     }
 
+    /// Converte somente os idiomas que o resumidor promete produzir. Outros
+    /// idiomas continuam sem instrução explícita, preservando o texto-fonte.
+    public static func idiomaDeProcessamento(_ idioma: String?) -> IdiomaDeProcessamento? {
+        guard let idioma,
+              let base = idioma.split(separator: "-", maxSplits: 1).first?.lowercased()
+        else { return nil }
+        switch base {
+        case "en": return .ingles
+        case "pt": return .portugues
+        default: return nil
+        }
+    }
+
     public static func deveTraduzir(
         idiomaDetectado: String?,
         configuracao: ConfiguracaoDeTraducaoAutomatica

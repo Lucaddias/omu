@@ -189,7 +189,7 @@ public struct PipelineDeArquivo: Sendable {
                 )
             )
             ? traducaoAutomatica.idiomaPadrao
-            : nil
+            : DetectorDeIdiomaDaTranscricao.idiomaDeProcessamento(idiomaDetectado)
         if let resumirNoIdioma {
             atualizado.resumo = try await resumirNoIdioma(atualizado.trechos, idiomaDoResumo)
         } else {
