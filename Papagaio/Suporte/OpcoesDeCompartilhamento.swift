@@ -25,7 +25,7 @@ final class OpcoesDeCompartilhamento: NSObject, NSSharingServicePickerDelegate, 
 
         let icone = NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage()
         let arquivosParaLimpar = arquivos
-        let salvar = NSSharingService(title: "Salvar em…", image: icone, alternateImage: nil) {
+        let salvar = NSSharingService(title: "Salvar em…".localized, image: icone, alternateImage: nil) {
             Task { @MainActor in
                 let painel = NSSavePanel()
                 painel.nameFieldStringValue = primeiro.lastPathComponent
@@ -42,10 +42,7 @@ final class OpcoesDeCompartilhamento: NSObject, NSSharingServicePickerDelegate, 
                     let acesso = destino.startAccessingSecurityScopedResource()
                     defer { if acesso { destino.stopAccessingSecurityScopedResource() } }
                     do {
-                        if FileManager.default.fileExists(atPath: destino.path) {
-                            try FileManager.default.removeItem(at: destino)
-                        }
-                        try FileManager.default.copyItem(at: primeiro, to: destino)
+                        try CopiaSegura.copiar(primeiro, substituindo: destino)
                     } catch {
                         await MainActor.run {
                             let alerta = NSAlert()

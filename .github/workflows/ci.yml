@@ -7,6 +7,19 @@ on:
     branches: [main]
 
 jobs:
+  test-scripts:
+    name: Testes dos scripts
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      # O teste de sincronização do alvo de testes se pula sem a gem.
+      - name: Instala xcodeproj
+        run: gem install --user-install xcodeproj
+
+      - name: unittest
+        run: python3 -m unittest Scripts/tests/test_scripts.py
+
   test-papagaio-core:
     name: Testes do PapagaioCore (SPM)
     runs-on: macos-26

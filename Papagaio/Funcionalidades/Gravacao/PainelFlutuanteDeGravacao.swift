@@ -104,7 +104,7 @@ struct PainelFlutuanteDeGravacao: View {
             }
 
             BotaoDoSelo(simbolo: "xmark", ajuda: "Cancelar gravação".localized, perigo: true) {
-                Task { await gravador.cancelar() }
+                Task { await gravador.cancelarComConfirmacao() }
             }
 
             if exibindoNota {

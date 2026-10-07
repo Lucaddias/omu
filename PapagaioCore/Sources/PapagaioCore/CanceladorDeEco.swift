@@ -24,11 +24,20 @@ public final class CanceladorDeEco {
     /// Coeficientes do filtro adaptativo.
     private var filtros: [Float]
 
-    /// Buffer circular com as últimas amostras de referência (sistema).
+    /// Últimas amostras de referência (sistema), guardadas **em dobro** e da
+    /// mais recente para a mais antiga: `refBuffer[posicao ..< posicao + L]`
+    /// é sempre a janela do filtro, contígua.
+    ///
+    /// Antes a janela era remontada a cada amostra, com 4.096 leituras de um
+    /// buffer circular e um `%` em cada uma — era isso que fazia uma hora de
+    /// áudio custar centenas de bilhões de iterações escalares.
     private var refBuffer: [Float]
 
-    /// Posição de escrita no buffer circular.
-    private var refIdx: Int = 0
+    /// Onde está a amostra mais recente dentro da primeira metade do buffer.
+    private var posicao: Int = 0
+
+    /// ‖x‖² da janela atual, mantida de forma incremental.
+    private var normaQuadrada: Float = 0
 
     // MARK: - Init
 
@@ -49,7 +58,7 @@ public final class CanceladorDeEco {
         self.comprimentoFiltro = comprimentoFiltro
         self.mu = mu
         self.filtros = [Float](repeating: 0, count: comprimentoFiltro)
-        self.refBuffer = [Float](repeating: 0, count: comprimentoFiltro)
+        self.refBuffer = [Float](repeating: 0, count: comprimentoFiltro * 2)
     }
 
     // MARK: - API pública
@@ -65,49 +74,59 @@ public final class CanceladorDeEco {
         }
 
         var saida = [Float](repeating: 0, count: tamanhoBloco)
+        let comprimento = comprimentoFiltro
+        let tamanho = vDSP_Length(comprimento)
+        let passo = mu
 
-        var refBloco = [Float](repeating: 0, count: comprimentoFiltro)
-        for i in 0..<tamanhoBloco {
-            // Insere a amostra de referência no buffer circular.
-            let idx = (refIdx + i) % comprimentoFiltro
-            refBuffer[idx] = blocoSistema[i]
+        filtros.withUnsafeMutableBufferPointer { filtro in
+            refBuffer.withUnsafeMutableBufferPointer { referencia in
+                guard let w = filtro.baseAddress, let ref = referencia.baseAddress else { return }
 
-            // Extrai o vetor de referência na ordem do filtro (mais recente → mais antigo).
-            for j in 0..<comprimentoFiltro {
-                refBloco[j] = refBuffer[(idx &- j &+ comprimentoFiltro) % comprimentoFiltro]
-            }
+                // A norma incremental acumula erro de arredondamento; uma
+                // soma exata por bloco o mantém limitado.
+                vDSP_svesq(ref + posicao, 1, &normaQuadrada, tamanho)
 
-            // Saída do filtro: y = w^T · x
-            var estimativaEcho: Float = 0
-            vDSP_dotpr(filtros, 1, refBloco, 1, &estimativaEcho, vDSP_Length(comprimentoFiltro))
+                for i in 0..<tamanhoBloco {
+                    // Avança a janela: a amostra nova entra na frente e a
+                    // mais antiga (que ocupava esta posição) sai.
+                    posicao = (posicao == 0 ? comprimento : posicao) - 1
+                    let nova = blocoSistema[i]
+                    let antiga = ref[posicao]
+                    ref[posicao] = nova
+                    ref[posicao + comprimento] = nova
+                    normaQuadrada = max(0, normaQuadrada + nova * nova - antiga * antiga)
+                    let x = ref + posicao
 
-            let erro = blocoMicrofone[i] - estimativaEcho
-            saida[i] = erro
+                    // Saída do filtro: y = w^T · x
+                    var estimativaEcho: Float = 0
+                    vDSP_dotpr(w, 1, x, 1, &estimativaEcho, tamanho)
 
-            // NLMS: w = w + μ · e · x / (‖x‖² + δ)
-            var normaQuadrada: Float = 0
-            vDSP_svesq(refBloco, 1, &normaQuadrada, vDSP_Length(comprimentoFiltro))
-            let norma = normaQuadrada + 1e-6
+                    let erro = blocoMicrofone[i] - estimativaEcho
+                    saida[i] = erro
 
-            guard norma.isFinite, erro.isFinite else { continue }
-            let escalar = mu * erro / norma
-
-            for j in 0..<comprimentoFiltro {
-                filtros[j] += escalar * refBloco[j]
+                    // NLMS: w = w + μ · e · x / (‖x‖² + δ)
+                    let norma = normaQuadrada + 1e-6
+                    guard norma.isFinite, erro.isFinite else { continue }
+                    var escalar = passo * erro / norma
+                    vDSP_vsma(x, 1, &escalar, w, 1, w, 1, tamanho)
+                }
             }
         }
-
-        refIdx = (refIdx + tamanhoBloco) % comprimentoFiltro
 
         return saida
     }
 
     /// Processa um canal completo sem perder a cauda ou o último bloco parcial.
     /// A referência ausente equivale a silêncio, preservando a memória do filtro.
-    func processar(microfone: [Float], sistema: [Float]) -> [Float] {
+    ///
+    /// Confere o cancelamento da tarefa a cada bloco: uma hora de gravação
+    /// são dezenas de segundos de filtro, e mover a conversa para a lixeira
+    /// não pode esperar isso terminar.
+    func processar(microfone: [Float], sistema: [Float]) throws -> [Float] {
         var saida: [Float] = []
         saida.reserveCapacity(microfone.count)
         for inicio in stride(from: 0, to: microfone.count, by: tamanhoBloco) {
+            try Task.checkCancellation()
             let fim = min(inicio + tamanhoBloco, microfone.count)
             var mic = Array(microfone[inicio..<fim])
             mic.append(contentsOf: repeatElement(0, count: tamanhoBloco - mic.count))
@@ -124,7 +143,8 @@ public final class CanceladorDeEco {
     /// Redefine o estado interno do cancelador.
     public func resetar() {
         filtros = [Float](repeating: 0, count: comprimentoFiltro)
-        refBuffer = [Float](repeating: 0, count: comprimentoFiltro)
-        refIdx = 0
+        refBuffer = [Float](repeating: 0, count: comprimentoFiltro * 2)
+        posicao = 0
+        normaQuadrada = 0
     }
 }

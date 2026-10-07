@@ -13,6 +13,7 @@ enum LimpezaDeArquivo {
         LixeiraDeMidia.removerRegistros(do: id, em: defaults)
         LixeiraDeTarefas.removerRegistros(do: id, em: defaults)
         LixeiraDePastas.removerReferencias(ao: id, em: defaults)
+        FalantePreservadoParaTrecho.limpar(id, em: defaults)
     }
 }
 

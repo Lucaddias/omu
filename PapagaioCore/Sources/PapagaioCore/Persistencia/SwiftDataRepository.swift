@@ -65,6 +65,23 @@ public actor SwiftDataRepository: ArquivoRepository {
 
     // MARK: - ArquivoRepository
 
+    /// Aplica uma versão que veio de outro Mac pela sincronização, **com o
+    /// estado de lixeira que ela traz**.
+    ///
+    /// `salvar` nunca tira nada da lixeira — é a proteção contra um resultado
+    /// tardio do pipeline ressuscitar o que a pessoa apagou. Mas na
+    /// sincronização o `apagadoEm` recebido é a decisão de alguém: sem
+    /// aplicá-lo, uma conversa restaurada por um colega continuava na lixeira
+    /// de todos os outros.
+    public func salvarRecebido(_ a: Arquivo) async throws {
+        try await salvar(a)
+        guard let persistido = try buscarPersistido(id: a.id),
+              persistido.apagadoEm != a.apagadoEm
+        else { return }
+        persistido.apagadoEm = a.apagadoEm
+        try modelContext.save()
+    }
+
     public func salvar(_ a: Arquivo) async throws {
         // Um preview pode ter `palavras=[]` apenas porque a lista adiou o
         // decode. Recusá-lo protege os timestamps caso algum chamador esqueça
@@ -83,6 +100,7 @@ public actor SwiftDataRepository: ArquivoRepository {
         persistido.pastaRelativa = a.pastaRelativa
         persistido.idExterno = a.idExterno
         persistido.usavaFones = a.usavaFones
+        persistido.tituloManual = a.tituloManual
         persistido.engineTranscricao = a.engineTranscricao
         persistido.engineResumo = a.engineResumo
         // Uma atualização tardia do pipeline não pode ressuscitar um item que
@@ -91,9 +109,6 @@ public actor SwiftDataRepository: ArquivoRepository {
         if existente == nil || a.apagadoEm != nil {
             persistido.apagadoEm = a.apagadoEm
         }
-        persistido.temResumo = a.resumo != nil
-        persistido.resumoTitulo = a.resumo?.titulo ?? ""
-        persistido.resumoVisaoGeral = a.resumo?.visaoGeral ?? ""
         persistido.espaco = try espacoPersistido(a.espaco)
 
         if existente == nil { modelContext.insert(persistido) }
@@ -102,14 +117,90 @@ public actor SwiftDataRepository: ArquivoRepository {
         // como valores no `Arquivo` de domínio, e reconciliar item a item
         // custaria mais que regravar. `ordem` preserva a sequência de notas
         // quando duas compartilham o mesmo timestamp.
-        for antigo in persistido.trechos ?? [] { modelContext.delete(antigo) }
-        for antigo in persistido.insights ?? [] { modelContext.delete(antigo) }
-        for antiga in persistido.notas ?? [] { modelContext.delete(antiga) }
-        persistido.trechos = []
-        persistido.insights = []
-        persistido.notas = []
+        regravarTrechos(a.trechos, em: persistido)
+        regravarResumo(a.resumo, em: persistido)
 
-        for trecho in a.trechos {
+        for antiga in persistido.notas ?? [] { modelContext.delete(antiga) }
+        persistido.notas = []
+        for (ordem, nota) in a.notas.enumerated() {
+            let persistida = NotaPersistida(id: nota.id)
+            persistida.texto = nota.texto
+            persistida.start = nota.start
+            persistida.critica = nota.critica
+            persistida.tipo = nota.tipo.rawValue
+            persistida.ordem = ordem
+            persistida.arquivo = persistido
+            modelContext.insert(persistida)
+        }
+
+        try salvarContexto()
+    }
+
+    /// Ver `ArquivoRepository.salvarResultadoDoProcessamento`.
+    ///
+    /// Registro que ainda não existe (CLI, que processa sem ter salvo antes)
+    /// é gravado por inteiro. O que já existe só recebe as partes pedidas.
+    public func salvarResultadoDoProcessamento(
+        _ a: Arquivo,
+        partes: PartesDoProcessamento
+    ) async throws {
+        guard let persistido = try buscarPersistido(id: a.id) else {
+            try await salvar(a)
+            return
+        }
+
+        if partes.contains(.transcricao) {
+            guard a.possuiPalavrasComTimestamp != true else {
+                throw ErroDeSalvamento.previewIncompleto
+            }
+            regravarTrechos(a.trechos, em: persistido)
+            persistido.engineTranscricao = a.engineTranscricao
+        }
+
+        if partes.contains(.resumo) {
+            var resumo = a.resumo
+            // Título escolhido pela pessoa vence o que o modelo inventou —
+            // a interface mostra o título do resumo quando ele existe.
+            if persistido.tituloManual == true, let gerado = resumo {
+                resumo = Resumo(
+                    titulo: persistido.titulo,
+                    visaoGeral: gerado.visaoGeral,
+                    temas: gerado.temas,
+                    citacoes: gerado.citacoes,
+                    proximosPassos: gerado.proximosPassos
+                )
+            }
+            regravarResumo(resumo, em: persistido)
+            persistido.engineResumo = a.engineResumo
+        }
+
+        try salvarContexto()
+    }
+
+    /// Caminhos de mídia de **todos** os registros — qualquer espaço, ativos
+    /// e na lixeira. Serve para reconhecer, na abertura, pastas de gravação
+    /// que ficaram no disco sem registro (app encerrado no meio da gravação).
+    public func pastasRelativasConhecidas() throws -> Set<String> {
+        let todos = try modelContext.fetch(FetchDescriptor<ArquivoPersistido>())
+        return Set(todos.map(\.pastaRelativa).filter { !$0.isEmpty })
+    }
+
+    private func regravarResumo(_ resumo: Resumo?, em persistido: ArquivoPersistido) {
+        persistido.temResumo = resumo != nil
+        persistido.resumoTitulo = resumo?.titulo ?? ""
+        persistido.resumoVisaoGeral = resumo?.visaoGeral ?? ""
+        for antigo in persistido.insights ?? [] { modelContext.delete(antigo) }
+        persistido.insights = []
+        if let resumo {
+            inserirInsights(de: resumo, em: persistido)
+        }
+    }
+
+    private func regravarTrechos(_ trechos: [Trecho], em persistido: ArquivoPersistido) {
+        for antigo in persistido.trechos ?? [] { modelContext.delete(antigo) }
+        persistido.trechos = []
+
+        for trecho in trechos {
             let t = TrechoPersistido(id: trecho.id)
             t.start = trecho.start
             t.fim = trecho.end
@@ -136,23 +227,6 @@ public actor SwiftDataRepository: ArquivoRepository {
             t.arquivo = persistido
             modelContext.insert(t)
         }
-
-        if let resumo = a.resumo {
-            inserirInsights(de: resumo, em: persistido)
-        }
-
-        for (ordem, nota) in a.notas.enumerated() {
-            let persistida = NotaPersistida(id: nota.id)
-            persistida.texto = nota.texto
-            persistida.start = nota.start
-            persistida.critica = nota.critica
-            persistida.tipo = nota.tipo.rawValue
-            persistida.ordem = ordem
-            persistida.arquivo = persistido
-            modelContext.insert(persistida)
-        }
-
-        try salvarContexto()
     }
 
     /// Busca com **prioridade de título**.
@@ -341,6 +415,15 @@ public actor SwiftDataRepository: ArquivoRepository {
         }
     }
 
+    /// Mesmo fluxo, removendo a mídia do armazenamento **de quem chama**. A
+    /// variante sem argumento usa sempre o container padrão: uma biblioteca
+    /// aberta sobre outra raiz apagava o registro e deixava o áudio no disco.
+    public func apagar(_ id: ArquivoID, em armazenamento: Armazenamento) async throws {
+        try await apagar(id) { relativo in
+            try armazenamento.removerGravacao(relativa: relativo)
+        }
+    }
+
     /// Mesmo fluxo com a remoção da mídia injetável — os testes simulam a
     /// falha dela sem tocar o disco real do usuário.
     func apagar(_ id: ArquivoID, removerMidia: (String) throws -> Void) async throws {
@@ -356,7 +439,16 @@ public actor SwiftDataRepository: ArquivoRepository {
         // `save` falhar depois, a pasta já ausente é aceita pelo armazenamento
         // e uma nova tentativa consegue concluir a remoção do registro.
         if !relativo.isEmpty {
-            try removerMidia(relativo)
+            do {
+                try removerMidia(relativo)
+            } catch ErroArmazenamento.caminhoDeGravacaoInvalido {
+                // Um caminho fora do formato `Gravacoes/<nome>` nunca é
+                // apagado do disco — mas também não pode prender o registro
+                // na lixeira para sempre. Sai o registro; o caso fica no log.
+                Self.logger.error(
+                    "Registro apagado sem remover mídia: caminho fora do padrão (\(relativo, privacy: .private))"
+                )
+            }
         }
 
         modelContext.delete(persistido)
@@ -504,7 +596,7 @@ public actor SwiftDataRepository: ArquivoRepository {
         let trechos = trechosPersistidos.map { pTrecho in
             let palavras: [Palavra]
             if decodificarPalavras {
-                palavras = (try? JSONDecoder().decode([Palavra].self, from: pTrecho.palavrasJSON ?? Data()))?
+                palavras = Self.decodificarPalavras(pTrecho.palavrasJSON, trecho: pTrecho.id)?
                     .map {
                         Palavra(
                             id: $0.id,
@@ -530,7 +622,10 @@ public actor SwiftDataRepository: ArquivoRepository {
                 end: pTrecho.fim,
                 texto: pTrecho.texto,
                 speaker: pTrecho.speaker,
-                palavras: palavras
+                palavras: palavras,
+                // Derivada das palavras, que são persistidas com a confiança
+                // de cada uma: o selo por trecho volta sem campo novo no banco.
+                confianca: Trecho.confiancaMedia(palavras)
             )
         }
 
@@ -580,8 +675,24 @@ public actor SwiftDataRepository: ArquivoRepository {
             idExterno: p.idExterno,
             importadoEm: p.importadoEm,
             usavaFones: p.usavaFones,
-            possuiPalavrasComTimestamp: decodificarPalavras ? nil : possuiPalavrasComTimestamp
+            possuiPalavrasComTimestamp: decodificarPalavras ? nil : possuiPalavrasComTimestamp,
+            tituloManual: p.tituloManual
         )
+    }
+
+    /// Sem palavras guardadas devolve `nil` em silêncio — é o estado normal de
+    /// um trecho sem timestamps. JSON que existe e não decodifica é registrado:
+    /// antes o trecho perdia a navegação por palavra sem deixar pista.
+    private static func decodificarPalavras(_ json: Data?, trecho: UUID) -> [Palavra]? {
+        guard let json, !json.isEmpty else { return nil }
+        do {
+            return try JSONDecoder().decode([Palavra].self, from: json)
+        } catch {
+            logger.error(
+                "Palavras do trecho \(trecho.uuidString) não decodificaram: \(error.localizedDescription, privacy: .public). O trecho segue sem timestamps."
+            )
+            return nil
+        }
     }
 
     /// Reconhece `[]` sem instanciar `Palavra`; o encoder do app serializa

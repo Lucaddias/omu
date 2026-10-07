@@ -394,7 +394,7 @@ struct ContentView: View {
                                secaoSelecionada: $secaoDaBiblioteca, pastaSelecionada: $pastaDaBibliotecaSelecionada,
                                mostrandoImportador: $mostrandoImportador, processamentoAutomatico: processamentoAutomatico,
                                aoAlternarGravacao: aoAlternarGravacao, aoPausarGravacao: aoPausarGravacao,
-                               aoContinuarGravacao: aoContinuarGravacao, aoCancelarGravacao: aoCancelarGravacao,
+                               aoContinuarGravacao: aoContinuarGravacao, aoCancelarGravacao: aoPedirCancelamentoDaGravacao,
                                aoEscolherPastaDeModelos: escolherPastaDeModelos, aoUsarPastaDoApp: usarPastaDoApp,
                                aoSoltarArquivos: importarArrastados,
  aoPrepararGravacaoParaReuniao: { (pendente: ReuniaoPendenteCalendar) in
@@ -486,9 +486,6 @@ struct ContentView: View {
                 nova?.marcarFichaPendente(arquivo.id)
             }
             biblioteca = nova
-            if politicaDeInicializacaoExterna.permiteServicosExternos {
-                await reconciliarEquipesExcluidas()
-            }
 
             if politicaDeInicializacaoExterna.permiteServicosExternos {
                 let conexao = GranolaViewModel()
@@ -518,6 +515,13 @@ struct ContentView: View {
 #endif
             gerenciador.verificar()
             nova.pastaDeModelos = gerenciador.pasta
+            // Conversas recusadas por falta de modelos voltam à fila quando o
+            // download termina, sem a pessoa precisar pedir de novo.
+            gerenciador.aoFicarPronto = { [weak nova, weak gerenciador] in
+                guard let nova, let gerenciador else { return }
+                nova.pastaDeModelos = gerenciador.pasta
+                nova.retomarProcessamentosPendentes()
+            }
             modelos = gerenciador
 
             // A gravação entrega o áudio; a biblioteca salva e processa. Esta
@@ -531,21 +535,42 @@ struct ContentView: View {
                 focoNaGravacao = false
             }
             let gcalCapturado = googleCalendar
-            modelo.aoProduzirAudio = { titulo, pasta, duracao, notas, dataDeGravacao in
+            modelo.aoProduzirAudio = { titulo, pasta, duracao, notas, dataDeGravacao, usavaFones in
                 if let pendente = caixaPendente.pendente {
                     // Gravação iniciada a partir de uma reunião pendente do
                     // Calendar: o título vem do evento, não do relógio.
                     let audioURL = nova.armazenamento.resolver(relativo: pasta)
                         .appendingPathComponent(Armazenamento.Nome.microfone)
-                    _ = await gcalCapturado?.importarAudioParaReuniao(
+                    let criado = await gcalCapturado?.importarAudioParaReuniao(
                         pendente,
                         audioURL: audioURL,
                         biblioteca: nova,
                         duracao: duracao,
-                        notas: notas
+                        notas: notas,
+                        usavaFones: usavaFones
                     )
-                    await MainActor.run { caixaPendente.pendente = nil }
-                    await MainActor.run { focoNaGravacao = false }
+                    caixaPendente.pendente = nil
+                    focoNaGravacao = false
+                    // A reunião pode já ter virado conversa (mesmo
+                    // `idExterno`) ou o salvamento pode ter falhado. O áudio
+                    // recém-gravado não fica órfão no disco por isso: entra
+                    // como gravação comum, com o título do evento.
+                    if criado == nil {
+                        let avulso = await nova.registrar(
+                            titulo: pendente.titulo,
+                            pastaRelativa: pasta,
+                            duracao: duracao,
+                            notas: notas,
+                            usavaFones: usavaFones
+                        )
+                        if avulso != nil {
+                            notificacoes.registrar(
+                                titulo: "Gravação salva como conversa avulsa".localized,
+                                mensagem: "Não foi possível vinculá-la à reunião \"%@\"; o áudio está na biblioteca.".localized(pendente.titulo),
+                                tipo: .aviso
+                            )
+                        }
+                    }
                 } else {
                     // Gravação normal
                     if let arquivo = await nova.registrar(
@@ -553,7 +578,8 @@ struct ContentView: View {
                         pastaRelativa: pasta,
                         duracao: duracao,
                         notas: notas,
-                        dataDeGravacao: dataDeGravacao
+                        dataDeGravacao: dataDeGravacao,
+                        usavaFones: usavaFones
                     ) {
                         if let pastaDaBibliotecaSelecionada {
                             PreferenciasVisuaisDoArquivo.definirPasta(
@@ -581,6 +607,25 @@ struct ContentView: View {
             }
             await nova.preparar()
             atualizarEspacoDaBiblioteca()
+            // Anexos, pastas e tarefas que passaram do prazo da lixeira. As
+            // conversas saem pela própria biblioteca, ao carregar.
+            if politicaDeInicializacaoExterna.permiteServicosExternos {
+                ExpurgoDaLixeira.lojasAuxiliares()
+            }
+            // Gravações que um encerramento forçado deixou sem registro. Fora
+            // do host de testes; e nunca enquanto o gravador não souber dizer
+            // quais pastas são dele (uma importação copiando).
+            if politicaDeInicializacaoExterna.permiteServicosExternos,
+               let pastasEmUso = modelo.pastasEmUso {
+                await nova.recuperarGravacoesOrfas(ignorando: pastasEmUso)
+            }
+            // Só depois de a biblioteca estar na tela: a consulta ao banco
+            // público (uma por equipe) esperava a rede antes de `preparar()`,
+            // e com conexão lenta a biblioteca aparecia vazia até o iCloud
+            // responder ou expirar.
+            if politicaDeInicializacaoExterna.permiteServicosExternos {
+                Task { await reconciliarEquipesExcluidas() }
+            }
 #if OMU_PERF
             if PerfProbe.ativada {
                 await tarefaDeSelecaoDeEspaco?.value
@@ -597,7 +642,7 @@ struct ContentView: View {
               CredenciaisGoogle.estaConfigurado,
               googleCalendar.temAutorizacaoPersistida
         else { return }
-        await googleCalendar.conectar(biblioteca: biblioteca)
+        await googleCalendar.conectar(biblioteca: biblioteca, interativo: false)
     }
 
     private func abrirFichaDaEntrevista(para arquivo: Arquivo) {
@@ -648,9 +693,9 @@ struct ContentView: View {
             naFila: biblioteca.estaNaFila(arquivo),
             responsaveisDisponiveis: responsaveisDaEquipeAtiva,
             aoTranscrever: { biblioteca.enfileirarProcessamento(arquivo) },
-            // Regera tudo (transcrição, resumo e próximos passos), não só o
-            // resumo: é o mesmo pipeline do "Transcrever".
-            aoGerarNovoResumo: { biblioteca.enfileirarProcessamento(arquivo) },
+            // Só o resumo e os próximos passos, sobre a transcrição atual —
+            // refazer a transcrição apagaria as correções feitas à mão.
+            aoGerarNovoResumo: { biblioteca.enfileirarNovoResumo(arquivo) },
             aoAtualizarNotas: { notas in
                 await biblioteca.atualizarNotas(notas, de: arquivo)
             },
@@ -916,7 +961,10 @@ struct ContentView: View {
         Task { @MainActor in
             do {
                 let equipe = try await servicoDeEquipesCloudKit.entrarNaEquipe(com: codigo)
-                EquipesDoUsuario.incluirOuAtualizar(equipe)
+                guard EquipesDoUsuario.incluirOuAtualizar(equipe) else {
+                    await servicoDeEquipesCloudKit.abandonarZonaCompartilhada(de: equipe)
+                    throw ErroDeEquipeCloudKit.conviteConflitaComEquipeLocal
+                }
                 equipes = EquipesDoUsuario.carregar()
                 usarEquipe(equipe)
             } catch {
@@ -1162,6 +1210,13 @@ struct ContentView: View {
     private func aoPausarGravacao() async { await modelo.pausar() }
     private func aoContinuarGravacao() async { await modelo.continuar() }
 
+    /// Botão "Cancelar" da tela de gravação: confirma antes, como o selo. O
+    /// contexto (pendente do Calendar, foco) é limpo por
+    /// `modelo.aoCancelarGravacao` quando o cancelamento acontece de fato.
+    private func aoPedirCancelamentoDaGravacao() async {
+        await modelo.cancelarComConfirmacao()
+    }
+
     private func aoCancelarGravacao() async {
         await modelo.cancelar()
         // Cancelar não produz áudio: sem isto, a próxima gravação comum seria
@@ -1230,22 +1285,42 @@ private struct ArquivoCompletoCarregado<Conteudo: View>: View {
                 ProgressView()
             }
         }
-        .task(id: id) { await carregar() }
+        // A revisão sobe a cada mudança gravada (edição, processamento,
+        // sincronização). Recarregar por ela é o que mantém a tela de
+        // detalhe trabalhando sobre a versão atual: sem isso, ela seguia com
+        // a cópia da abertura e cada correção desfazia a anterior.
+        .task(id: Chave(id: id, revisao: biblioteca.revisao(de: id))) { await carregar() }
+    }
+
+    private struct Chave: Equatable {
+        let id: UUID
+        let revisao: Int
     }
 
     @MainActor
     private func carregar() async {
-        arquivo = nil
+        // Só esvazia ao trocar de conversa. Numa recarga da mesma conversa a
+        // versão antiga fica na tela até a nova chegar — trocar por um
+        // spinner destruiria o estado do detalhe (aba, rolagem, player).
+        if arquivo?.id.rawValue != id {
+            arquivo = nil
+        }
         erro = nil
         do {
             guard let completo = try await biblioteca.buscarArquivoCompleto(id: id) else {
+                guard !Task.isCancelled else { return }
+                arquivo = nil
                 erro = "A conversa não está mais disponível na biblioteca.".localized
                 return
             }
             guard !Task.isCancelled else { return }
-            arquivo = completo
+            if arquivo != completo {
+                arquivo = completo
+            }
         } catch {
             guard !Task.isCancelled else { return }
+            // Falha ao recarregar não derruba o que já está na tela.
+            guard arquivo == nil else { return }
             erro = "Não foi possível abrir a conversa: %@".localized(error.localizedDescription)
         }
     }

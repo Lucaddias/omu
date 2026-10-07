@@ -86,6 +86,7 @@ struct PapagaioApp: App {
     var body: some Scene {
         WindowGroup("") {
             ContentView(gravador: gravador)
+                .task { EncerramentoDoApp.registrar(gravador) }
                 // O painel aparece e some junto com a gravação. Fica fora da
                 // `ContentView` para não depender da janela principal estar
                 // visível — ela pode estar minimizada, que é o caso de uso.
@@ -120,6 +121,13 @@ struct PapagaioApp: App {
         // continua arrastável abaixo dele e o conteúdo transborda em vez de
         // parar de encolher.
         .windowResizability(.contentMinSize)
+        .commands {
+            // O app tem uma janela só, com a biblioteca e a gravação. O
+            // "Nova Janela" (⌘N) padrão do `WindowGroup` abria uma segunda
+            // `ContentView`, com outra `Biblioteca` sobre o mesmo banco e a
+            // mesma gravação desenhada duas vezes.
+            CommandGroup(replacing: .newItem) {}
+        }
 
         // Único sinal de que o microfone está ligado quando o app está atrás de
         // outra janela ou minimizado. Some quando não há gravação — item de
@@ -145,7 +153,7 @@ struct PapagaioApp: App {
             }
 
             Button("Cancelar gravação".localized) {
-                Task { await gravador.cancelar() }
+                Task { await gravador.cancelarComConfirmacao() }
             }
         } label: {
             // Ponto vermelho com o cronômetro: legível de canto de tela, sem

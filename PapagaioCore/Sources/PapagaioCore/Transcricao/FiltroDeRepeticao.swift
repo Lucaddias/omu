@@ -46,10 +46,7 @@ public enum FiltroDeRepeticao {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !texto.isEmpty else { return nil }
             let palavrasLimpa = trecho.palavras.filter { !$0.texto.ehSomenteEmoji }
-            return Trecho(
-                id: trecho.id, start: trecho.start, end: trecho.end,
-                texto: texto, speaker: trecho.speaker, palavras: palavrasLimpa
-            )
+            return trecho.com(texto: texto, palavras: palavrasLimpa)
         }
 
         var anterior: String?
@@ -76,11 +73,7 @@ public enum FiltroDeRepeticao {
         let texto = mantidas.joined(separator: " ").removendoEmojis()
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !texto.isEmpty else { return nil }
-        return Trecho(
-            id: trecho.id, start: trecho.start, end: trecho.end,
-            texto: texto, speaker: trecho.speaker,
-            palavras: palavrasSobreviventes(de: trecho)
-        )
+        return trecho.com(texto: texto, palavras: palavrasSobreviventes(de: trecho))
     }
 
     /// As palavras das frases que ficaram. A decisão de manter/sair é

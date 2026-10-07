@@ -39,6 +39,10 @@ final class TarefasDaConversaViewModel {
     var aoNotificar: ((_ titulo: String, _ mensagem: String) -> Void)?
 
     private var tarefaEmEdicaoID: UUID?
+    /// O prazo que o formulário mostrava ao abrir a edição. Uma tarefa sem
+    /// prazo abre com um valor padrão no seletor; só é prazo de verdade se a
+    /// pessoa o alterar.
+    private var prazoAoAbrirEdicao: Date?
     private let arquivoID: ArquivoID
 
     init(arquivoID: ArquivoID) {
@@ -106,6 +110,7 @@ final class TarefasDaConversaViewModel {
         prioridadeDaTarefa = tarefa.prioridade
         statusDaTarefa = tarefa.status
         prazoDaTarefa = tarefa.prazo ?? Self.prazoPadrao
+        prazoAoAbrirEdicao = prazoDaTarefa
         mostrandoEdicao = true
     }
 
@@ -126,10 +131,15 @@ final class TarefasDaConversaViewModel {
         // anterior não vale mais pra esta nova data — se a nova também já
         // estiver vencida, a tarefa deve voltar a contar como "Atrasada"
         // normalmente. Ver `TarefaDaConversa.atrasoReconhecido`.
-        if tarefa.prazo != prazoDaTarefa {
-            tarefa.atrasoReconhecido = nil
+        //
+        // Só quando a pessoa mexeu no prazo: corrigir o título de uma tarefa
+        // sem prazo não pode gravar "daqui a 7 dias" por baixo.
+        if prazoDaTarefa != prazoAoAbrirEdicao {
+            if tarefa.prazo != prazoDaTarefa {
+                tarefa.atrasoReconhecido = nil
+            }
+            tarefa.prazo = prazoDaTarefa
         }
-        tarefa.prazo = prazoDaTarefa
         // Editar e salvar uma sugestão é uma forma de aceitá-la — com os
         // ajustes que a pessoa acabou de fazer. Sem isto, uma sugestão
         // editada continuaria fora do quadro, esperando um "aceitar" que
@@ -144,6 +154,7 @@ final class TarefasDaConversaViewModel {
 
     func cancelarEdicao() {
         tarefaEmEdicaoID = nil
+        prazoAoAbrirEdicao = nil
         limparFormulario()
         mostrandoEdicao = false
     }

@@ -6,6 +6,12 @@ enum FalantePreservadoParaTrecho {
         "falantePreservado.\(arquivo.rawValue.uuidString)"
     }
 
+    /// Esquece todos os falantes preservados de uma conversa apagada. Sem
+    /// isto, cada conversa excluída deixava um mapa de nomes no Mac.
+    static func limpar(_ arquivo: ArquivoID, em defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: chave(arquivo))
+    }
+
     static func definir(_ falante: String?, para trecho: UUID, arquivo: ArquivoID) {
         var mapa = carregar(arquivo: arquivo)
         let k = trecho.uuidString

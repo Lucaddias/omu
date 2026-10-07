@@ -35,7 +35,7 @@ struct CartaoDaLixeira: View {
 
     private var prazoDeExclusao: String {
         guard let apagadoEm = arquivo.apagadoEm,
-              let limite = Calendar.current.date(byAdding: .day, value: 30, to: apagadoEm)
+              let limite = PrazoDaLixeira.limite(de: apagadoEm)
         else { return "Exclui em 30 dias".localized }
 
         let dias = Calendar.current.dateComponents([.day], from: Date(), to: limite).day ?? 0

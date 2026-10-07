@@ -29,7 +29,7 @@ class ScriptTests(unittest.TestCase):
         path.write_text("#!/bin/bash\nset -eu\n" + body)
         path.chmod(0o755)
 
-    def run_core(self, first="success", second="success", args=()):
+    def run_core(self, first="success", second="success", args=(), codesign="success"):
         script = self.root / "Scripts/testa-papagaio-core.sh"
         shutil.copy2(ROOT / "Scripts/testa-papagaio-core.sh", script)
         self.executable("swift", '''
@@ -46,9 +46,26 @@ case "$result" in
 esac
 ''')
         self.executable("xattr", 'printf "xattr <%s> <%s>\\n" "$1" "$2" >> "$TEST_CALLS"\n')
+        self.executable("codesign", '''
+printf 'codesign' >> "$TEST_CALLS"
+printf ' <%s>' "$@" >> "$TEST_CALLS"
+printf '\\n' >> "$TEST_CALLS"
+[[ "${TEST_CODESIGN:-success}" == success ]]
+''')
         return subprocess.run(["bash", str(script), *args], cwd=self.root,
-                              env=dict(self.env, TEST_FIRST=first, TEST_SECOND=second),
+                              env=dict(self.env, TEST_FIRST=first, TEST_SECOND=second,
+                                       TEST_CODESIGN=codesign),
                               capture_output=True, text=True)
+
+    def bundle(self, products=None, config="Debug"):
+        """Cria o .xctest de mentira que o build interrompido teria deixado."""
+        products = products or self.root / "PapagaioCore/.build/out/Products"
+        bundle = products / config / "PapagaioCoreTests.xctest"
+        (bundle / "Contents").mkdir(parents=True)
+        return bundle
+
+    def calls(self):
+        return self.log.read_text().splitlines()
 
     def test_success_runs_once(self):
         self.assertEqual(self.run_core().returncode, 0)
@@ -58,33 +75,68 @@ esac
         self.assertNotEqual(self.run_core("compile").returncode, 0)
         self.assertEqual(len(self.log.read_text().splitlines()), 1)
 
-    def test_attribute_recovery_rebuilds(self):
+    def test_attribute_recovery_signs_and_reruns(self):
+        bundle = self.bundle()
         self.assertEqual(self.run_core("attributes").returncode, 0)
-        calls = self.log.read_text()
-        self.assertEqual(calls.count("swift <test>"), 2)
-        self.assertNotIn("--skip-build", calls)
-        self.assertIn(".build/out/Products>", calls)
+        calls = self.calls()
+        swift = [i for i, call in enumerate(calls) if call.startswith("swift <test>")]
+        self.assertEqual(len(swift), 2)
+        self.assertNotIn("--skip-build", calls[swift[0]])
+        self.assertIn("<--skip-build>", calls[swift[1]])
+        # Limpa o bundle em profundidade, assina e só então roda sem recompilar.
+        limpeza = calls.index(f"xattr <-c> <{bundle}>")
+        assinatura = next(i for i, call in enumerate(calls)
+                          if call.startswith("codesign") and call.endswith(f"<{bundle}>"))
+        self.assertIn(f"xattr <-c> <{bundle}/Contents>", calls)
+        self.assertLess(limpeza, assinatura)
+        self.assertLess(assinatura, swift[1])
 
     def test_retry_failure_is_not_success(self):
+        self.bundle()
         self.assertNotEqual(self.run_core("attributes", "compile").returncode, 0)
+        self.assertEqual(self.log.read_text().count("<--skip-build>"), 1)
+
+    def test_persistent_attributes_give_up(self):
+        self.bundle()
+        self.assertNotEqual(self.run_core("attributes", "attributes").returncode, 0)
+        self.assertEqual(self.log.read_text().count("<--skip-build>"), 5)
+
+    def test_unsigned_bundle_never_runs(self):
+        self.bundle()
+        self.assertNotEqual(self.run_core("attributes", codesign="failure").returncode, 0)
+        self.assertNotIn("--skip-build", self.log.read_text())
+
+    def test_missing_bundle_never_runs_stale_tests(self):
+        self.assertNotEqual(self.run_core("attributes").returncode, 0)
+        calls = self.log.read_text()
+        self.assertNotIn("codesign", calls)
+        self.assertNotIn("--skip-build", calls)
 
     def test_scratch_path_with_spaces(self):
         scratch = self.root / "custom scratch"
-        (scratch / "out/Products/Release").mkdir(parents=True)
+        bundle = self.bundle(scratch / "out/Products", "Release")
         result = self.run_core("attributes", args=("--scratch-path", str(scratch), "-c", "release"))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"xattr <-cr> <{scratch}/out/Products>", self.log.read_text())
+        calls = self.calls()
+        self.assertIn(f"xattr <-c> <{bundle}>", calls)
+        self.assertTrue(any(call.startswith("codesign") and call.endswith(f"<{bundle}>") for call in calls))
+        self.assertIn(f"swift <test> <--no-parallel> <--skip-build> <--scratch-path> <{scratch}> <-c> <release>", calls)
 
     def test_scratch_path_equals(self):
         scratch = self.root / "custom scratch"
-        (scratch / "out/Products").mkdir(parents=True)
+        bundle = self.bundle(scratch / "out/Products")
         self.assertEqual(self.run_core("attributes", args=(f"--scratch-path={scratch}",)).returncode, 0)
-        self.assertIn(f"xattr <-cr> <{scratch}/out/Products>", self.log.read_text())
+        calls = self.calls()
+        self.assertIn(f"xattr <-c> <{bundle}>", calls)
+        self.assertTrue(any(call.startswith("codesign") and call.endswith(f"<{bundle}>") for call in calls))
+        self.assertIn(f"swift <test> <--no-parallel> <--skip-build> <--scratch-path={scratch}>", calls)
 
     def test_missing_products_stops_recovery(self):
         shutil.rmtree(self.root / "PapagaioCore/.build")
         self.assertNotEqual(self.run_core("attributes").returncode, 0)
-        self.assertNotIn("xattr", self.log.read_text())
+        calls = self.log.read_text()
+        self.assertNotIn("xattr", calls)
+        self.assertNotIn("codesign", calls)
 
     def test_target_sync_recovers_scheme_and_keeps_executable(self):
         check = subprocess.run(["ruby", "-rxcodeproj", "-e", ""], capture_output=True)

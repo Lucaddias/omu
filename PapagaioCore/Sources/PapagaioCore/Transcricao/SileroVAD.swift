@@ -160,7 +160,11 @@ public actor SileroVAD: CicloDeVidaDeModelos.Residente {
 }
 
 /// Erros do Silero VAD. O `ErroOnnx` embutido carrega a mensagem do runtime.
-public enum ErroSilero: Error, CustomStringConvertible, Sendable {
+public enum ErroSilero: Error, CustomStringConvertible, LocalizedError, Sendable {
+    /// `localizedDescription` é o que chega à tela e às notificações; sem
+    /// isto ela devolvia "The operation couldn't be completed (… error N)".
+    public var errorDescription: String? { description }
+
     case modeloAusente
     case saidaInvalida
     case erroOnnx(ErroOnnx)

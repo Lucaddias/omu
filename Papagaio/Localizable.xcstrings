@@ -444,6 +444,50 @@
         }
       }
     },
+    "%lld gravações que não tinham sido finalizadas voltaram para a biblioteca." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld recordings that had not been finished are back in the library."
+          }
+        }
+      }
+    },
+    "%lld pasta(s) de gravação continuam no disco. Elas ficam na pasta de gravações do Ōmu e podem ser removidas pelo Finder." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld recording folder(s) are still on disk. They are in Ōmu's recordings folder and can be removed in Finder."
+          }
+        }
+      }
+    },
+    "%d alteração(ões) não puderam ser enviadas ao iCloud e ficaram só neste Mac%@. Verifique sua permissão na equipe e o espaço no iCloud, depois toque em tentar de novo." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d change(s) could not be sent to iCloud and remain only on this Mac%@. Check your permission in the team and your iCloud storage, then tap try again."
+          }
+        }
+      }
+    },
+    "%lld conversa(s) da equipe não puderam ser lidas e foram puladas. Atualizar o Ōmu costuma resolver." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld team conversation(s) could not be read and were skipped. Updating Ōmu usually fixes this."
+          }
+        }
+      }
+    },
     "A biblioteca ainda está abrindo — a conexão com o Google Calendar aparece aqui em instantes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -473,6 +517,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The library has not opened yet."
+          }
+        }
+      }
+    },
+    "A conversa desta pasta vai para a lixeira junto com ela. Dá para restaurar a pasta inteira ou só a conversa." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation in this folder goes to the trash with it. You can restore the whole folder or just the conversation."
           }
         }
       }
@@ -543,6 +598,17 @@
         }
       }
     },
+    "A lista de alterações pendentes estava ilegível. As que puderam ser lidas continuam na fila; o arquivo original foi guardado em %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The list of pending changes was unreadable. The ones that could be read remain in the queue; the original file was kept at %@."
+          }
+        }
+      }
+    },
     "A lista vem diretamente do compartilhamento do iCloud. O CloudKit não disponibiliza os e-mails das Apple Accounts." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -572,6 +638,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ is empty"
+          }
+        }
+      }
+    },
+    "A pasta está vazia. Nenhuma conversa será removida." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder is empty. No conversations will be removed."
           }
         }
       }
@@ -675,6 +752,17 @@
         }
       }
     },
+    "A sessão do Google Calendar expirou. Conecte de novo." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Google Calendar session has expired. Connect again."
+          }
+        }
+      }
+    },
     "A sessão expirou e não há refresh token. Conecte de novo." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -719,6 +807,17 @@
         }
       }
     },
+    "A transcrição e o resumo serão refeitos a partir do áudio. Correções feitas à mão no texto e na identificação das vozes serão perdidas. Para atualizar só o resumo, use \"Gerar novo resumo\" dentro da conversa." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The transcript and summary will be redone from the audio. Manual corrections to the text and to speaker identification will be lost. To update only the summary, use \"Generate new summary\" inside the conversation."
+          }
+        }
+      }
+    },
     "A transcrição falhou" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -726,6 +825,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transcription failed"
+          }
+        }
+      }
+    },
+    "A transcrição vai ficar mais lenta e esquentar mais o Mac. Se preferir, cancele na fila e tente de novo depois." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription will be slower and heat the Mac further. If you prefer, cancel it in the queue and try again later."
           }
         }
       }
@@ -880,6 +990,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Access & Deletion"
+          }
+        }
+      }
+    },
+    "Aguarde o processamento em andamento terminar para separar as vozes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wait for the current processing to finish before separating the voices."
+          }
+        }
+      }
+    },
+    "As %d conversas desta pasta vão para a lixeira junto com ela. Dá para restaurar a pasta inteira ou uma conversa só." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The %d conversations in this folder go to the trash with it. You can restore the whole folder or a single conversation."
           }
         }
       }
@@ -1837,6 +1969,325 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Update the information shown on the card and header."
+          }
+        }
+      }
+    },
+    "Citações" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quotes"
+          }
+        }
+      }
+    },
+    "Conversas da equipe não lidas" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Team conversations could not be read"
+          }
+        }
+      }
+    },
+    "Criado em" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Created on"
+          }
+        }
+      }
+    },
+    "Crítica" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Critical"
+          }
+        }
+      }
+    },
+    "Esta conversa não tem áudio para transcrever." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This conversation has no audio to transcribe."
+          }
+        }
+      }
+    },
+    "Este convite usa a identidade de uma equipe que já existe neste Mac em outro lugar do iCloud. Ele foi recusado." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This invitation uses the identity of a team that already exists on this Mac elsewhere in iCloud. It was declined."
+          }
+        }
+      }
+    },
+    "Este código aponta para mais de uma equipe. Peça a quem administra a equipe para gerar um código novo." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This code points to more than one team. Ask the team's admin to generate a new code."
+          }
+        }
+      }
+    },
+    "Fila do iCloud recuperada" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud queue recovered"
+          }
+        }
+      }
+    },
+    "Finalize a gravação em andamento antes de importar um áudio." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish the recording in progress before importing audio."
+          }
+        }
+      }
+    },
+    "Gravação recuperada" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovered recording"
+          }
+        }
+      }
+    },
+    "Gravação recuperada — %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovered recording — %@"
+          }
+        }
+      }
+    },
+    "Gravação salva como conversa avulsa" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording saved as a standalone conversation"
+          }
+        }
+      }
+    },
+    "Interlocutor" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other speaker"
+          }
+        }
+      }
+    },
+    "Nota" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note"
+          }
+        }
+      }
+    },
+    "Não foi possível vinculá-la à reunião \"%@\"; o áudio está na biblioteca." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It couldn't be linked to the meeting \"%@\"; the audio is in the library."
+          }
+        }
+      }
+    },
+    "Não há transcrição para resumir." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There is no transcript to summarize."
+          }
+        }
+      }
+    },
+    "O processamento desta conversa foi interrompido mais de uma vez. Tente de novo pelo menu da conversa." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processing of this conversation was interrupted more than once. Try again from the conversation's menu."
+          }
+        }
+      }
+    },
+    "O refinamento do ditado fica disponível quando o processamento em andamento terminar." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation refinement becomes available when the current processing finishes."
+          }
+        }
+      }
+    },
+    "O Ōmu lê os participantes do evento no horário da gravação e completa os nomes com seus contatos, para acertar a grafia na transcrição. Esses nomes não saem do Mac." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ōmu reads the participants of the event at the time of the recording and completes the names with your contacts, to get the spelling right in the transcript. These names never leave your Mac."
+          }
+        }
+      }
+    },
+    "Parte do áudio não pôde ser apagada" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some audio could not be deleted"
+          }
+        }
+      }
+    },
+    "Refaz o resumo e os próximos passos a partir da transcrição atual, com as correções que você fez" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regenerates the summary and next steps from the current transcript, including your corrections"
+          }
+        }
+      }
+    },
+    "Reprocessar esta conversa?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprocess this conversation?"
+          }
+        }
+      }
+    },
+    "Resumo falhou" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summary failed"
+          }
+        }
+      }
+    },
+    "Salvar em…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save to…"
+          }
+        }
+      }
+    },
+    "Sem e-mail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No email"
+          }
+        }
+      }
+    },
+    "Seu Mac está muito quente" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Mac is very hot"
+          }
+        }
+      }
+    },
+    "Uma gravação que não tinha sido finalizada voltou para a biblioteca." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A recording that had not been finished is back in the library."
+          }
+        }
+      }
+    },
+    "Usar Contatos e Calendário para reconhecer nomes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Contacts and Calendar to recognize names"
+          }
+        }
+      }
+    },
+    "Visão geral" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overview"
           }
         }
       }

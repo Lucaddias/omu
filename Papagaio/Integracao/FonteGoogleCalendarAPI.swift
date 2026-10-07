@@ -27,13 +27,25 @@ struct FonteGoogleCalendarAPI: FonteDeReunioesExternas {
         self.obterToken = obterToken
     }
 
-    func conta() async throws -> ContaExterna {
-        let token = try await obterToken(false)
-        var pedido = URLRequest(url: URL(string: "https://www.googleapis.com/oauth2/v3/userinfo")!)
-        pedido.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        pedido.timeoutInterval = 15
+    /// Envia com o token atual e, se o servidor responder `401` (token
+    /// revogado ou vencido antes da hora local), renova à força e repete
+    /// **uma** vez. Sem isso o `401` virava "respondeu algo inesperado" e se
+    /// repetia até a expiração local do token.
+    private func enviar(_ url: URL) async throws -> (Data, URLResponse) {
+        func pedido(_ token: String) -> URLRequest {
+            var pedido = URLRequest(url: url)
+            pedido.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            pedido.timeoutInterval = 15
+            return pedido
+        }
+        let primeira = try await transportar(pedido(try await obterToken(false)))
+        guard (primeira.1 as? HTTPURLResponse)?.statusCode == 401 else { return primeira }
+        registro.info("Google respondeu 401 — renovando o token e repetindo o pedido")
+        return try await transportar(pedido(try await obterToken(true)))
+    }
 
-        let (dados, resposta) = try await transportar(pedido)
+    func conta() async throws -> ContaExterna {
+        let (dados, resposta) = try await enviar(URL(string: "https://www.googleapis.com/oauth2/v3/userinfo")!)
         guard let http = resposta as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw FonteGoogleCalendarErro.respostaInesperada
         }
@@ -61,13 +73,9 @@ struct FonteGoogleCalendarAPI: FonteDeReunioesExternas {
     }
 
     func obterReuniao(id: String, incluirTranscricao: Bool) async throws -> ReuniaoExterna {
-        let token = try await obterToken(false)
-
-        var pedido = URLRequest(url: baseURL.appendingPathComponent("calendars/primary/events/\(id)"))
-        pedido.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        pedido.timeoutInterval = 15
-
-        let (dados, resposta) = try await transportar(pedido)
+        let (dados, resposta) = try await enviar(
+            baseURL.appendingPathComponent("calendars/primary/events/\(id)")
+        )
         guard let http = resposta as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             if (resposta as? HTTPURLResponse)?.statusCode == 404 {
                 throw FonteGoogleCalendarErro.reuniaoNaoEncontrada(id)
@@ -99,8 +107,6 @@ struct FonteGoogleCalendarAPI: FonteDeReunioesExternas {
     }
 
     func listarEventos() async throws -> [EventoCalendarSimples] {
-        let token = try await obterToken(false)
-
         let agora = agora()
         let fim = agora.addingTimeInterval(24 * 3600)
 
@@ -130,11 +136,7 @@ struct FonteGoogleCalendarAPI: FonteDeReunioesExternas {
                 )
             }
 
-            var pedido = URLRequest(url: componentes.url!)
-            pedido.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            pedido.timeoutInterval = 15
-
-            let (dados, resposta) = try await transportar(pedido)
+            let (dados, resposta) = try await enviar(componentes.url!)
             guard let http = resposta as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode)
             else { throw FonteGoogleCalendarErro.respostaInesperada }
@@ -142,7 +144,16 @@ struct FonteGoogleCalendarAPI: FonteDeReunioesExternas {
             else { throw FonteGoogleCalendarErro.respostaInesperada }
 
             let itens = json["items"] as? [[String: Any]] ?? []
-            eventos += try itens.compactMap { try decodificarEvento($0) }
+            // Um evento com data ilegível fica de fora e vai para o log; ele
+            // não pode esconder todos os outros compromissos do dia.
+            eventos += itens.compactMap { item in
+                do {
+                    return try decodificarEvento(item)
+                } catch {
+                    registro.error("Evento do Google Calendar ignorado: \(error.localizedDescription, privacy: .public)")
+                    return nil
+                }
+            }
             proximaPagina = (json["nextPageToken"] as? String).flatMap {
                 $0.isEmpty ? nil : $0
             }
@@ -154,13 +165,9 @@ struct FonteGoogleCalendarAPI: FonteDeReunioesExternas {
 
     // Internal method for detailed event fetch
     func obterEventoDetalhado(id: String) async throws -> EventoCalendarSimples? {
-        let token = try await obterToken(false)
-
-        var pedido = URLRequest(url: baseURL.appendingPathComponent("calendars/primary/events/\(id)"))
-        pedido.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        pedido.timeoutInterval = 15
-
-        let (dados, resposta) = try await transportar(pedido)
+        let (dados, resposta) = try await enviar(
+            baseURL.appendingPathComponent("calendars/primary/events/\(id)")
+        )
         guard let http = resposta as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             if (resposta as? HTTPURLResponse)?.statusCode == 404 {
                 return nil

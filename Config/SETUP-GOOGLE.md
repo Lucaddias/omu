@@ -45,3 +45,18 @@ workflow do Xcode Cloud e gere o xcconfig no `ci_post_clone.sh`.
 O Client ID identifica o app, mas não é uma credencial confidencial. A
 proteção do código de autorização vem de um verificador PKCE novo por fluxo e
 da validação do parâmetro `state` no callback de loopback.
+
+A conexão usa `prompt=consent`: a tela de consentimento do Google aparece e a
+resposta traz o `refresh_token`. O navegador só é aberto quando a pessoa clica
+em **Conectar**; renovações de fundo nunca abrem janelas.
+
+## Se a troca do código falhar com `client_secret is missing`
+
+Para clientes do tipo *Aplicativo para computador*, o endpoint de token do
+Google pode exigir a "chave secreta do cliente" mesmo com PKCE. O app não a
+envia, por decisão de projeto (há um teste que garante isso). Se a conexão
+parar nesse erro, as saídas são: criar o cliente como tipo **iOS** (sem
+segredo, com redirecionamento por esquema próprio — exige trocar o servidor de
+loopback por um esquema de URL registrado) ou rever a decisão e embutir o
+segredo do cliente desktop, que o Google não trata como confidencial. Este
+ponto ainda não foi validado contra o servidor com uma conta nova.

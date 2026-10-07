@@ -20,6 +20,10 @@ final class ModelosViewModel {
     /// container", que é onde o download deposita.
     private(set) var pastaEscolhida: URL?
 
+    /// Chamado quando um download deixa os modelos prontos: quem esperava
+    /// por eles (a fila de processamento) pode continuar.
+    var aoFicarPronto: (@MainActor () -> Void)?
+
     private let pastaDoContainer: URL
     private let download: DownloadDeModelos
     private var tarefa: Task<Void, Never>?
@@ -110,6 +114,7 @@ final class ModelosViewModel {
             progresso = nil
             baixando = false
             verificar()
+            if pronto { aoFicarPronto?() }
         }
     }
 

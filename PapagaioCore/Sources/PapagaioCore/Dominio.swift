@@ -201,6 +201,24 @@ public struct Trecho: Sendable, Identifiable, Codable, Equatable {
         )
     }
 
+    /// Cópia com outro texto e outras palavras, **sem perder** o que não
+    /// mudou: `noSpeechProb` segue o trecho e a confiança é recalculada das
+    /// palavras que ficaram (a do trecho original vale quando nenhuma palavra
+    /// traz confiança). Reconstruir o `Trecho` campo a campo era o que fazia
+    /// o selo de confiança sumir a cada transformação.
+    func com(texto novoTexto: String, palavras novas: [Palavra]) -> Trecho {
+        Trecho(
+            id: id,
+            start: start,
+            end: end,
+            texto: novoTexto,
+            speaker: speaker,
+            palavras: novas,
+            confianca: Trecho.confiancaMedia(novas) ?? confianca,
+            noSpeechProb: noSpeechProb
+        )
+    }
+
     /// Cópia com outras palavras — usada pela diarização para trocar as
     /// palavras do trecho pelas versões com `falanteAcustico`.
     public func comPalavras(_ novas: [Palavra]) -> Trecho {
@@ -446,7 +464,7 @@ public struct ProximoPasso: Sendable, Codable, Equatable {
 ///
 /// É um **struct de domínio**, não a entidade de persistência. O `@Model` do
 /// SwiftData entra no Passo 8 como detalhe do `SwiftDataRepository` e é mapeado
-/// para cá — ver D-1.2 em `DECISIONS.md`. Um `@Model` é classe e não é
+/// para cá. Um `@Model` é classe e não é
 /// `Sendable`; se ele atravessasse o protocolo, `ArquivoRepository: Sendable`
 /// seria mentira.
 public struct Arquivo: Sendable, Identifiable, Codable, Equatable {
@@ -487,6 +505,12 @@ public struct Arquivo: Sendable, Identifiable, Codable, Equatable {
     /// importados ou gravações anteriores à esta feature.
     public var usavaFones: Bool?
 
+    /// `true` quando o título foi escolhido pela pessoa (renomeou, preencheu
+    /// a ficha) ou veio de um evento do calendário. Enquanto for `nil`/`false`
+    /// o título é provisório ("Gravação de …") e o do resumo pode substituí-lo;
+    /// depois disso nenhum reprocessamento troca o título de novo.
+    public var tituloManual: Bool?
+
     /// O critério certo para ordenar "mais recente primeiro" na biblioteca.
     ///
     /// Não é `criadoEm`: numa importação, `criadoEm` passou a valer a data
@@ -524,7 +548,8 @@ public struct Arquivo: Sendable, Identifiable, Codable, Equatable {
         idExterno: String? = nil,
         importadoEm: Date? = nil,
         usavaFones: Bool? = nil,
-        possuiPalavrasComTimestamp: Bool? = nil
+        possuiPalavrasComTimestamp: Bool? = nil,
+        tituloManual: Bool? = nil
     ) {
         self.id = id
         self.titulo = titulo
@@ -542,5 +567,6 @@ public struct Arquivo: Sendable, Identifiable, Codable, Equatable {
         self.idExterno = idExterno
         self.importadoEm = importadoEm
         self.usavaFones = usavaFones
+        self.tituloManual = tituloManual
     }
 }

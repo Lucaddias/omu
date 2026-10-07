@@ -21,7 +21,7 @@ public enum GramaticaDoResumo {
     opcional ::= string | "null"
     numeroOuNulo ::= numero | "null"
     string ::= "\"" char* "\"" ws
-    char ::= [^"\\] | "\\" (["\\bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+    char ::= [^"\\\x7F\x00-\x1F] | "\\" (["\\bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
     numero ::= "-"? [0-9]+ ("." [0-9]+)? ws
     ws ::= [ \t\n]*
     """#

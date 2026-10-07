@@ -59,6 +59,11 @@ public final class ArquivoPersistido {
     /// `nil` para arquivos importados ou gravações anteriores à esta feature.
     public var usavaFones: Bool?
 
+    /// O título foi escolhido pela pessoa (ou veio do calendário) e não deve
+    /// ser trocado pelo título que o resumo inventar. Opcional para manter a
+    /// migração leve: registros antigos ficam `nil` (título automático).
+    public var tituloManual: Bool?
+
     /// Título e visão geral do resumo. O resto do `Resumo` vira `InsightPersistido`.
     ///
     /// **Não opcionais, com default.** Um `String?` obrigaria o predicado de

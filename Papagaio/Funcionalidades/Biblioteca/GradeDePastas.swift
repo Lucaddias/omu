@@ -262,12 +262,15 @@ struct CartaoDePasta: View {
             Button("Apagar pasta".localized, role: .destructive, action: aoApagar)
             Button("Cancelar".localized, role: .cancel) {}
         } message: {
-            // O texto tira o susto: a palavra "apagar" ao lado de um número de
-            // conversas faz qualquer um imaginar que elas vão junto.
+            // O texto diz o que `PastasDaBiblioteca.apagar` faz de fato: as
+            // conversas vão para a lixeira com a pasta. A versão anterior
+            // prometia o contrário ("continuam na biblioteca").
             Text(
                 pasta.quantidade == 0
-                    ? "A pasta é só um rótulo. Nada mais será removido.".localized
-                    : "As %d conversas continuam na biblioteca — só deixam de estar nesta pasta.".localized(pasta.quantidade)
+                    ? "A pasta está vazia. Nenhuma conversa será removida.".localized
+                    : pasta.quantidade == 1
+                        ? "A conversa desta pasta vai para a lixeira junto com ela. Dá para restaurar a pasta inteira ou só a conversa.".localized
+                        : "As %d conversas desta pasta vão para a lixeira junto com ela. Dá para restaurar a pasta inteira ou uma conversa só.".localized(pasta.quantidade)
             )
         }
         .popover(isPresented: $escolhendoAparencia, arrowEdge: .bottom) {

@@ -1,5 +1,6 @@
 import CloudKit
 import Foundation
+import os
 import PapagaioCore
 
 /// Cursor opaco: produção guarda `CKQueryOperation.Cursor`; testes usam um
@@ -194,7 +195,7 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
         // buscamos suas alterações diretamente: esse fluxo não depende de
         // índices e inclui a carga completa quando o token é nulo.
         let registros = try await registrosDaZona(zona, no: banco)
-        return Self.pagina(de: try Self.dadosDosRegistros(registros), aPartirDe: 0)
+        return Self.pagina(de: Self.dadosDosRegistros(registros), aPartirDe: 0)
     }
 
     func remover(id: String, equipe: EquipeDisponivel) async throws {
@@ -209,12 +210,21 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
         )
     }
 
-    private static func dadosDosRegistros(_ registros: [CKRecord]) throws -> [Data] {
-        try registros.compactMap { registro -> Data? in
+    private static let logger = Logger(subsystem: "com.papagaio.Papagaio", category: "cloudkit")
+
+    private static func dadosDosRegistros(_ registros: [CKRecord]) -> [Data] {
+        registros.compactMap { registro -> Data? in
             guard registro.recordType == tipoDeRegistro else { return nil }
             if let asset = registro[Campo.conteudo] as? CKAsset,
                let url = asset.fileURL {
-                return try Data(contentsOf: url)
+                // Um anexo que não pôde ser lido é problema daquela conversa,
+                // não da equipe inteira.
+                do {
+                    return try Data(contentsOf: url)
+                } catch {
+                    logger.error("conversa \(registro.recordID.recordName, privacy: .public) ignorada no download: \(error.localizedDescription, privacy: .public)")
+                    return nil
+                }
             }
             return registro[Campo.dados] as? Data
         }
@@ -249,19 +259,19 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
             operacao.fetchAllChanges = true
 
             var registros: [CKRecord] = []
-            var erroPorRegistro: (any Error)?
-            operacao.recordWasChangedBlock = { _, resultado in
+            operacao.recordWasChangedBlock = { id, resultado in
                 switch resultado {
                 case let .success(registro):
                     registros.append(registro)
                 case let .failure(erro):
-                    erroPorRegistro = erro
+                    // A falha de um registro não invalida os demais: antes,
+                    // uma conversa problemática bloqueava o download da
+                    // equipe toda.
+                    Self.logger.error("registro \(id.recordName, privacy: .public) ignorado no download: \(erro.localizedDescription, privacy: .public)")
                 }
             }
             operacao.fetchRecordZoneChangesResultBlock = { resultado in
-                if let erroPorRegistro {
-                    continuation.resume(throwing: erroPorRegistro)
-                } else if case let .failure(erro) = resultado {
+                if case let .failure(erro) = resultado {
                     continuation.resume(throwing: erro)
                 } else {
                     continuation.resume(returning: registros)
@@ -335,6 +345,10 @@ private final class PaginaPendenteDeConversasCloudKit: @unchecked Sendable {
 /// política explícita de `CKAsset`.
 actor SincronizadorDaBibliotecaCloudKit {
     private let transporte: any TransporteDeConversasCloudKit
+    private static let logger = Logger(subsystem: "com.papagaio.Papagaio", category: "cloudkit")
+    /// Quantos registros o último download não conseguiu ler (payload de uma
+    /// versão mais nova do app, conteúdo corrompido).
+    private(set) var ignoradasNoUltimoDownload = 0
 
     init(
         container: CKContainer = CKContainer(
@@ -378,11 +392,22 @@ actor SincronizadorDaBibliotecaCloudKit {
         let espacoEsperado = try espacoDaEquipe(equipe)
         var cursor: CursorDeConversasCloudKit?
         var conversas: [ConversaRecebidaCloudKit] = []
+        ignoradasNoUltimoDownload = 0
 
         repeat {
             let pagina = try await transporte.pagina(da: equipe, continuando: cursor)
             for dados in pagina.registros {
-                let conversa = try Self.decodificar(dados)
+                // Um payload que não decodifica (versão mais nova do app,
+                // campo novo obrigatório) é pulado e registrado; as outras
+                // conversas da equipe continuam chegando.
+                let conversa: ConversaRecebidaCloudKit
+                do {
+                    conversa = try Self.decodificar(dados)
+                } catch {
+                    ignoradasNoUltimoDownload += 1
+                    Self.logger.error("conversa ilegível ignorada no download: \(error.localizedDescription, privacy: .public)")
+                    continue
+                }
                 let arquivo = conversa.arquivo
                 guard arquivo.espaco == espacoEsperado else { continue }
                 conversas.append(conversa)

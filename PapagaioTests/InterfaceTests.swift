@@ -209,3 +209,162 @@ func leituraDeDuracaoValida() {
     #expect(TimeInterval.lendo("1e308") == nil)
     #expect(TimeInterval.lendo(String(repeating: "9", count: 400) + "h") == nil)
 }
+
+// MARK: - Data digitada (V-25)
+
+/// Monta a digitação na ordem que a região do sistema usa.
+private func digitando(dia: String, mes: String, ano: String?, separador: String = "/") -> String {
+    let mesPrimeiro = DataDigitada.exemploDeFormato.hasPrefix("mm")
+    let partes = (mesPrimeiro ? [mes, dia] : [dia, mes]) + (ano.map { [$0] } ?? [])
+    return partes.joined(separator: separador)
+}
+
+private func componentes(_ data: Date) -> DateComponents {
+    Calendar.autoupdatingCurrent.dateComponents([.day, .month, .year, .hour, .minute], from: data)
+}
+
+@Test("Ano de dois dígitos é deste século, não o ano 26 (V-25)")
+@MainActor
+func dataDigitadaComAnoDeDoisDigitos() throws {
+    for separador in ["/", "-"] {
+        let lida = try #require(DataDigitada.lendo(digitando(dia: "13", mes: "08", ano: "26", separador: separador)))
+        let partes = componentes(lida)
+        #expect(partes.year == 2026)
+        #expect(partes.month == 8)
+        #expect(partes.day == 13)
+    }
+
+    let completa = try #require(DataDigitada.lendo(digitando(dia: "13", mes: "08", ano: "2026")))
+    #expect(componentes(completa).year == 2026)
+
+    // Sem zero à esquerda continua valendo.
+    let curta = try #require(DataDigitada.lendo(digitando(dia: "1", mes: "2", ano: "2026")))
+    #expect(componentes(curta).day == 1)
+    #expect(componentes(curta).month == 2)
+}
+
+@Test("Data que não existe é recusada em vez de corrigida em silêncio (V-25)")
+@MainActor
+func dataDigitadaInexistente() {
+    #expect(DataDigitada.lendo(digitando(dia: "31", mes: "02", ano: "2026")) == nil)
+    #expect(DataDigitada.lendo(digitando(dia: "31", mes: "04", ano: "26")) == nil)
+    #expect(DataDigitada.lendo("amanhã") == nil)
+}
+
+@Test("Confirmar a data digitada preserva a hora que a conversa tinha (V-25)")
+@MainActor
+func dataDigitadaPreservaAHora() throws {
+    let calendario = Calendar.autoupdatingCurrent
+    let anterior = try #require(calendario.date(from: DateComponents(
+        year: 2026, month: 8, day: 10, hour: 14, minute: 32
+    )))
+
+    let lida = try #require(DataDigitada.lendo(
+        digitando(dia: "13", mes: "08", ano: "2026"),
+        preservandoHoraDe: anterior
+    ))
+
+    let partes = componentes(lida)
+    #expect(partes.day == 13)
+    #expect(partes.hour == 14)
+    #expect(partes.minute == 32)
+}
+
+// MARK: - Fotos ao editar a ficha (V-27)
+
+@Test("Remover, inserir ou reordenar pessoas não passa a foto de uma para outra (V-27)")
+@MainActor
+func fotosNaoMigramQuandoAListaMuda() {
+    func pares(_ antes: [String], _ depois: [String]) -> [String] {
+        FotosDePessoas.renomeacoes(
+            de: antes.joined(separator: "\n"),
+            para: depois.joined(separator: "\n")
+        ).map { "\($0.de)→\($0.para)" }
+    }
+
+    // Remover a pessoa do meio casava "Bruno" com "Carla".
+    #expect(pares(["Ana", "Bruno", "Carla"], ["Ana", "Carla"]).isEmpty)
+    // Inserir alguém no meio desloca as linhas do mesmo jeito.
+    #expect(pares(["Ana", "Carla"], ["Ana", "Bruno", "Carla"]).isEmpty)
+    // Reordenar não é renomear ninguém.
+    #expect(pares(["Ana", "Bruno"], ["Bruno", "Ana"]).isEmpty)
+    // Só caixa ou acento: a chave é a mesma, não há o que migrar.
+    #expect(pares(["joao"], ["João"]).isEmpty)
+
+    // Corrigir um nome, com a lista do mesmo tamanho, é renomeação.
+    #expect(pares(["Ana", "Joao", "Carla"], ["Ana", "João Silva", "Carla"]) == ["Joao→João Silva"])
+}
+
+// MARK: - Cópia segura (V-03) e rótulos do player (V-21)
+
+@Test("Salvar por cima só troca o arquivo depois de a cópia dar certo (V-03)")
+func copiaSeguraPreservaODestinoQuandoFalha() throws {
+    let pasta = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: pasta, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: pasta) }
+    let destino = pasta.appendingPathComponent("conversa.zip")
+    try Data("versão antiga".utf8).write(to: destino)
+
+    // A origem não existe: a cópia falha — e o que já estava no destino fica.
+    #expect(throws: (any Error).self) {
+        try CopiaSegura.copiar(pasta.appendingPathComponent("nao-existe.zip"), substituindo: destino)
+    }
+    #expect(try Data(contentsOf: destino) == Data("versão antiga".utf8))
+
+    // Com a origem válida, o destino passa a ter o conteúdo novo.
+    let origem = pasta.appendingPathComponent("novo.zip")
+    try Data("versão nova".utf8).write(to: origem)
+    try CopiaSegura.copiar(origem, substituindo: destino)
+    #expect(try Data(contentsOf: destino) == Data("versão nova".utf8))
+    #expect(FileManager.default.fileExists(atPath: origem.path))
+
+    // Destino que ainda não existe é cópia simples.
+    let inedito = pasta.appendingPathComponent("outro.zip")
+    try CopiaSegura.copiar(origem, substituindo: inedito)
+    #expect(try Data(contentsOf: inedito) == Data("versão nova".utf8))
+}
+
+@Test("O rótulo de velocidade mostra o valor exato (V-21)")
+@MainActor
+func rotuloDeVelocidadeNaoArredonda() {
+    #expect(BarraDeAudioDaConversa.rotuloDeVelocidade(0.75) == "0.75x")
+    #expect(BarraDeAudioDaConversa.rotuloDeVelocidade(1) == "1x")
+    #expect(BarraDeAudioDaConversa.rotuloDeVelocidade(1.25) == "1.25x")
+    #expect(BarraDeAudioDaConversa.rotuloDeVelocidade(1.5) == "1.5x")
+    #expect(BarraDeAudioDaConversa.rotuloDeVelocidade(2) == "2x")
+}
+
+@Test("O prompt de nomes prioriza a ficha e o evento; contatos só completam (PS-03)")
+func promptDeNomesPriorizaAReuniao() {
+    let agenda = (1...60).map { String(format: "Aaron Contato %02d", $0) }
+    let prompt = PromptDeEntidades.montarPrompt(
+        daFicha: ["Mariana", " "],
+        doEvento: ["Revisão do contrato", "Zuleica Prado", "mariana"],
+        contatos: agenda + ["Mariana Albuquerque", "Zé Prado", "Zuleica Prado"]
+    )
+
+    // Antes: os 40 primeiros em ordem alfabética — só "Aaron Contato…".
+    #expect(prompt == "Mariana, Revisão do contrato, Zuleica Prado, Mariana Albuquerque, Zé Prado")
+
+    // Sem candidatos, a agenda de contatos não entra.
+    #expect(PromptDeEntidades.montarPrompt(daFicha: [], doEvento: [], contatos: agenda) == nil)
+
+    // O teto continua valendo, na ordem de prioridade.
+    let muitos = PromptDeEntidades.montarPrompt(
+        daFicha: (1...50).map { "Pessoa \($0)" }, doEvento: ["Evento"], contatos: []
+    )
+    #expect(muitos?.components(separatedBy: ", ").count == PromptDeEntidades.limiteDeTermos)
+    #expect(muitos?.hasPrefix("Pessoa 1, Pessoa 2") == true)
+}
+
+@Test("Sem escolha nos Ajustes o prompt de nomes não pede acesso; a escolha explícita vale")
+func preferenciaDoPromptDeNomes() throws {
+    let suite = "PromptDeEntidadesTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+
+    defaults.set(false, forKey: PromptDeEntidades.chaveDaPreferencia)
+    #expect(!PromptDeEntidades.habilitado(em: defaults))
+    defaults.set(true, forKey: PromptDeEntidades.chaveDaPreferencia)
+    #expect(PromptDeEntidades.habilitado(em: defaults))
+}

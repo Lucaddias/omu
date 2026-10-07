@@ -10,7 +10,7 @@ enum GramaticaDaTraducao {
         return #"""
         root ::= "{" ws "\"traducoes\":" ws "[" ws \#(itens) ws "]" ws "}"
         string ::= "\"" char* "\""
-        char ::= [^"\\] | "\\" (["\\bfnrt] | "u" hex hex hex hex)
+        char ::= [^"\\\x7F\x00-\x1F] | "\\" (["\\bfnrt] | "u" hex hex hex hex)
         hex ::= [0-9a-fA-F]
         ws ::= [ \t\n]*
         """#

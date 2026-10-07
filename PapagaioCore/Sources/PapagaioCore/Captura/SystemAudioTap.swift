@@ -46,6 +46,10 @@ final class SystemAudioTap {
         /// `nil` quando o formato não é Float32 PCM e, portanto, não foi
         /// possível medir pico sem converter no callback.
         let peak: Float?
+        /// A saída padrão do macOS mudou durante a captura (fones conectados
+        /// ou desconectados). O tap fica preso ao dispositivo do início: daí
+        /// em diante o canal pode ter gravado silêncio.
+        var saidaMudou = false
 
         static let empty = Statistics(callbacks: 0, frames: 0, peak: nil)
     }
@@ -56,6 +60,17 @@ final class SystemAudioTap {
     private var writer: SystemTrackWriter?
     private var callbackState: SystemTapCallbackState?
     private let nivel: NivelAudio
+    private let saidaMudou = OSAllocatedUnfairLock(initialState: false)
+    private var ouvinteDaSaida: AudioObjectPropertyListenerBlock?
+    private static let filaDoOuvinte = DispatchQueue(label: "Papagaio.SystemAudioTap.saida")
+
+    private static var enderecoDaSaidaPadrao: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
 
     private(set) var isRunning = false
 
@@ -170,6 +185,32 @@ final class SystemAudioTap {
         }
 
         isRunning = true
+        observarSaidaPadrao()
+    }
+
+    /// Só registra a troca: recriar o tap no dispositivo novo no meio da
+    /// gravação fica para depois; por ora quem gravou precisa ao menos saber
+    /// por que o interlocutor sumiu a partir de um ponto.
+    private func observarSaidaPadrao() {
+        saidaMudou.withLock { $0 = false }
+        let marca = saidaMudou
+        let ouvinte: AudioObjectPropertyListenerBlock = { _, _ in
+            marca.withLock { $0 = true }
+        }
+        var endereco = Self.enderecoDaSaidaPadrao
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &endereco, Self.filaDoOuvinte, ouvinte
+        )
+        if status == noErr { ouvinteDaSaida = ouvinte }
+    }
+
+    private func pararDeObservarSaidaPadrao() {
+        guard let ouvinte = ouvinteDaSaida else { return }
+        var endereco = Self.enderecoDaSaidaPadrao
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &endereco, Self.filaDoOuvinte, ouvinte
+        )
+        ouvinteDaSaida = nil
     }
 
     /// Pausa a escrita do canal do sistema.
@@ -189,6 +230,7 @@ final class SystemAudioTap {
 
     @discardableResult
     func stop() -> Statistics {
+        pararDeObservarSaidaPadrao()
         if let ioProcID {
             AudioDeviceStop(aggregateDeviceID, ioProcID)
             AudioDeviceDestroyIOProcID(aggregateDeviceID, ioProcID)
@@ -202,7 +244,14 @@ final class SystemAudioTap {
         ioProcID = nil
         aggregateDeviceID = AudioObjectID(kAudioObjectUnknown)
         tapID = AudioObjectID(kAudioObjectUnknown)
-        let statistics = callbackState?.statistics ?? .empty
+        var statistics = callbackState?.statistics ?? .empty
+        statistics.saidaMudou = saidaMudou.withLock { $0 }
+        // O IOProc já foi destruído: nenhum callback toca mais no writer.
+        // Fechar aqui, e não no `deinit`, garante que a fila do
+        // `ExtAudioFileWriteAsync` foi despejada antes de quem chamou medir o
+        // tamanho do arquivo ou abri-lo — o `deinit` depende de o bloco do
+        // IOProc já ter soltado a última referência.
+        writer?.finalizar()
         callbackState = nil
         writer = nil
         isRunning = false

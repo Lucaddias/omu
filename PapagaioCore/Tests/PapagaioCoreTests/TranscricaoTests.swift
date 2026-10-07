@@ -252,3 +252,20 @@ struct TestesComModeloWhisper {
         }
     }
 }
+
+@Test("O idioma é fixado na primeira janela com fala suficiente e não muda mais (T-02)")
+func idiomaDaTranscricaoEhFixadoUmaVez() {
+    // Janela curta ou quase sem palavras: ainda não decide nada.
+    #expect(IdiomaDaTranscricao.fixar(atual: nil, detectado: "es", duracaoDaJanela: 1.2, palavras: 2) == nil)
+    #expect(IdiomaDaTranscricao.fixar(atual: nil, detectado: "gl", duracaoDaJanela: 20, palavras: 1) == nil)
+    #expect(IdiomaDaTranscricao.fixar(atual: nil, detectado: nil, duracaoDaJanela: 20, palavras: 40) == nil)
+
+    // A primeira janela com fala de verdade fixa o idioma…
+    let fixado = IdiomaDaTranscricao.fixar(atual: nil, detectado: "pt", duracaoDaJanela: 20, palavras: 40)
+    #expect(fixado == "pt")
+    // …e uma janela ruidosa depois não o troca.
+    #expect(IdiomaDaTranscricao.fixar(atual: fixado, detectado: "es", duracaoDaJanela: 30, palavras: 60) == "pt")
+
+    // Idioma pedido por quem chama vale desde o começo.
+    #expect(IdiomaDaTranscricao.fixar(atual: "en", detectado: "pt", duracaoDaJanela: 30, palavras: 60) == "en")
+}

@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import PapagaioCore
 
@@ -15,6 +16,11 @@ struct OperacaoPendenteCloudKit: Codable, Equatable, Sendable, Identifiable {
     let revisao: Date
     var tentativas: Int
     var proximaTentativa: Date
+    /// Preenchido quando o iCloud recusou a operação por um motivo que
+    /// repetir não resolve (sem permissão de escrita, cota cheia). Ela fica
+    /// na fila — o conteúdo não se perde —, mas sai das tentativas
+    /// automáticas; "Tentar de novo" na tela da equipe a reenvia.
+    var bloqueadaPor: String?
 }
 
 struct ResultadoDaFilaCloudKit: Sendable, Equatable {
@@ -22,6 +28,48 @@ struct ResultadoDaFilaCloudKit: Sendable, Equatable {
     let pendentes: Int
     let erros: [String]
     let proximaTentativa: Date?
+    /// Das pendentes, quantas estão paradas à espera de uma ação da pessoa.
+    var bloqueadas = 0
+}
+
+/// O que fazer com uma operação que o iCloud recusou.
+enum DestinoDaFalhaCloudKit: Equatable {
+    /// Rede, servidor ocupado, conflito: vale repetir com espera crescente.
+    case tentarDeNovo
+    /// O efeito desejado já é o estado do servidor (remover o que não existe).
+    case jaConcluida
+    /// Repetir não muda o resultado; é preciso alguém agir.
+    case bloqueada
+
+    static func classificar(
+        _ erro: any Error,
+        acao: OperacaoPendenteCloudKit.Acao
+    ) -> DestinoDaFalhaCloudKit {
+        guard let erro = erro as? CKError else { return .tentarDeNovo }
+        return classificar(codigos: codigos(de: erro), acao: acao)
+    }
+
+    /// Separada do `CKError` para ser testável sem montar erros do CloudKit.
+    static func classificar(
+        codigos: [CKError.Code],
+        acao: OperacaoPendenteCloudKit.Acao
+    ) -> DestinoDaFalhaCloudKit {
+        guard !codigos.isEmpty else { return .tentarDeNovo }
+        let ausencias: Set<CKError.Code> = [.unknownItem, .zoneNotFound, .userDeletedZone]
+        if acao == .remover, codigos.allSatisfy(ausencias.contains) {
+            return .jaConcluida
+        }
+        let semSaida: Set<CKError.Code> = [.permissionFailure, .quotaExceeded]
+        return codigos.contains(where: semSaida.contains) ? .bloqueada : .tentarDeNovo
+    }
+
+    /// Uma falha parcial carrega o motivo real dentro, por item.
+    private static func codigos(de erro: CKError) -> [CKError.Code] {
+        guard erro.code == .partialFailure,
+              let porItem = erro.partialErrorsByItemID, !porItem.isEmpty
+        else { return [erro.code] }
+        return porItem.values.compactMap { ($0 as? CKError)?.code }
+    }
 }
 
 /// Outbox durável para alterações do workspace. A operação entra no arquivo
@@ -34,21 +82,52 @@ actor FilaPersistenteCloudKit {
     private var processando = false
     private var esperas: [CheckedContinuation<Void, Never>] = []
     private var operacoesCarregadas: [OperacaoPendenteCloudKit]?
+    /// Cópia do arquivo da fila que não pôde ser lido por inteiro, se houve.
+    nonisolated let quarentena: URL?
 
     init(url: URL, fm: FileManager = .default) {
         self.url = url
         self.fm = fm
+        guard fm.fileExists(atPath: url.path) else {
+            estadoInicial = .success([])
+            quarentena = nil
+            return
+        }
         do {
-            guard fm.fileExists(atPath: url.path) else {
-                estadoInicial = .success([])
-                return
-            }
             let dados = try Data(contentsOf: url)
-            estadoInicial = .success(
-                try JSONDecoder().decode([OperacaoPendenteCloudKit].self, from: dados)
-            )
+            do {
+                estadoInicial = .success(
+                    try JSONDecoder().decode([OperacaoPendenteCloudKit].self, from: dados)
+                )
+                quarentena = nil
+            } catch {
+                // Arquivo truncado, ou gravado por uma versão com campos que
+                // esta não conhece. Antes isso virava falha permanente: todo
+                // agendamento e todo processamento passavam a lançar, para
+                // sempre. O original vai para a quarentena e a fila segue com
+                // as operações que ainda dá para ler.
+                let destino = url.deletingPathExtension()
+                    .appendingPathExtension("ilegivel-\(Int(Date().timeIntervalSince1970)).json")
+                try? fm.copyItem(at: url, to: destino)
+                quarentena = destino
+                let legiveis = (try? JSONDecoder().decode([Tolerante].self, from: dados))?
+                    .compactMap(\.operacao) ?? []
+                estadoInicial = .success(legiveis)
+            }
         } catch {
+            // Nem ler o arquivo foi possível (permissão, disco): isso pode
+            // ser passageiro, então o erro continua sendo relatado.
             estadoInicial = .failure(error)
+            quarentena = nil
+        }
+    }
+
+    /// Decodifica um item da fila sem derrubar os vizinhos.
+    private struct Tolerante: Decodable {
+        let operacao: OperacaoPendenteCloudKit?
+
+        init(from decoder: any Decoder) throws {
+            operacao = try? OperacaoPendenteCloudKit(from: decoder)
         }
     }
 
@@ -118,7 +197,7 @@ actor FilaPersistenteCloudKit {
         }
         try Task.checkCancellation()
         let elegiveis = try carregar().filter {
-            ignorarBackoff || $0.proximaTentativa <= agora
+            ignorarBackoff || ($0.bloqueadaPor == nil && $0.proximaTentativa <= agora)
         }
         var concluidas = 0
         var erros: [String] = []
@@ -149,14 +228,33 @@ actor FilaPersistenteCloudKit {
                 atuais.removeAll { $0.id == operacao.id }
                 try salvar(atuais)
                 concluidas += 1
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 var atuais = try carregar()
-                if let indice = atuais.firstIndex(where: { $0.id == operacao.id }) {
-                    atuais[indice].tentativas = min(atuais[indice].tentativas + 1, 10)
-                    atuais[indice].proximaTentativa = agora.addingTimeInterval(
-                        Self.atraso(para: atuais[indice].tentativas)
-                    )
+                switch DestinoDaFalhaCloudKit.classificar(error, acao: operacao.acao) {
+                case .jaConcluida:
+                    // Remover o que já não existe é sucesso, não falha a
+                    // repetir para sempre.
+                    atuais.removeAll { $0.id == operacao.id }
                     try salvar(atuais)
+                    concluidas += 1
+                    continue
+                case .bloqueada:
+                    if let indice = atuais.firstIndex(where: { $0.id == operacao.id }) {
+                        atuais[indice].tentativas = min(atuais[indice].tentativas + 1, 10)
+                        atuais[indice].bloqueadaPor = error.localizedDescription
+                        try salvar(atuais)
+                    }
+                case .tentarDeNovo:
+                    if let indice = atuais.firstIndex(where: { $0.id == operacao.id }) {
+                        atuais[indice].tentativas = min(atuais[indice].tentativas + 1, 10)
+                        atuais[indice].bloqueadaPor = nil
+                        atuais[indice].proximaTentativa = agora.addingTimeInterval(
+                            Self.atraso(para: atuais[indice].tentativas)
+                        )
+                        try salvar(atuais)
+                    }
                 }
                 erros.append(error.localizedDescription)
             }
@@ -167,7 +265,10 @@ actor FilaPersistenteCloudKit {
             concluidas: concluidas,
             pendentes: restantes.count,
             erros: erros,
-            proximaTentativa: restantes.map(\.proximaTentativa).min()
+            // As bloqueadas não marcam hora: não há tentativa automática
+            // para elas.
+            proximaTentativa: restantes.filter { $0.bloqueadaPor == nil }.map(\.proximaTentativa).min(),
+            bloqueadas: restantes.filter { $0.bloqueadaPor != nil }.count
         )
     }
 

@@ -52,8 +52,11 @@ struct ArquivoDetalheView: View {
     /// parecia "travado" sem realmente estar. Medindo a altura de verdade,
     /// a reserva sempre cobre exatamente o que o player ocupa.
     @State private var alturaMedidaDoPlayer: CGFloat = 116
-    @State private var mostrandoExportador = false
     @State private var notasEditaveis: [NotaDaConversa] = []
+    /// As notas como estavam na última carga ou no último salvamento. É a
+    /// régua do "sujo": só há o que gravar quando as notas em edição diferem
+    /// disto. Fechar a conversa sem editar não regrava nem reenvia nada.
+    @State private var notasSalvas: [NotaDaConversa] = []
     @State private var estadoDeSalvamentoDasNotas = "Salvo"
     @State private var tarefaDeSalvamentoDasNotas: Task<Void, Never>?
     /// Anexos, áudios da gravação e lixeira de mídia num view model próprio —
@@ -513,6 +516,22 @@ struct ArquivoDetalheView: View {
             // E libera (ou não) a remoção do áudio da gravação.
             midiasDaConversaVM.transcricaoDisponivel = !novos.isEmpty
         }
+        .onChange(of: arquivo.notas) { _, _ in
+            // Notas que mudaram por fora (equipe, outra janela) entram na
+            // tela — a não ser que haja edição local ainda por salvar, que
+            // tem precedência e será gravada por cima.
+            guard !notasForamEditadas else { return }
+            sincronizarNotasComArquivo()
+        }
+        .onChange(of: arquivo.resumo?.proximosPassos) { _, novos in
+            // O resumo chegou (ou foi refeito) com a conversa aberta: os
+            // próximos passos inéditos viram sugestões de tarefa.
+            tarefasDaConversaVM.carregar(
+                base: novos ?? [],
+                tituloDaConversa: titulo,
+                dataDaConversa: arquivo.criadoEm
+            )
+        }
         .onDisappear {
             // Sem isto o observador periódico sobrevive à view — critério de
             // aceite do Passo 10.
@@ -521,15 +540,6 @@ struct ArquivoDetalheView: View {
             reprodutor?.encerrar()
             reprodutor = nil
         }
-        .fileExporter(
-            isPresented: $mostrandoExportador,
-            // Mesmo conteúdo do Compartilhar do cartão: resumo, transcrição,
-            // notas, mídia e tarefas num documento só. O áudio não vai junto —
-            // fica na aba Mídia, de onde pode ser aberto ou apagado.
-            document: DocumentoMarkdown(conteudo: DossieDaConversa.gerar(arquivo: arquivo)),
-            contentType: DocumentoMarkdown.tipo,
-            defaultFilename: DossieDaConversa.nomeDeArquivo(para: arquivo)
-        ) { _ in }
         .alert("Não foi possível adicionar a mídia".localized, isPresented: Binding(
             get: { midiasDaConversaVM.erro != nil },
             set: { if !$0 { midiasDaConversaVM.erro = nil } }
@@ -578,7 +588,8 @@ struct ArquivoDetalheView: View {
                 prazo: $tarefasDaConversaVM.prazoDaTarefa,
                 responsaveisDisponiveis: responsaveisDisponiveis,
                 aoCancelar: tarefasDaConversaVM.cancelarEdicao,
-                aoAdicionar: tarefasDaConversaVM.salvarEdicao
+                aoAdicionar: tarefasDaConversaVM.salvarEdicao,
+                aoExcluir: { tarefasDaConversaVM.excluirTarefaEmEdicao(conversaTitulo: titulo) }
             )
         }
     }
@@ -1114,7 +1125,7 @@ struct ArquivoDetalheView: View {
                         }
                         .buttonStyle(BotaoDeContornoPapagaio())
                         .disabled(arquivo.trechos.isEmpty)
-                        .help("Reprocessa a conversa inteira: transcrição, resumo e próximos passos".localized)
+                        .help("Refaz o resumo e os próximos passos a partir da transcrição atual, com as correções que você fez".localized)
                     }
                 }
 
@@ -1356,9 +1367,18 @@ struct ArquivoDetalheView: View {
     /// Carrega as notas do arquivo. O bloco único que existia antes continua
     /// válido — vira uma nota como as outras, ancorada em 0:00.
     private func sincronizarNotasComArquivo() {
-        notasEditaveis = arquivo.notas.sorted {
+        notasEditaveis = Self.notasEmOrdem(arquivo.notas)
+        notasSalvas = notasEditaveis
+    }
+
+    private static func notasEmOrdem(_ notas: [NotaDaConversa]) -> [NotaDaConversa] {
+        notas.sorted {
             $0.start == $1.start ? $0.id.uuidString < $1.id.uuidString : $0.start < $1.start
         }
+    }
+
+    private var notasForamEditadas: Bool {
+        Self.notasEmOrdem(notasEditaveis) != notasSalvas
     }
 
     private func agendarSalvamentoDasNotas() {
@@ -1372,10 +1392,16 @@ struct ArquivoDetalheView: View {
     }
 
     private func salvarNotasAgora() {
-        let atualizadas = notasEditaveis.sorted {
-            $0.start == $1.start ? $0.id.uuidString < $1.id.uuidString : $0.start < $1.start
+        let atualizadas = Self.notasEmOrdem(notasEditaveis)
+        // Nada mudou desde a última carga/salvamento: gravar aqui reescrevia
+        // a conversa inteira e, em equipe, reenviava ao iCloud a cada vez que
+        // alguém só abria e fechava a tela.
+        guard atualizadas != notasSalvas else {
+            estadoDeSalvamentoDasNotas = "Salvo"
+            return
         }
         notasEditaveis = atualizadas
+        notasSalvas = atualizadas
         estadoDeSalvamentoDasNotas = "Salvando..."
 
         Task { @MainActor in
@@ -1756,6 +1782,9 @@ struct ArquivoDetalheView: View {
 
             Button("Transcrever".localized, systemImage: "text.badge.plus", action: aoTranscrever)
                 .buttonStyle(BotaoPrincipalPapagaio())
+                // Conversa recebida da equipe ou importada sem mídia: não há
+                // o que transcrever, e o clique terminava em erro.
+                .disabled(arquivo.semAudio)
                 .accessibilityHint("Adiciona esta conversa à fila. O resumo será feito após a transcrição.".localized)
         }
         .padding(PapagaioTema.Espaco.pagina)

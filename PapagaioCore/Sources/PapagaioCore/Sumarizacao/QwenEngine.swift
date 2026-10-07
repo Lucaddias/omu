@@ -8,7 +8,11 @@ import LlamaRuntime
 /// conectar um assunto do início com a retomada dele no fim, que é justamente o
 /// que um modelo de 4k não faz.
 public struct QwenEngine: SummarizationEngine {
-    private enum ErroDeTraducao: Error, CustomStringConvertible {
+    private enum ErroDeTraducao: Error, CustomStringConvertible, LocalizedError {
+        /// `localizedDescription` é o que chega à tela e às notificações; sem
+        /// isto ela devolvia "The operation couldn't be completed (… error N)".
+        var errorDescription: String? { description }
+
         case respostaJSONInvalida(caracteres: Int)
         case quantidadeIncorreta(esperada: Int, recebida: Int)
         case textoVazio(indice: Int)
@@ -56,7 +60,7 @@ public struct QwenEngine: SummarizationEngine {
         idiomaDeSaida: IdiomaDeProcessamento? = nil
     ) async throws -> Resumo {
         guard !trechos.isEmpty else {
-            throw NotImplemented("resumo de transcrição vazia", passo: 7)
+            throw ErroDeResumo.transcricaoVazia
         }
 
         let transcricao = Self.formatar(trechos)
@@ -188,7 +192,10 @@ public struct QwenEngine: SummarizationEngine {
             maxTokens: 4_096
         )
         guard let resumo = Self.decodificar(corrigido) else {
-            throw ErroLlama.gramaticaInvalida
+            // A gramática foi aceita — o que falhou foi a saída, quase sempre
+            // cortada pelo limite de tokens antes de fechar o JSON.
+            // `gramaticaInvalida` dizia outra coisa ("a gramática foi recusada").
+            throw ErroDeResumo.resumoIncompleto
         }
         return resumo
     }
@@ -424,4 +431,25 @@ public struct QwenEngine: SummarizationEngine {
 
 extension ContextoLlama: CicloDeVidaDeModelos.Residente {
     public nonisolated var identificador: String { QwenEngine.identificador }
+}
+
+/// Falhas do resumo que não são do runtime: dizem o que aconteceu com o
+/// conteúdo, na língua de quem usa.
+public enum ErroDeResumo: Error, Equatable, CustomStringConvertible, LocalizedError {
+    /// Não há fala para resumir.
+    case transcricaoVazia
+    /// O modelo respondeu, mas a saída não fechou num resumo válido nem
+    /// depois da segunda tentativa.
+    case resumoIncompleto
+
+    public var description: String {
+        switch self {
+        case .transcricaoVazia:
+            "não há transcrição para resumir"
+        case .resumoIncompleto:
+            "o modelo não conseguiu concluir o resumo; a transcrição está salva e dá para gerar o resumo de novo"
+        }
+    }
+
+    public var errorDescription: String? { description }
 }

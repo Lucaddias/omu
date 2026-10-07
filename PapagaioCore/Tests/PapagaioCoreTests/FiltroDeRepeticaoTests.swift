@@ -208,3 +208,21 @@ func fraseUnica() {
 func visaoGeralVazia() {
     #expect(FormatacaoDoResumo.visaoGeralEmBlocosDeDuasFrases("   ").isEmpty)
 }
+
+@Test("Limpar uma repetição não apaga confiança nem noSpeechProb (T-05)")
+func filtroPreservaMetadadosDoTrecho() throws {
+    let original = Trecho(
+        start: 0, end: 4,
+        texto: "Vamos começar. Vamos começar.",
+        speaker: Speaker.eu,
+        confianca: 0.82,
+        noSpeechProb: 0.07
+    )
+
+    let saida = try #require(FiltroDeRepeticao.remover([original]).first)
+
+    #expect(saida.texto == "Vamos começar.")
+    #expect(saida.id == original.id)
+    #expect(saida.confianca == 0.82)
+    #expect(saida.noSpeechProb == 0.07)
+}

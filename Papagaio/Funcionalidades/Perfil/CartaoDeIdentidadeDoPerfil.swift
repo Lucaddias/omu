@@ -46,7 +46,7 @@ struct CartaoDeIdentidadeDoPerfil: View {
                     .foregroundStyle(PapagaioTema.texto)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(email.isEmpty ? "email@exemplo.com" : email)
+                Text(email.isEmpty ? "Sem e-mail".localized : email)
                     .font(.title3)
                     .foregroundStyle(PapagaioTema.textoSecundario)
                     .lineLimit(2)

@@ -36,6 +36,15 @@ public enum Segmentacao {
                 guard !vals.isEmpty else { return nil }
                 return vals.reduce(0, +) / Float(vals.count)
             }()
+            // Sem confiança por palavra (transcrição legada), vale a média
+            // dos segmentos ponderada pela duração de cada um.
+            let confiancaDosSegmentos: Float? = {
+                let pares = acumulados.compactMap { s in s.confianca.map { ($0, max(0, s.end - s.start)) } }
+                guard !pares.isEmpty else { return nil }
+                let total = pares.reduce(0) { $0 + $1.1 }
+                guard total > 0 else { return pares.reduce(Float(0)) { $0 + $1.0 } / Float(pares.count) }
+                return pares.reduce(Float(0)) { $0 + $1.0 * Float($1.1) } / Float(total)
+            }()
             trechos.append(Trecho(
                 id: primeiro.id,
                 start: primeiro.start,
@@ -45,6 +54,7 @@ public enum Segmentacao {
                 // As palavras já vêm na linha do tempo do arquivo; concatena
                 // na ordem dos segmentos, como o texto.
                 palavras: palavras,
+                confianca: Trecho.confiancaMedia(palavras) ?? confiancaDosSegmentos,
                 noSpeechProb: noSpeech
             ))
             acumulados.removeAll()
@@ -78,6 +88,11 @@ public enum Segmentacao {
         return trechos
     }
 
+    /// Abaixo disto o trecho do microfone é candidato a ruído residual do
+    /// alto-falante — mas só com as outras duas evidências (ver `mesclarCanais`).
+    static let duracaoDeRespostaCurta: TimeInterval = 0.5
+    static let noSpeechDeRuidoCurto: Float = 0.3
+
     /// Mescla os dois canais numa linha do tempo única e agrupa.
     ///
     /// O falante vem do **canal de origem** — microfone é `"eu"`, tap do
@@ -92,9 +107,15 @@ public enum Segmentacao {
         let microfoneLimpo = microfone.filter { trecho in
             // Se o Whisper indica alta probabilidade de "sem fala", descarta.
             if let p = trecho.noSpeechProb, p > 0.6 { return false }
-            // Trechos muito curtos (< 0.5s) no microfone com sistema ativo
-            // costumam ser ruído residual.
-            if trecho.end - trecho.start < 0.5 { return false }
+            // Um trecho muito curto só é ruído residual quando o sistema
+            // está tocando ao mesmo tempo **e** o próprio Whisper desconfia
+            // dele. Cortar todo trecho curto apagava "Sim.", "Não." e "Ok."
+            // da conversa — e do resumo.
+            if trecho.end - trecho.start < duracaoDeRespostaCurta,
+               let p = trecho.noSpeechProb, p > noSpeechDeRuidoCurto,
+               sistema.contains(where: { sobrepoe(trecho, $0) }) {
+                return false
+            }
             return true
         }
 

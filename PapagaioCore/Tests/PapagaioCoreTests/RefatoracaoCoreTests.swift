@@ -55,11 +55,11 @@ func cicloPreservaRegistroDuranteUnload() async {
 }
 
 @Test("AEC conserva cauda do microfone e bloco final sem referência")
-func aecPreservaDuracaoEBlocoParcial() {
+func aecPreservaDuracaoEBlocoParcial() throws {
     for quantidade in [0, 1, 511, 512, 513, 1027] {
         let microfone = [Float](repeating: 0.37, count: quantidade)
         let cancelador = CanceladorDeEco(tamanhoBloco: 512, comprimentoFiltro: 512)
-        let saida = cancelador.processar(microfone: microfone, sistema: [Float](repeating: 0, count: 17))
+        let saida = try cancelador.processar(microfone: microfone, sistema: [Float](repeating: 0, count: 17))
         #expect(saida == microfone)
     }
 }
@@ -189,7 +189,25 @@ func downloadValidaDestinoExistente() async throws {
     let teste = try DownloadDeTeste()
     defer { teste.limpar() }
     try Data(repeating: 0, count: teste.conteudo.count).write(to: teste.destino)
+    // O servidor recusa o download que vem depois — e o arquivo ruim nunca
+    // é devolvido como modelo pronto.
+    teste.responder(status: 500, dados: Data())
     await #expect(throws: ErroDownload.self) {
         _ = try await DownloadDeModelos(pastaDeModelos: teste.pasta, sessao: teste.sessao).baixar(teste.peso)
     }
+    #expect(!FileManager.default.fileExists(atPath: teste.destino.path))
+}
+
+@Test("Peso inválido já presente é substituído pelo download (M-08)")
+func downloadSubstituiDestinoInvalido() async throws {
+    let teste = try DownloadDeTeste()
+    defer { teste.limpar() }
+    // Cópia truncada com o nome final: antes travava "Baixar" para sempre.
+    try teste.conteudo.prefix(4).write(to: teste.destino)
+    teste.responder(dados: teste.conteudo)
+
+    let destino = try await DownloadDeModelos(pastaDeModelos: teste.pasta, sessao: teste.sessao).baixar(teste.peso)
+
+    #expect(destino == teste.destino)
+    #expect(try Data(contentsOf: destino) == teste.conteudo)
 }

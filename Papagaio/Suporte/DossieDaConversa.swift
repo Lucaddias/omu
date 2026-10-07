@@ -4,11 +4,11 @@ import PapagaioCore
 
 enum DossieDaConversa {
     static func gerar(arquivo: Arquivo) -> String {
-        var texto = ExportacaoMarkdown.gerar(arquivo: arquivo)
+        var texto = ExportacaoMarkdown.gerar(arquivo: arquivo, opcoes: opcoes(para: arquivo))
 
         let anexos = MidiasDaConversa.carregar(arquivo.id)
         if !anexos.isEmpty {
-            texto += "\n## Mídia\n\n"
+            texto += "\n## \("Mídia".localized)\n\n"
             texto += anexos
                 .map { "- \($0.nome) — \($0.tipoVisual), \($0.data.formatted(date: .numeric, time: .omitted))" }
                 .joined(separator: "\n")
@@ -17,12 +17,36 @@ enum DossieDaConversa {
 
         let tarefas = TarefasGeraisStore.carregar(arquivo)
         if !tarefas.isEmpty {
-            texto += "\n## Tarefas\n\n"
+            texto += "\n## \("Tarefas".localized)\n\n"
             texto += tarefas.map(linhaDaTarefa).joined(separator: "\n")
             texto += "\n"
         }
 
         return texto
+    }
+
+    /// O documento leva o que a tela mostra: as vozes com os nomes de "Quem
+    /// é quem?", a ficha da conversa e os rótulos no idioma do app.
+    static func opcoes(para arquivo: Arquivo) -> OpcoesDeExportacao {
+        let nomes = PreferenciasVisuaisDoArquivo.nomesDeVoz(arquivo.id)
+        let ficha = PreferenciasVisuaisDoArquivo.metadados(arquivo.id)
+        func pessoas(_ texto: String) -> String {
+            texto.split(whereSeparator: \.isNewline)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .joined(separator: ", ")
+        }
+        return OpcoesDeExportacao(
+            traduzir: { $0.localized },
+            nomeDeVoz: { RotuloDeVoz.exibicao($0, nomes: nomes) },
+            falantePreservado: { FalantePreservadoParaTrecho.obter(para: $0, arquivo: arquivo.id) },
+            ficha: [
+                ("Entrevistados".localized, pessoas(ficha.entrevistado)),
+                ("Entrevistadores".localized, pessoas(ficha.entrevistadores)),
+                ("Modalidade".localized, ficha.formato.isEmpty ? "" : ficha.formato.localized),
+                ("Descrição".localized, ficha.descricao.replacingOccurrences(of: "\n", with: " ")),
+            ]
+        )
     }
 
     static func nomeDeArquivo(para arquivo: Arquivo) -> String {

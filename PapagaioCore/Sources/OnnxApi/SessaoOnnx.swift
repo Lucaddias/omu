@@ -7,7 +7,11 @@ import Dispatch
 // (D-3.2). Só a API C atravessa esta fronteira.
 internal import onnxruntime
 
-public enum ErroOnnx: Error, CustomStringConvertible, Sendable {
+public enum ErroOnnx: Error, CustomStringConvertible, LocalizedError, Sendable {
+    /// `localizedDescription` é o que chega à tela e às notificações; sem
+    /// isto ela devolvia "The operation couldn't be completed (… error N)".
+    public var errorDescription: String? { description }
+
     case falha(String)
 
     public var description: String {
@@ -100,10 +104,23 @@ public actor SessaoOnnx {
         let api = apiPtr.pointee
 
         var env: OpaquePointer?
-        try Self.verificar(api, api.CreateEnv(ORT_LOGGING_LEVEL_WARNING, "papagaio", &env))
         var opcoes: OpaquePointer?
-        try Self.verificar(api, api.CreateSessionOptions(&opcoes))
         var memoria: OpaquePointer?
+        // Qualquer falha daqui até a sessão existir tem de devolver o que já
+        // foi criado: antes, um modelo ilegível vazava os três a cada tentativa.
+        var entregue = false
+        defer {
+            if !entregue {
+                if let opcoes { api.ReleaseSessionOptions(opcoes) }
+                if let memoria { api.ReleaseMemoryInfo(memoria) }
+                if let env { api.ReleaseEnv(env) }
+            }
+        }
+        try Self.verificar(api, api.CreateEnv(ORT_LOGGING_LEVEL_WARNING, "papagaio", &env))
+        try Self.verificar(api, api.CreateSessionOptions(&opcoes))
+        // O modelo tem 2 MB e roda ~112 mil vezes por hora de áudio: o pool
+        // padrão de threads intra-op custa mais em coordenação do que rende.
+        try Self.verificar(api, api.SetIntraOpNumThreads(opcoes, 1))
         try Self.verificar(api, api.CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeCPU, &memoria))
 
         var sessao: OpaquePointer?
@@ -122,6 +139,7 @@ public actor SessaoOnnx {
         caixa.opcoes = opcoes
         caixa.memoria = memoria
         caixa.sessao = sessao
+        entregue = true
 #if OMU_PERF
         sucesso = true
 #endif

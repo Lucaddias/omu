@@ -18,15 +18,12 @@
 </head>
 <body>
     <h1>POLÍTICA DE PRIVACIDADE — Ōmu</h1>
-    <p class="update">Última atualização: 5 de agosto de 2026</p>
-    <div class="important">
-        <strong>IMPORTANTE:</strong> Este documento é um modelo adaptado ao funcionamento conhecido do aplicativo Ōmu. Antes da publicação, o responsável legal deve revisar o texto, preencher os dados de identificação que ainda não foram informados e, se necessário, submetê-lo à análise de um profissional especializado em proteção de dados.
-    </div>
+    <p class="update">Última atualização: 6 de outubro de 2026</p>
     <h2>1. INFORMAÇÕES GERAIS</h2>
     <p>Esta Política de Privacidade explica como o aplicativo Ōmu coleta, usa, armazena e protege informações durante sua utilização.</p>
-    <p>O Ōmu é um aplicativo para macOS que grava reuniões, captura áudio do microfone e do sistema, gera transcrições e produz resumos. Nesta versão, o processamento principal é realizado localmente no Mac do usuário. As gravações, transcrições, resumos, anotações e demais arquivos de trabalho permanecem no dispositivo, salvo quando o próprio usuário decide exportá-los ou compartilhá-los.</p>
-    <p>O responsável pelo aplicativo deve preencher os dados abaixo antes da publicação:</p>
-    <ul><li>E-mail de contato e privacidade: <a href="mailto:omusuporte@gmail.com">omusuporte@gmail.com</a></li></ul>
+    <p>O Ōmu é um aplicativo para macOS que grava reuniões, captura áudio do microfone e do sistema, gera transcrições e produz resumos. A transcrição e o resumo são processados localmente no Mac do usuário. No uso individual, as gravações, transcrições, resumos, anotações e demais arquivos de trabalho permanecem no dispositivo, salvo quando o próprio usuário decide exportá-los ou compartilhá-los.</p>
+    <p>Três recursos opcionais fazem dados saírem do dispositivo ou entrarem nele, e estão descritos nas seções 5 e 6: as <strong>equipes</strong>, que sincronizam o conteúdo textual das conversas pelo iCloud; a conexão com o <strong>Google Calendar</strong>; e a conexão com o <strong>Granola</strong>.</p>
+    <p>Contato para assuntos de privacidade: <a href="mailto:omusuporte@gmail.com">omusuporte@gmail.com</a>.</p>
     <p>Esta Política aplica-se aos usuários do Ōmu e deve ser lida em conjunto com eventuais Termos de Uso do aplicativo. Ela poderá ser atualizada para refletir mudanças no aplicativo, na legislação ou nas práticas de tratamento de dados.</p>
     <h2>2. QUAIS DADOS PODEM SER TRATADOS</h2>
     <p>Dependendo das funções utilizadas, o Ōmu pode tratar as seguintes categorias de dados:</p>
@@ -34,9 +31,12 @@
         <li><strong>Dados de áudio:</strong> gravações capturadas pelo microfone e pelo áudio do sistema, além de arquivos de áudio importados pelo usuário.</li>
         <li><strong>Conteúdo produzido pelo usuário:</strong> transcrições, trechos de fala, resumos, títulos, notas, marcadores e arquivos exportados.</li>
         <li><strong>Dados de perfil:</strong> informações fornecidas pelo usuário ao utilizar o recurso opcional de perfil ou autenticação, como nome e e-mail associados ao Sign in with Apple, quando essa função for utilizada.</li>
+        <li><strong>Dados de equipe:</strong> quando o usuário cria uma equipe ou entra em uma, o nome da equipe, o código de entrada, os nomes dos participantes e o conteúdo textual das conversas daquele espaço (título, transcrição, resumo e notas).</li>
+        <li><strong>Nomes de Contatos e do Calendário do macOS:</strong> se o usuário conceder as permissões correspondentes, o Ōmu lê nomes de contatos e de organizações, além de títulos e participantes dos eventos próximos ao horário da gravação, para orientar a grafia de nomes próprios na transcrição.</li>
+        <li><strong>Dados de serviços conectados:</strong> se o usuário conectar o Google Calendar, o e-mail da conta e os eventos da agenda (título, horário, participantes e descrição); se conectar o Granola, a lista de reuniões e as notas e transcrições das reuniões que decidir importar.</li>
         <li><strong>Dados técnicos mínimos:</strong> informações necessárias ao funcionamento do aplicativo, como versão do macOS, versão do Ōmu, estado de permissões, disponibilidade de memória e espaço em disco.</li>
     </ol>
-    <p>O Ōmu não solicita, para seu funcionamento normal, dados como número de cartão, dados bancários, localização precisa, contatos, fotos ou acesso ao conteúdo de outros aplicativos além do áudio do sistema autorizado pelo usuário.</p>
+    <p>O Ōmu não solicita, para seu funcionamento normal, dados como número de cartão, dados bancários, localização precisa, fotos ou acesso ao conteúdo de outros aplicativos além do áudio do sistema autorizado pelo usuário. O acesso a Contatos e ao Calendário é opcional: o aplicativo funciona sem ele.</p>
     <p>O áudio de uma reunião e seu conteúdo transcrito podem conter dados pessoais ou dados pessoais sensíveis de terceiros. O usuário é responsável por obter as autorizações necessárias antes de realizar uma gravação e por utilizar o aplicativo de acordo com a legislação aplicável.</p>
     <h2>3. COMO OS DADOS SÃO COLETADOS</h2>
     <p>Os dados podem ser obtidos das seguintes formas:</p>
@@ -46,6 +46,9 @@
         <li>Quando o usuário importa voluntariamente um arquivo de áudio.</li>
         <li>Quando o usuário cria ou utiliza um perfil opcional com o Sign in with Apple.</li>
         <li>Quando o usuário cria notas, marcadores, títulos, exportações ou outras informações dentro do aplicativo.</li>
+        <li>Quando o usuário cria uma equipe, entra em uma ou trabalha em um espaço de equipe.</li>
+        <li>Quando o usuário concede ao Ōmu acesso a Contatos ou ao Calendário do macOS.</li>
+        <li>Quando o usuário conecta sua conta do Google Calendar ou do Granola e importa uma reunião.</li>
     </ol>
     <p>O Ōmu não coleta o conteúdo do áudio sem que o usuário inicie uma ação de gravação ou importação e conceda as permissões correspondentes.</p>
     <h2>4. FINALIDADES DO TRATAMENTO</h2>
@@ -56,25 +59,38 @@
         <li>gerar resumos, decisões, temas e próximos passos a partir da transcrição;</li>
         <li>permitir reprodução, busca, revisão, anotação e exportação do conteúdo;</li>
         <li>manter a biblioteca local do usuário;</li>
+        <li>sincronizar as conversas de um espaço de equipe entre seus participantes;</li>
+        <li>reconhecer nomes próprios na transcrição com apoio de Contatos e do Calendário, quando autorizado;</li>
+        <li>mostrar as reuniões da agenda e importar reuniões de serviços conectados pelo usuário;</li>
         <li>autenticar o usuário quando o recurso opcional de perfil for utilizado;</li>
         <li>diagnosticar falhas de permissão, memória, espaço, áudio ou processamento;</li>
         <li>cumprir obrigações legais, proteger direitos e prevenir uso indevido do aplicativo.</li>
     </ol>
-    <p>O Ōmu não utiliza o conteúdo das reuniões para publicidade personalizada, venda de dados ou treinamento de modelos externos. O processamento de transcrição e resumo é executado localmente no dispositivo nesta versão.</p>
+    <p>O Ōmu não utiliza o conteúdo das reuniões para publicidade personalizada, venda de dados ou treinamento de modelos externos. O processamento de transcrição e resumo é executado localmente no dispositivo.</p>
     <h2>5. ARMAZENAMENTO E RETENÇÃO</h2>
-    <p>As gravações, transcrições, resumos e anotações são armazenados localmente no espaço de armazenamento do aplicativo no Mac do usuário. O Ōmu não mantém uma cópia em nuvem desses conteúdos nesta versão.</p>
+    <p><strong>No dispositivo.</strong> As gravações, transcrições, resumos, anotações, tarefas e anexos são armazenados localmente no espaço de armazenamento do aplicativo no Mac do usuário. O áudio e os anexos nunca são enviados pelo Ōmu a um servidor.</p>
+    <p><strong>No iCloud, para equipes.</strong> As conversas que pertencem a um espaço de equipe têm seu conteúdo textual — título, transcrição, resumo e notas — enviado ao iCloud (CloudKit), junto com o nome da equipe, o código de entrada e os nomes dos participantes, para que os demais participantes possam recebê-lo. Esses dados ficam na conta iCloud de quem criou a equipe e são compartilhados com os participantes pelos mecanismos de compartilhamento da Apple. Para que uma pessoa encontre a equipe ao digitar o código de entrada, o código e o endereço do convite ficam em um registro do iCloud que pode ser consultado por qualquer instalação do Ōmu; esse registro não contém conversas nem nomes. As conversas do espaço pessoal não são enviadas ao iCloud.</p>
+    <p><strong>Credenciais de serviços conectados.</strong> Os tokens de acesso do Google Calendar e do Granola ficam guardados nas Chaves (Keychain) do macOS e são removidos quando o usuário desconecta o serviço.</p>
+    <p><strong>Lixeira.</strong> Itens enviados à lixeira são excluídos definitivamente depois de 30 dias. Em um espaço de equipe, a exclusão definitiva também remove a cópia mantida no iCloud.</p>
     <p>Os dados permanecem armazenados enquanto forem necessários para que o usuário utilize a biblioteca e as funções do aplicativo, ou até que o próprio usuário os exclua. O usuário deve exportar os arquivos que deseja preservar antes de excluir uma gravação ou desinstalar o aplicativo.</p>
-    <p>O usuário pode solicitar orientação pelo e-mail <a href="mailto:omusuporte@gmail.com">omusuporte@gmail.com</a> caso não consiga localizar ou excluir dados associados a um perfil.</p>
+    <p>O usuário pode solicitar orientação pelo e-mail <a href="mailto:omusuporte@gmail.com">omusuporte@gmail.com</a> caso não consiga localizar ou excluir dados associados a um perfil ou a uma equipe.</p>
     <h2>6. COMPARTILHAMENTO E TRANSFERÊNCIA</h2>
-    <p>O Ōmu não compartilha automaticamente gravações, transcrições, resumos ou anotações com terceiros.</p>
-    <p>O conteúdo somente deixa o dispositivo quando o usuário decide exportá-lo, enviá-lo por outro aplicativo, anexá-lo a uma mensagem ou compartilhá-lo por qualquer outro meio sob seu controle.</p>
-    <p>Se o usuário utilizar o Sign in with Apple, alguns dados necessários à autenticação poderão ser tratados pela Apple de acordo com os termos e a política de privacidade da Apple. O Ōmu não recebe mais dados do que os autorizados pelo usuário e disponibilizados pela Apple para esse recurso.</p>
-    <p>O Ōmu não utiliza, nesta versão, CloudKit, sincronização entre dispositivos ou colaboração em nuvem para os arquivos da biblioteca.</p>
+    <p>O Ōmu não vende dados e não compartilha gravações, transcrições, resumos ou anotações com terceiros para publicidade. O conteúdo deixa o dispositivo apenas nas situações abaixo, todas iniciadas pelo usuário:</p>
+    <ol type="a">
+        <li><strong>Exportação e compartilhamento:</strong> quando o usuário decide exportar um conteúdo, enviá-lo por outro aplicativo ou anexá-lo a uma mensagem.</li>
+        <li><strong>Equipes (Apple iCloud):</strong> o conteúdo textual das conversas de um espaço de equipe é armazenado no iCloud e fica acessível aos participantes daquela equipe. O tratamento pela Apple segue os termos e a política de privacidade da Apple. Quem entra em uma equipe passa a ver as conversas daquele espaço; quem grava em um espaço de equipe deve considerar que os colegas terão acesso à transcrição e ao resumo.</li>
+        <li><strong>Sign in with Apple:</strong> alguns dados necessários à autenticação são tratados pela Apple. O Ōmu não recebe mais dados do que os autorizados pelo usuário e disponibilizados pela Apple para esse recurso.</li>
+        <li><strong>Google Calendar (opcional):</strong> ao conectar a conta, o Ōmu solicita ao Google acesso somente de leitura à agenda e ao endereço de e-mail da conta. Os eventos são lidos diretamente do Google para o Mac do usuário; o Ōmu não altera a agenda e não envia gravações, transcrições ou resumos ao Google.</li>
+        <li><strong>Granola (opcional):</strong> ao conectar a conta, o Ōmu consulta o serviço do Granola para listar reuniões e importar as notas e a transcrição das reuniões escolhidas pelo usuário. O Ōmu não envia ao Granola o conteúdo da biblioteca.</li>
+        <li><strong>Download dos modelos:</strong> os modelos de transcrição e de resumo são baixados do repositório público Hugging Face na primeira utilização. Nesse download nenhum conteúdo do usuário é enviado; como em qualquer conexão, o serviço recebe o endereço IP de quem baixa.</li>
+    </ol>
+    <p>Os nomes lidos de Contatos e do Calendário do macOS são usados apenas no dispositivo, durante a transcrição, e não são enviados a nenhum servidor.</p>
+    <p>Apple, Google e Granola tratam os dados que recebem de acordo com suas próprias políticas de privacidade. O usuário pode desconectar o Google Calendar e o Granola a qualquer momento nos Ajustes do Ōmu.</p>
     <h2>7. COOKIES E TECNOLOGIAS DE RASTREAMENTO</h2>
     <p>O aplicativo macOS não utiliza cookies de navegador para funcionar.</p>
     <p>Não são utilizados, nesta versão, pixels de publicidade, rastreadores de navegação ou tecnologias destinadas a criar um perfil publicitário do usuário.</p>
     <h2>8. SEGURANÇA</h2>
-    <p>O Ōmu utiliza o armazenamento privado do aplicativo e os mecanismos de segurança do macOS para proteger os arquivos locais contra acesso não autorizado. O aplicativo também solicita permissões do sistema para acessar o microfone e capturar áudio do sistema.</p>
+    <p>O Ōmu utiliza o armazenamento privado do aplicativo e os mecanismos de segurança do macOS para proteger os arquivos locais contra acesso não autorizado. O aplicativo também solicita permissões do sistema para acessar o microfone, capturar áudio do sistema e, opcionalmente, ler Contatos e Calendário. As comunicações com o iCloud, o Google e o Granola usam conexões cifradas (HTTPS).</p>
     <p>Nenhum método de armazenamento ou transmissão é completamente invulnerável. O usuário deve manter o macOS atualizado, proteger sua conta de usuário, evitar compartilhar o acesso ao Mac e exportar dados apenas para destinos de confiança.</p>
     <h2>9. DIREITOS DO TITULAR</h2>
     <p>Nos termos da legislação aplicável, especialmente da Lei Geral de Proteção de Dados Pessoais — Lei nº 13.709/2018 —, o titular pode solicitar, conforme o caso:</p>
@@ -96,6 +112,7 @@
         <li>informar os participantes quando a legislação exigir;</li>
         <li>não utilizar o Ōmu para violar direitos de terceiros;</li>
         <li>proteger o acesso ao seu Mac e aos arquivos exportados;</li>
+        <li>compartilhar o código de entrada de uma equipe apenas com quem deve ter acesso às conversas dela;</li>
         <li>revisar transcrições e resumos antes de utilizá-los para decisões profissionais, jurídicas, financeiras, médicas ou similares.</li>
     </ol>
     <p>Transcrições e resumos são recursos de apoio e podem conter omissões ou imprecisões. Eles não substituem a conferência do áudio original nem a análise de um profissional qualificado.</p>
@@ -107,8 +124,5 @@
     <h2>13. CONTATO</h2>
     <p>Para dúvidas, solicitações relacionadas a dados pessoais ou suporte ao aplicativo:</p>
     <p>E-mail: <a href="mailto:omusuporte@gmail.com">omusuporte@gmail.com</a></p>
-    <footer>
-        <p>Este documento é informativo e não substitui revisão jurídica específica para o responsável pelo aplicativo, sua estrutura societária e suas práticas reais de tratamento de dados.</p>
-    </footer>
 </body>
 </html>

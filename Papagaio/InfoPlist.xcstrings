@@ -25,6 +25,24 @@
         }
       }
     },
+    "NSAudioCaptureUsageDescription" : {
+      "comment" : "Texto de privacidade mostrado pelo macOS ao solicitar a captura do áudio do sistema.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ōmu records the meeting audio to transcribe what the other participants say."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Ōmu grava o áudio da reunião para transcrever a fala do seu interlocutor."
+          }
+        }
+      }
+    },
     "NSCalendarsFullAccessUsageDescription" : {
       "comment" : "Texto de privacidade mostrado pelo macOS ao solicitar acesso completo ao Calendário.",
       "extractionState" : "manual",

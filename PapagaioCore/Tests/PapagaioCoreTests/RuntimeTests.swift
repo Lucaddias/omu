@@ -1,6 +1,8 @@
 import CryptoKit
 import Foundation
+import LlamaRuntime
 import Testing
+import WhisperRuntime
 @testable import PapagaioCore
 
 // MARK: - Linkagem dos runtimes
@@ -212,4 +214,69 @@ func downloadNaoRebaixa() async throws {
     )
     let url = try await DownloadDeModelos(pastaDeModelos: pasta).baixar(peso)
     #expect(url == destino)
+}
+
+@Test("Erros dos runtimes chegam à tela com a própria mensagem")
+func errosDosRuntimesTemDescricaoLocalizada() {
+    let erros: [(any Error, String)] = [
+        (ErroWhisper.semFalaDetectada, ErroWhisper.semFalaDetectada.description),
+        (ErroLlama.contextoNaoCriado, ErroLlama.contextoNaoCriado.description),
+        (ErroDownload.interrompido, ErroDownload.interrompido.description),
+    ]
+    for (erro, esperado) in erros {
+        // Sem `LocalizedError` isto era "The operation couldn't be completed…".
+        #expect(erro.localizedDescription == esperado)
+    }
+}
+
+@Test("Com os pesos instalados, pouco disco livre não bloqueia a transcrição")
+func preflightDiscoSoPeloQueFaltaBaixar() throws {
+    guard Preflight.ramInstalada >= Preflight.ramMinima else { return }
+    let pasta = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: pasta, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: pasta) }
+    let gb: Int64 = 1_073_741_824
+    let instalado = PesoDeModelo(
+        nomeArquivo: "instalado.bin", bytes: 1_000, sha256: "",
+        url: URL(string: "https://exemplo.invalido/instalado.bin")!
+    )
+    let ausente = PesoDeModelo(
+        nomeArquivo: "ausente.bin", bytes: 6 * gb, sha256: "",
+        url: URL(string: "https://exemplo.invalido/ausente.bin")!
+    )
+    try Data(repeating: 0, count: 1_000).write(to: pasta.appendingPathComponent("instalado.bin"))
+
+    // 5 GB livres — bem abaixo dos 20 GB do piso de instalação.
+    let apertado = Preflight(pastaDeModelos: pasta, discoLivre: 5 * gb)
+
+    // Tudo instalado: só a folga de trabalho é exigida.
+    let comTudo = apertado.avaliar(pesos: [instalado])
+    #expect(comTudo == .pronto || comTudo == .termicoCritico)
+
+    // Falta um peso de 6 GB: aí sim o espaço não basta, e o número pedido é
+    // o do que falta baixar — não os 20 GB fixos.
+    #expect(
+        apertado.avaliar(pesos: [instalado, ausente])
+            == .discoInsuficiente(livre: 5 * gb, minimo: 6 * gb + Preflight.folgaDeDisco)
+    )
+
+    // Com espaço para o que falta, o resultado é a oferta de download.
+    let folgado = Preflight(pastaDeModelos: pasta, discoLivre: 9 * gb)
+    #expect(folgado.avaliar(pesos: [instalado, ausente]) == .pesosFaltando([ausente]))
+
+    // Sem a folga mínima nem os modelos instalados resolvem.
+    let cheio = Preflight(pastaDeModelos: pasta, discoLivre: gb)
+    #expect(cheio.avaliar(pesos: [instalado]).bloqueia)
+}
+
+@Test("Os pesos são baixados de um commit fixo, não do ramo (M-02)")
+func pesosApontamParaUmCommit() {
+    for peso in Pesos.todos {
+        let partes = peso.url.pathComponents
+        let indice = partes.firstIndex(of: "resolve")
+        let revisao = indice.flatMap { partes.indices.contains($0 + 1) ? partes[$0 + 1] : nil }
+        #expect(revisao?.count == 40, "\(peso.nomeArquivo) aponta para \(revisao ?? "nada")")
+        #expect(revisao?.allSatisfy(\.isHexDigit) == true)
+        #expect(partes.last == peso.nomeArquivo)
+    }
 }

@@ -324,3 +324,41 @@ func esvaziarLixeiraDeMidiaPreservaFalhas() throws {
     #expect(FileManager.default.fileExists(atPath: externo.path))
     #expect(LixeiraDeMidia.itens(em: defaults).map(\.id) == [invalido.id])
 }
+
+@MainActor
+@Test("Anexo na lixeira há mais de 30 dias é apagado; o recente fica (V-06)")
+func anexoVencidoSaiDaLixeira() throws {
+    let (armazenamento, raiz, defaults, suite) = try cenarioDeLixeiraDeMidia()
+    defer {
+        try? FileManager.default.removeItem(at: raiz)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    let conversa = armazenamento.raiz
+        .appendingPathComponent(Armazenamento.pastaGravacoes, isDirectory: true)
+        .appendingPathComponent("Conversa", isDirectory: true)
+    try FileManager.default.createDirectory(at: conversa, withIntermediateDirectories: true)
+    let origem = conversa.appendingPathComponent("anexo.txt")
+    try Data("conteúdo".utf8).write(to: origem)
+    try LixeiraDeMidia.mover(
+        url: origem,
+        nome: "anexo.txt",
+        tamanho: 8,
+        tipo: "Documento",
+        daGravacao: false,
+        arquivoID: ArquivoID(),
+        conversaTitulo: "Conversa",
+        pastaDaConversa: conversa,
+        em: defaults
+    )
+    let item = try #require(LixeiraDeMidia.itens(em: defaults).first)
+
+    let cedo = Date().addingTimeInterval(10 * 24 * 3_600)
+    #expect(ExpurgoDaLixeira.lojasAuxiliares(agora: cedo, em: defaults, armazenamento: armazenamento) == 0)
+    #expect(FileManager.default.fileExists(atPath: item.caminhoNaLixeira))
+
+    let tarde = Date().addingTimeInterval(31 * 24 * 3_600)
+    #expect(ExpurgoDaLixeira.lojasAuxiliares(agora: tarde, em: defaults, armazenamento: armazenamento) == 1)
+    #expect(!FileManager.default.fileExists(atPath: item.caminhoNaLixeira))
+    #expect(LixeiraDeMidia.itens(em: defaults).isEmpty)
+}

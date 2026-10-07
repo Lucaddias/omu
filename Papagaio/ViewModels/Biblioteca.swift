@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Foundation
 import Observation
@@ -48,7 +49,31 @@ final class Biblioteca {
     /// pedidos em ordem de chegada e permite que somente um deles carregue os
     /// modelos por vez.
     private var filaDeProcessamento: [ArquivoID] = []
+    /// Os mesmos pedidos em disco, por espaço: sobrevivem a fechar o app e a
+    /// trocar de perfil ou equipe.
+    private let filaPersistida: FilaDeProcessamentoPersistida
+    /// O que cada item da fila pediu. Ausente = processamento completo.
+    private var modosDaFila: [ArquivoID: ModoDeProcessamento] = [:]
     private var arquivoEmProcessamento: ArquivoID?
+
+    /// Quanto do pipeline um pedido executa.
+    enum ModoDeProcessamento: Equatable {
+        /// Transcreve, diariza e resume — refaz a transcrição.
+        case completo
+        /// Só o resumo, sobre a transcrição que já existe (inclusive a
+        /// corrigida à mão). Não carrega o Whisper.
+        case somenteResumo
+    }
+
+    /// Contador que sobe a cada mudança gravada numa conversa. A tela de
+    /// detalhe trabalha sobre a versão completa, carregada do banco; é por
+    /// este número que ela sabe que precisa recarregar — sem ele, a tela
+    /// seguia com a cópia da abertura e cada correção apagava a anterior.
+    private(set) var revisoes: [ArquivoID: Int] = [:]
+
+    func revisao(de id: UUID) -> Int {
+        revisoes[ArquivoID(rawValue: id)] ?? 0
+    }
     private var identificadorDaExecucao: UUID?
     private var tarefaDeProcessamento: Task<Void, Never>?
 
@@ -71,6 +96,11 @@ final class Biblioteca {
     /// automático, mantendo um único par de modelos carregado por vez.
     var processamentoAutomatico = true
     var aoNotificar: (@MainActor (_ titulo: String, _ mensagem: String, _ tipo: NotificacaoDoApp.Tipo) -> Void)?
+    private var avisouMacQuente = false
+    private var ultimoExpurgoDaLixeira: [EspacoID: Date] = [:]
+    private var lixeiraDaEquipeConferida = false
+    /// Ditado e separação de vozes carregam modelos fora da fila.
+    private var operacoesAvulsasComModelos = 0
     var aoConcluirProcessamento: (@MainActor (_ arquivo: Arquivo) -> Void)?
 
     /// Arquivos que acabaram de ser transcritos e resumidos e ainda esperam a
@@ -133,6 +163,15 @@ final class Biblioteca {
     private var sincronizadorCloudKitArmazenado: SincronizadorDaBibliotecaCloudKit?
     private let filaCloudKit: FilaPersistenteCloudKit
     private var tarefaDeRetryCloudKit: Task<Void, Never>?
+    /// O envio da fila do iCloud em curso — um por biblioteca. Quem salva
+    /// localmente só agenda (gravação durável) e segue; a rede fica aqui.
+    private var tarefaDeEnvioCloudKit: Task<Void, Never>?
+    /// Revisão remota já aplicada de cada conversa, nesta execução do app.
+    /// Cada troca de espaço baixa a zona inteira; sem isto, toda conversa
+    /// era regravada por inteiro no banco, tivesse mudado ou não.
+    private var revisoesRemotasAplicadas: [ArquivoID: Date] = [:]
+    private var avisouQuarentenaDaFila = false
+    private var haEnvioCloudKitAguardando = false
     private var sincronizadorCloudKit: SincronizadorDaBibliotecaCloudKit {
         if let sincronizadorCloudKitArmazenado {
             return sincronizadorCloudKitArmazenado
@@ -186,6 +225,7 @@ final class Biblioteca {
                     .appendingPathComponent("CloudKit", isDirectory: true)
                     .appendingPathComponent("fila-pendente.json")
             )
+            self.filaPersistida = Self.filaPersistida(em: armazenamento)
             self.espaco = PerfProbe.espacoPadrao
             return
         }
@@ -205,6 +245,7 @@ final class Biblioteca {
                 .appendingPathComponent("CloudKit", isDirectory: true)
                 .appendingPathComponent("fila-pendente.json")
         )
+        self.filaPersistida = Self.filaPersistida(em: armazenamento)
         self.espaco = Self.espacoPessoal()
     }
 
@@ -231,7 +272,16 @@ final class Biblioteca {
                 .appendingPathComponent("CloudKit", isDirectory: true)
                 .appendingPathComponent("fila-pendente.json")
         )
+        self.filaPersistida = Self.filaPersistida(em: armazenamento)
         self.espaco = espaco
+    }
+
+    private static func filaPersistida(em armazenamento: Armazenamento) -> FilaDeProcessamentoPersistida {
+        FilaDeProcessamentoPersistida(
+            url: armazenamento.raiz
+                .appendingPathComponent("Processamento", isDirectory: true)
+                .appendingPathComponent("fila-pendente.json")
+        )
     }
 
     /// O espaço individual é um só e precisa sobreviver a relançamentos: sem
@@ -264,6 +314,7 @@ final class Biblioteca {
         }
         if mudouDeEspaco {
             filaDeProcessamento.removeAll()
+            modosDaFila.removeAll()
             espaco = novoEspaco
             arquivos.removeAll()
             arquivosNaLixeira.removeAll()
@@ -286,6 +337,38 @@ final class Biblioteca {
         await carregar()
     }
 
+    /// Apaga de vez as conversas que estão na lixeira há mais tempo que o
+    /// prazo anunciado em cada cartão. Devolve quantas saíram.
+    ///
+    /// Passa pelo mesmo caminho do botão "Apagar definitivamente" — registro,
+    /// pasta de áudio, lojas auxiliares e, numa equipe, a remoção no iCloud —
+    /// e roda no máximo uma vez por dia por espaço. Uma falha fica para a
+    /// próxima rodada, sem aviso: ninguém pediu esta exclusão agora.
+    @discardableResult
+    func expurgarLixeiraVencida(agora: Date = Date()) async -> Int {
+        let espacoDoExpurgo = espaco
+        if let ultimo = ultimoExpurgoDaLixeira[espacoDoExpurgo],
+           agora.timeIntervalSince(ultimo) < 24 * 3_600, agora >= ultimo {
+            return 0
+        }
+        ultimoExpurgoDaLixeira[espacoDoExpurgo] = agora
+
+        let vencidos = arquivosNaLixeira.filter { arquivo in
+            arquivo.apagadoEm.map { PrazoDaLixeira.venceu($0, agora: agora) } ?? false
+        }
+        guard !vencidos.isEmpty else { return 0 }
+
+        let erroAnterior = erroDaLixeira
+        var apagados = 0
+        for arquivo in vencidos {
+            guard espaco == espacoDoExpurgo else { break }
+            await apagarDefinitivamente(arquivo)
+            if !arquivosNaLixeira.contains(where: { $0.id == arquivo.id }) { apagados += 1 }
+        }
+        erroDaLixeira = erroAnterior
+        return apagados
+    }
+
     func carregar() async {
         let contexto = contextoDoEspaco
         let espacoDaCarga = espaco
@@ -299,6 +382,15 @@ final class Biblioteca {
             arquivos = ativos
             arquivosNaLixeira = excluidos
             erroDeCarregamento = nil
+            // Numa equipe, o estado da lixeira só vale depois de baixar o que
+            // os colegas fizeram: uma conversa restaurada por alguém ainda
+            // apareceria aqui como "vencida" e seria removida para todos.
+            if equipeCloudKit == nil || lixeiraDaEquipeConferida {
+                await expurgarLixeiraVencida()
+            }
+            guard contexto == contextoDoEspaco, carga == cargaAtual,
+                  !Task.isCancelled else { return }
+            retomarProcessamentosPendentes()
         } catch {
             guard contexto == contextoDoEspaco, carga == cargaAtual,
                   !Task.isCancelled else { return }
@@ -319,7 +411,8 @@ final class Biblioteca {
         pastaRelativa: String,
         duracao: TimeInterval,
         notas: [NotaDaConversa] = [],
-        dataDeGravacao: Date? = nil
+        dataDeGravacao: Date? = nil,
+        usavaFones: Bool? = nil
     ) async -> Arquivo? {
         let espacoDestino = espaco
         guard !espacosExcluidos.contains(espacoDestino) else {
@@ -335,7 +428,10 @@ final class Biblioteca {
             pastaRelativa: pastaRelativa,
             espaco: espacoDestino,
             notas: notas,
-            importadoEm: dataDeGravacao != nil ? Date() : nil
+            importadoEm: dataDeGravacao != nil ? Date() : nil,
+            // Sem isto o pipeline nunca sabia que a gravação foi feita pelo
+            // alto-falante, e o cancelamento de eco não rodava no app.
+            usavaFones: usavaFones
         )
         do {
             try await repositorio.salvar(arquivo)
@@ -360,6 +456,107 @@ final class Biblioteca {
             enfileirarProcessamento(arquivo)
         }
         return arquivo
+    }
+
+    // MARK: - Gravações órfãs
+
+    /// Reencontra gravações que ficaram no disco sem registro no banco.
+    ///
+    /// A conversa só nasce quando a gravação é finalizada. Se o app é
+    /// encerrado à força, trava ou a máquina desliga no meio de uma reunião,
+    /// a pasta em `Gravacoes/` sobra com o áudio dentro e nada a mostra. Aqui
+    /// cada pasta sem registro vira uma conversa "recuperada" (com o
+    /// cabeçalho do WAV consertado), e as que não têm áudio aproveitável —
+    /// clique acidental interrompido — são removidas.
+    ///
+    /// - Parameter pastasEmUso: pastas de uma gravação em curso ou de uma
+    ///   entrega ainda a caminho do banco; não são órfãs, só novas.
+    @discardableResult
+    func recuperarGravacoesOrfas(ignorando pastasEmUso: Set<String> = []) async -> [Arquivo] {
+        let destino = Self.espacoPessoal()
+        guard !espacosExcluidos.contains(destino) else { return [] }
+
+        let fm = FileManager.default
+        let raizDasGravacoes = armazenamento.raiz
+            .appendingPathComponent(Armazenamento.pastaGravacoes, isDirectory: true)
+        guard let pastas = try? fm.contentsOfDirectory(
+            at: raizDasGravacoes,
+            includingPropertiesForKeys: [.isDirectoryKey, .creationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        // Sem a lista do banco não dá para afirmar que algo é órfão.
+        guard let conhecidas = try? await repositorio.pastasRelativasConhecidas() else { return [] }
+        // O sistema de arquivos não distingue caixa nem forma de acento; um
+        // falso "órfão" criaria um segundo registro apontando para a pasta de
+        // uma conversa que existe.
+        func chave(_ relativa: String) -> String {
+            relativa.precomposedStringWithCanonicalMapping.lowercased()
+        }
+        let ocupadas = Set(conhecidas.map(chave)).union(pastasEmUso.map(chave))
+
+        var recuperadas: [Arquivo] = []
+        for pasta in pastas {
+            let valores = try? pasta.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey])
+            guard valores?.isDirectory == true else { continue }
+            let relativa = "\(Armazenamento.pastaGravacoes)/\(pasta.lastPathComponent)"
+            guard !ocupadas.contains(chave(relativa)) else { continue }
+
+            let conteudo = (try? fm.contentsOfDirectory(atPath: pasta.path)) ?? []
+            let microfone = pasta.appendingPathComponent(Armazenamento.Nome.microfone)
+            let importado = conteudo
+                .first { $0.hasPrefix("\(Armazenamento.Nome.prefixoImportado).") }
+                .map { pasta.appendingPathComponent($0) }
+
+            var duracao: TimeInterval = 0
+            if fm.fileExists(atPath: microfone.path) {
+                _ = try? ReparoDeWAV.reparar(microfone)
+                duracao = SessaoGravacao.duracaoDoMicrofone(em: microfone) ?? 0
+            } else if let importado {
+                duracao = await Self.duracaoDoAudio(importado)
+            }
+
+            guard duracao.isFinite, duracao >= SessaoGravacao.duracaoMinima else {
+                // Só apaga o que a própria captura criou e descartaria: pasta
+                // vazia ou com os arquivos canônicos de uma gravação que não
+                // chegou a um segundo. Qualquer outra coisa fica onde está.
+                let arquivosDaCaptura: Set<String> = [Armazenamento.Nome.microfone, Armazenamento.Nome.sistema]
+                if Set(conteudo).isSubset(of: arquivosDaCaptura) {
+                    try? armazenamento.removerGravacao(relativa: relativa)
+                }
+                continue
+            }
+
+            let criadaEm = valores?.creationDate ?? Date()
+            let arquivo = Arquivo(
+                titulo: "Gravação recuperada — %@".localized(
+                    criadaEm.formatted(date: .abbreviated, time: .shortened)
+                ),
+                criadoEm: criadaEm,
+                duracao: duracao,
+                pastaRelativa: relativa,
+                espaco: destino
+            )
+            do {
+                try await repositorio.salvar(arquivo)
+            } catch {
+                continue
+            }
+            recuperadas.append(arquivo)
+            guard espaco == destino else { continue }
+            arquivos.insert(arquivo, at: 0)
+            if processamentoAutomatico {
+                enfileirarProcessamento(arquivo)
+            }
+        }
+
+        if !recuperadas.isEmpty {
+            let mensagem = recuperadas.count == 1
+                ? "Uma gravação que não tinha sido finalizada voltou para a biblioteca.".localized
+                : "%lld gravações que não tinham sido finalizadas voltaram para a biblioteca.".localized(recuperadas.count)
+            aoNotificar?("Gravação recuperada".localized, mensagem, .aviso)
+        }
+        return recuperadas
     }
 
     /// Importa uma reunião de fonte externa (Granola, Google Calendar etc.):
@@ -422,6 +619,9 @@ final class Biblioteca {
         guard espaco == espacoDestino else { return arquivo }
         arquivos.insert(arquivo, at: 0)
         arquivos.sort { $0.criadoEm > $1.criadoEm }
+        // Sem isto, no próximo download a versão remota (que não tem a
+        // reunião) vencia e a importação sumia do espaço da equipe.
+        await sincronizar(arquivo)
         return arquivo
     }
 
@@ -440,6 +640,7 @@ final class Biblioteca {
         // falhar, a conversa continua ativa e deve voltar ao processamento
         // que a própria pessoa já tinha pedido.
         let indiceNaFila = filaDeProcessamento.firstIndex(of: arquivo.id)
+        let modoNaFila = modosDaFila[arquivo.id]
         let estavaEmProcessamento = arquivoEmProcessamento == arquivo.id
         await cancelarProcessamentoDoArquivo(arquivo.id)
 
@@ -475,6 +676,10 @@ final class Biblioteca {
                 filaDeProcessamento.insert(
                     arquivo.id,
                     at: min(indiceNaFila ?? filaDeProcessamento.count, filaDeProcessamento.count)
+                )
+                modosDaFila[arquivo.id] = modoNaFila
+                filaPersistida.registrar(
+                    arquivo.id, espaco: arquivo.espaco, somenteResumo: modoNaFila == .somenteResumo
                 )
                 iniciarProximoProcessamentoSeNecessario()
             }
@@ -528,11 +733,12 @@ final class Biblioteca {
         defer { operacoesDeLixeiraEmAndamento.remove(arquivo.id) }
 
         do {
-            try await repositorio.apagar(arquivo.id)
+            try await repositorio.apagar(arquivo.id, em: armazenamento)
+            removerPastaDeAnexos(de: arquivo)
             if let equipeCloudKit {
                 do {
                     try await filaCloudKit.agendarRemocao(arquivo.id, da: equipeCloudKit)
-                    await retomarSincronizacaoCloudKit()
+                    dispararEnvioCloudKit()
                 } catch {
                     let mensagem = "A conversa saiu deste Mac, mas a remoção não entrou na fila do iCloud: %@".localized(error.localizedDescription)
                     estadoDaSincronizacaoCloudKit = .falhou(mensagem)
@@ -541,6 +747,8 @@ final class Biblioteca {
             }
             arquivosNaLixeira.removeAll { $0.id == arquivo.id }
             filaDeProcessamento.removeAll { $0 == arquivo.id }
+            modosDaFila[arquivo.id] = nil
+            revisoes[arquivo.id] = nil
             fases[arquivo.id.rawValue] = nil
             erros[arquivo.id.rawValue] = nil
             // O registro e a pasta já saíram; agora nenhum store auxiliar
@@ -594,6 +802,7 @@ final class Biblioteca {
         arquivoEmProcessamento = nil
         identificadorDaExecucao = nil
         filaDeProcessamento.removeAll()
+        modosDaFila.removeAll()
 
         if let tarefa { await tarefa.value }
 
@@ -607,10 +816,28 @@ final class Biblioteca {
         let pastasDaConta = Set(
             arquivosDaConta.map(\.pastaRelativa).filter { !$0.isEmpty }
         )
-        for pastaRelativa in pastasDaConta {
-            try armazenamento.removerGravacao(relativa: pastaRelativa)
-        }
+        // Os registros saem primeiro e as pastas depois, uma a uma e sem
+        // interromper: antes, a primeira pasta que falhasse (ou um caminho
+        // fora do padrão) parava tudo com parte da mídia já apagada e os
+        // registros ainda no banco — e a exclusão da conta nunca concluía.
         try await repositorio.apagarTodosOsDados(espaco: espacoExcluido)
+        filaPersistida.removerTodas(do: espacoExcluido)
+        arquivosDaConta.forEach(removerPastaDeAnexos)
+        var pastasQueSobraram = 0
+        for pastaRelativa in pastasDaConta {
+            do {
+                try armazenamento.removerGravacao(relativa: pastaRelativa)
+            } catch {
+                pastasQueSobraram += 1
+            }
+        }
+        if pastasQueSobraram > 0 {
+            aoNotificar?(
+                "Parte do áudio não pôde ser apagada".localized,
+                "%lld pasta(s) de gravação continuam no disco. Elas ficam na pasta de gravações do Ōmu e podem ser removidas pelo Finder.".localized(pastasQueSobraram),
+                .aviso
+            )
+        }
 
         if espaco == espacoExcluido {
             arquivos.removeAll()
@@ -652,6 +879,7 @@ final class Biblioteca {
         do {
             var editado = try await exigirArquivoCompleto(arquivo.id)
             editado.titulo = tituloLimpo
+            editado.tituloManual = true
             if let resumo = editado.resumo {
                 editado.resumo = Resumo(
                     titulo: tituloLimpo,
@@ -662,8 +890,7 @@ final class Biblioteca {
                 )
             }
             try await repositorio.salvar(editado)
-            substituir(editado)
-            await sincronizar(editado)
+            await publicar(editado)
         } catch {
             erros[arquivo.id.rawValue] = "Não foi possível renomear: %@".localized(error.localizedDescription)
         }
@@ -682,9 +909,15 @@ final class Biblioteca {
 
         do {
             var editado = try await exigirArquivoCompleto(arquivo.id)
+            // Só vira "título da pessoa" quando ela de fato o trocou: salvar
+            // a ficha sem mexer no título não congela o provisório.
+            let tituloExibido = editado.resumo?.titulo ?? editado.titulo
+            if tituloLimpo != tituloExibido {
+                editado.tituloManual = true
+            }
             editado.titulo = tituloLimpo
             editado.criadoEm = criadoEm
-            editado.duracao = max(0, duracao)
+            editado.duracao = duracao.isFinite ? max(0, duracao) : 0
             if let resumo = editado.resumo {
                 editado.resumo = Resumo(
                     titulo: tituloLimpo,
@@ -695,8 +928,7 @@ final class Biblioteca {
                 )
             }
             try await repositorio.salvar(editado)
-            substituir(editado)
-            await sincronizar(editado)
+            await publicar(editado)
         } catch {
             erros[arquivo.id.rawValue] = "Não foi possível salvar as informações: %@".localized(error.localizedDescription)
         }
@@ -707,10 +939,13 @@ final class Biblioteca {
 
         do {
             var editado = try await exigirArquivoCompleto(arquivo.id)
+            // Fechar a conversa chama isto mesmo sem edição. Regravar (e, em
+            // equipe, reenviar) algo idêntico marcava a conversa como "edição
+            // local pendente" de quem só leu.
+            guard editado.notas != notas else { return }
             editado.notas = notas
             try await repositorio.salvar(editado)
-            substituir(editado)
-            await sincronizar(editado)
+            await publicar(editado)
         } catch {
             erros[arquivo.id.rawValue] = "Não foi possível salvar as notas: %@".localized(error.localizedDescription)
         }
@@ -728,8 +963,7 @@ final class Biblioteca {
             var editado = try await exigirArquivoCompleto(arquivo.id)
             editado.trechos = trechos
             try await repositorio.salvar(editado)
-            substituir(editado)
-            await sincronizar(editado)
+            await publicar(editado)
         } catch {
             erros[arquivo.id.rawValue] = "Não foi possível salvar a transcrição: %@".localized(error.localizedDescription)
         }
@@ -748,16 +982,26 @@ final class Biblioteca {
         }
 
         let novoID = ArquivoID()
-        let pastaNovaRelativa = Armazenamento.caminhoRelativo(id: novoID.rawValue)
-        let origem = armazenamento.resolver(relativo: origemCompleta.pastaRelativa)
-        let destino = armazenamento.resolver(relativo: pastaNovaRelativa)
+        // Conversa sem áudio (Granola, recebida de um colega): `pastaRelativa`
+        // vazia resolveria para a RAIZ do armazenamento, e copiá-la para
+        // dentro de `Gravacoes/<novo>` duplicava a biblioteca inteira e os
+        // modelos, recursivamente. Aqui a cópia é só do registro.
+        let semAudio = origemCompleta.semAudio
+        let pastaNovaRelativa = semAudio
+            ? ""
+            : Armazenamento.caminhoRelativo(id: novoID.rawValue)
 
         do {
-            let origemExiste = FileManager.default.fileExists(atPath: origem.path)
-            if origemExiste {
-                try FileManager.default.copyItem(at: origem, to: destino)
-            } else {
-                try FileManager.default.createDirectory(at: destino, withIntermediateDirectories: true)
+            var origemCopiada: (origem: URL, destino: URL)?
+            if !semAudio {
+                let origem = try armazenamento.resolverSeguro(relativo: origemCompleta.pastaRelativa)
+                let destino = try armazenamento.resolverSeguro(relativo: pastaNovaRelativa)
+                if FileManager.default.fileExists(atPath: origem.path) {
+                    try FileManager.default.copyItem(at: origem, to: destino)
+                    origemCopiada = (origem, destino)
+                } else {
+                    try FileManager.default.createDirectory(at: destino, withIntermediateDirectories: true)
+                }
             }
 
             var copia = Arquivo(
@@ -787,11 +1031,11 @@ final class Biblioteca {
                 )
             }
 
-            if origemExiste {
+            if let origemCopiada {
                 let anexosCopiados = try MidiasDaConversa.anexosCopiados(
                     de: origemCompleta.id,
-                    da: origem,
-                    para: destino
+                    da: origemCopiada.origem,
+                    para: origemCopiada.destino
                 )
                 if !anexosCopiados.isEmpty {
                     try MidiasDaConversa.salvar(anexosCopiados, para: novoID)
@@ -809,7 +1053,9 @@ final class Biblioteca {
             MidiasDaConversa.remover(novoID)
             TarefasGeraisStore.remover(novoID)
             do {
-                try armazenamento.removerGravacao(relativa: pastaNovaRelativa)
+                if !pastaNovaRelativa.isEmpty {
+                    try armazenamento.removerGravacao(relativa: pastaNovaRelativa)
+                }
                 erros[origemCompleta.id.rawValue] = "Não foi possível duplicar: %@".localized(error.localizedDescription)
             } catch {
                 erros[origemCompleta.id.rawValue] = "Não foi possível duplicar: %@. A cópia incompleta permaneceu no armazenamento para não apagar dados de forma insegura.".localized(error.localizedDescription)
@@ -824,14 +1070,85 @@ final class Biblioteca {
         arquivoEmProcessamento != nil || !filaDeProcessamento.isEmpty
     }
 
-    func enfileirarProcessamento(_ arquivo: Arquivo) {
+    func enfileirarProcessamento(_ arquivo: Arquivo, modo: ModoDeProcessamento = .completo) {
         guard arquivoEmProcessamento != arquivo.id,
               !operacoesDeLixeiraEmAndamento.contains(arquivo.id),
               !filaDeProcessamento.contains(arquivo.id) else { return }
 
         erros[arquivo.id.rawValue] = nil
         filaDeProcessamento.append(arquivo.id)
+        modosDaFila[arquivo.id] = modo
+        filaPersistida.registrar(arquivo.id, espaco: arquivo.espaco, somenteResumo: modo == .somenteResumo)
         iniciarProximoProcessamentoSeNecessario()
+    }
+
+    /// Reenfileira o que ficou pendente neste espaço: pedidos interrompidos
+    /// ao fechar o app ou trocar de espaço, e os recusados por falta de
+    /// modelos. Chamado a cada carga da lista e quando o download dos modelos
+    /// termina; pedidos já na fila são ignorados por `enfileirarProcessamento`.
+    func retomarProcessamentosPendentes() {
+        guard processamentoAutomatico else { return }
+        let pendencias = filaPersistida.pendentes(do: espaco)
+        guard !pendencias.isEmpty else { return }
+        // Sem modelos (ou sem memória/disco) cada pedido seria recusado de
+        // novo: melhor esperar em disco do que piscar o erro em cada cartão.
+        let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar()
+        guard preflight == .pronto || preflight == .termicoCritico else { return }
+        for pendencia in pendencias {
+            let id = ArquivoID(rawValue: pendencia.id)
+            guard arquivoEmProcessamento != id, !filaDeProcessamento.contains(id) else { continue }
+            guard let arquivo = arquivos.first(where: { $0.id == id }) else {
+                // Foi para a lixeira ou deixou de existir: não há o que retomar.
+                filaPersistida.remover(id)
+                continue
+            }
+            guard pendencia.tentativas < FilaDeProcessamentoPersistida.tentativasMaximas else {
+                filaPersistida.remover(id)
+                erros[pendencia.id] = "O processamento desta conversa foi interrompido mais de uma vez. Tente de novo pelo menu da conversa.".localized
+                continue
+            }
+            enfileirarProcessamento(arquivo, modo: pendencia.somenteResumo ? .somenteResumo : .completo)
+        }
+    }
+
+    /// Refaz só o resumo, sobre a transcrição atual — é o que "Gerar novo
+    /// resumo" promete. O processamento completo refaria a transcrição e
+    /// descartaria trechos corrigidos à mão e falantes preservados.
+    func enfileirarNovoResumo(_ arquivo: Arquivo) {
+        enfileirarProcessamento(arquivo, modo: .somenteResumo)
+    }
+
+    /// Conversas sem áudio (Granola, recebidas da equipe) não têm o que
+    /// transcrever: "Transcrever"/"Reprocessar" só fazem sentido com mídia.
+    func podeTranscrever(_ arquivo: Arquivo) -> Bool {
+        !arquivo.semAudio
+    }
+
+    /// Pergunta antes de refazer uma transcrição que já existe. Injetável:
+    /// os testes respondem sem abrir um alerta.
+    var confirmarReprocessamento: @MainActor (Arquivo) -> Bool = Biblioteca.alertaDeReprocessamento
+
+    /// "Reprocessar" do menu da conversa: refaz transcrição, falantes e
+    /// resumo. Como isso descarta trechos corrigidos à mão e a atribuição de
+    /// vozes, pede confirmação quando já existe o que perder.
+    func reprocessar(_ arquivo: Arquivo) {
+        guard podeTranscrever(arquivo) else {
+            erros[arquivo.id.rawValue] = "Esta conversa não tem áudio para transcrever.".localized
+            return
+        }
+        let temOQuePerder = !arquivo.trechos.isEmpty || arquivo.resumo != nil
+        if temOQuePerder, !confirmarReprocessamento(arquivo) { return }
+        enfileirarProcessamento(arquivo)
+    }
+
+    private static func alertaDeReprocessamento(_ arquivo: Arquivo) -> Bool {
+        let alerta = NSAlert()
+        alerta.alertStyle = .warning
+        alerta.messageText = "Reprocessar esta conversa?".localized
+        alerta.informativeText = "A transcrição e o resumo serão refeitos a partir do áudio. Correções feitas à mão no texto e na identificação das vozes serão perdidas. Para atualizar só o resumo, use \"Gerar novo resumo\" dentro da conversa.".localized
+        alerta.addButton(withTitle: "Reprocessar".localized)
+        alerta.addButton(withTitle: "Cancelar".localized)
+        return alerta.runModal() == .alertFirstButtonReturn
     }
 
     /// Cancela e **espera o trabalho realmente parar**.
@@ -848,6 +1165,8 @@ final class Biblioteca {
     /// esteja livre antes de começar qualquer coisa nova.
     private func cancelarProcessamentoDoArquivo(_ arquivoID: ArquivoID) async {
         filaDeProcessamento.removeAll { $0 == arquivoID }
+        modosDaFila[arquivoID] = nil
+        filaPersistida.remover(arquivoID)
         guard arquivoEmProcessamento == arquivoID else { return }
 
         let emCurso = tarefaDeProcessamento
@@ -872,22 +1191,45 @@ final class Biblioteca {
     }
 
     private func iniciarProximoProcessamentoSeNecessario() {
-        guard arquivoEmProcessamento == nil else { return }
+        // Um ditado ou uma separação de vozes em curso também tem modelos
+        // carregados: a fila espera e é retomada quando eles terminam.
+        guard arquivoEmProcessamento == nil, operacoesAvulsasComModelos == 0 else { return }
 
         while let proximoID = filaDeProcessamento.first {
             filaDeProcessamento.removeFirst()
+            let modo = modosDaFila.removeValue(forKey: proximoID) ?? .completo
             guard let arquivo = arquivos.first(where: { $0.id == proximoID }) else {
+                filaPersistida.remover(proximoID)
                 continue
             }
 
             let execucao = UUID()
+            filaPersistida.marcarInicio(proximoID)
             arquivoEmProcessamento = proximoID
             identificadorDaExecucao = execucao
             tarefaDeProcessamento = Task { [weak self] in
-                await self?.executarProcessamento(arquivo, execucao: execucao)
+                await self?.executarProcessamento(arquivo, modo: modo, execucao: execucao)
             }
             return
         }
+    }
+
+    /// O estado térmico crítico não bloqueia — quem pediu a transcrição pode
+    /// precisar dela agora —, mas a pessoa tem de saber por que vai demorar e
+    /// que dá para cancelar na fila e tentar depois. Um aviso por episódio de
+    /// calor: a fila reavalia a cada item e não deve repetir a mesma mensagem.
+    private func avisarSeOMacEstiverQuente(_ preflight: ResultadoPreflight) {
+        guard preflight == .termicoCritico else {
+            avisouMacQuente = false
+            return
+        }
+        guard !avisouMacQuente else { return }
+        avisouMacQuente = true
+        aoNotificar?(
+            "Seu Mac está muito quente".localized,
+            "A transcrição vai ficar mais lenta e esquentar mais o Mac. Se preferir, cancele na fila e tente de novo depois.".localized,
+            .aviso
+        )
     }
 
     /// Transcreve um trecho ditado e devolve o texto corrido.
@@ -895,11 +1237,23 @@ final class Biblioteca {
     /// Mesmo Whisper das conversas, e descarrega no fim: uma nota ditada não
     /// justifica deixar modelos pesados residentes.
     func transcreverDitado(_ audio: URL) async throws -> String {
+        // Com uma conversa em processamento, carregar um segundo Whisper
+        // (3 GB) ao lado do Qwen (6 GB) quebra a regra "nunca os dois
+        // residentes" num Mac de 18 GB — e o ditado ainda ficaria minutos
+        // esperando a fila do VAD. Quem chama usa o texto reconhecido ao vivo.
+        guard arquivoEmProcessamento == nil, operacoesAvulsasComModelos == 0 else {
+            throw ErroDeDitado.modelosOcupados
+        }
         let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar()
         if preflight != .pronto, preflight != .termicoCritico {
             throw ErroDeDitado.modelosIndisponiveis(preflight.mensagem)
         }
 
+        operacoesAvulsasComModelos += 1
+        defer {
+            operacoesAvulsasComModelos -= 1
+            iniciarProximoProcessamentoSeNecessario()
+        }
         let motores = criarMotoresLocais()
         return try await OperacaoComLimpeza.executar {
             try await motores.transcrever(audio, speaker: nil, initialPrompt: nil)
@@ -913,15 +1267,22 @@ final class Biblioteca {
 
     enum ErroDeDitado: LocalizedError {
         case modelosIndisponiveis(String)
+        case modelosOcupados
 
         var errorDescription: String? {
             switch self {
             case let .modelosIndisponiveis(motivo): motivo
+            case .modelosOcupados:
+                "O refinamento do ditado fica disponível quando o processamento em andamento terminar.".localized
             }
         }
     }
 
-    private func executarProcessamento(_ arquivo: Arquivo, execucao: UUID) async {
+    private func executarProcessamento(
+        _ arquivo: Arquivo,
+        modo: ModoDeProcessamento,
+        execucao: UUID
+    ) async {
         let chave = arquivo.id.rawValue
         defer { finalizarProcessamento(chave, execucao: execucao) }
 
@@ -930,22 +1291,40 @@ final class Biblioteca {
             arquivoCompleto = try await exigirArquivoCompleto(arquivo.id)
         } catch {
             erros[chave] = "Não foi possível abrir a conversa para processamento: %@".localized(error.localizedDescription)
+            filaPersistida.remover(arquivo.id)
             return
         }
 #if OMU_PERF
         PerfProbe.shared.registrarPipelineInicio(arquivoCompleto)
 #endif
 
+        // Antes de qualquer checagem de modelo: pedir o impossível deve
+        // dizer por quê, e não "faltam os pesos".
+        if modo == .somenteResumo, arquivoCompleto.trechos.isEmpty {
+            erros[chave] = "Não há transcrição para resumir.".localized
+            filaPersistida.remover(arquivo.id)
+            return
+        }
+        if modo == .completo, arquivoCompleto.semAudio {
+            erros[chave] = "Esta conversa não tem áudio para transcrever.".localized
+            filaPersistida.remover(arquivo.id)
+            return
+        }
+
         // Sem os pesos, o Whisper falharia lá dentro com um erro de carga. Dizer
         // o que falta é mais útil que repassar o erro do llama.cpp.
         let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar()
         if preflight != .pronto, preflight != .termicoCritico {
             erros[chave] = preflight.mensagem
+            // O pedido continua valendo: é retomado quando os modelos
+            // chegarem (ou na próxima abertura), sem contar como tentativa.
+            filaPersistida.adiar(arquivo.id)
             return
         }
+        avisarSeOMacEstiverQuente(preflight)
 
         erros[chave] = nil
-        fases[chave] = .transcrevendo
+        fases[chave] = modo == .somenteResumo ? .resumindo : .transcrevendo
         iniciadoEm[chave] = Date()
 
         // O usuário iniciou explicitamente a transcrição. Mantém o trabalho
@@ -1010,21 +1389,47 @@ final class Biblioteca {
 
         await OperacaoComLimpeza.executar {
             do {
-                let final = try await pipeline.processar(arquivoCompleto) { fase in
+                let aoProgredir: @Sendable (PipelineDeArquivo.Fase) -> Void = { fase in
                     let instante = DispatchTime.now().uptimeNanoseconds
                     Task { @MainActor [weak self] in
                         guard self?.identificadorDaExecucao == execucao else { return }
 #if OMU_PERF
                         PerfProbe.shared.registrarFase(String(describing: fase), timestamp: instante)
 #endif
+                        _ = instante
                         self?.fases[chave] = fase
                     }
                 }
-                guard identificadorDaExecucao == execucao,
-                      arquivos.contains(where: { $0.id == arquivoCompleto.id })
-                else { return }
-                substituir(final)
-                await sincronizar(final)
+                switch modo {
+                case .completo:
+                    try await pipeline.processar(arquivoCompleto, aoProgredir: aoProgredir)
+                case .somenteResumo:
+                    try await pipeline.resumirExistente(arquivoCompleto, aoProgredir: aoProgredir)
+                }
+                // O trabalho está salvo no banco, qualquer que seja o espaço
+                // aberto agora.
+                filaPersistida.remover(arquivoCompleto.id)
+                guard identificadorDaExecucao == execucao else { return }
+                // O pipeline gravou só transcrição e resumo; título, data e
+                // notas podem ter mudado enquanto ele trabalhava. A versão
+                // que vai para a tela e para a equipe é a do banco.
+                let final = try await exigirArquivoCompleto(arquivoCompleto.id)
+                guard identificadorDaExecucao == execucao else { return }
+                guard final.espaco == espaco,
+                      arquivos.contains(where: { $0.id == final.id })
+                else {
+                    // A pessoa trocou de espaço no meio: a conversa não está
+                    // na tela, mas o aviso de que ficou pronta ainda vale.
+                    if final.espaco != espaco, final.apagadoEm == nil {
+                        aoNotificar?(
+                            "Transcrição concluída".localized,
+                            "%@ já está com transcrição e resumo prontos.".localized(final.resumo?.titulo ?? final.titulo),
+                            .sucesso
+                        )
+                    }
+                    return
+                }
+                await publicar(final)
                 aoConcluirProcessamento?(final)
                 if final.trechos.isEmpty {
                     erros[chave] = "Nenhuma fala reconhecida neste áudio.".localized
@@ -1040,10 +1445,17 @@ final class Biblioteca {
                         .sucesso
                     )
                 }
+            } catch is CancellationError {
+                // Cancelar (ou mover para a lixeira) é decisão da pessoa, não
+                // falha: sem erro no cartão e sem notificação do sistema.
             } catch {
-                erros[chave] = "\(error)"
+                // Uma falha de verdade não se repete sozinha a cada abertura;
+                // o cancelamento (fechar o app) deixa o pedido pendente.
+                if !Task.isCancelled { filaPersistida.remover(arquivoCompleto.id) }
+                guard !Task.isCancelled, identificadorDaExecucao == execucao else { return }
+                erros[chave] = error.localizedDescription
                 aoNotificar?(
-                    "Transcrição falhou".localized,
+                    modo == .somenteResumo ? "Resumo falhou".localized : "Transcrição falhou".localized,
                     "\(arquivoCompleto.titulo): \(error.localizedDescription)",
                     .erro
                 )
@@ -1085,8 +1497,20 @@ final class Biblioteca {
             return
         }
 
+        // Mesma regra do ditado: nunca um segundo conjunto de modelos ao
+        // lado de um processamento em curso.
+        guard arquivoEmProcessamento == nil, operacoesAvulsasComModelos == 0 else {
+            erros[chave] = "Aguarde o processamento em andamento terminar para separar as vozes.".localized
+            return
+        }
+
         erros[chave] = nil
         fases[chave] = .diarizando
+        operacoesAvulsasComModelos += 1
+        defer {
+            operacoesAvulsasComModelos -= 1
+            iniciarProximoProcessamentoSeNecessario()
+        }
         await ciclo.registrar(diarizacao)
 
         // Os motores são apenas o contrato do pipeline; o caminho leve nunca
@@ -1117,8 +1541,11 @@ final class Biblioteca {
             let diarizado = await pipeline.diarizarExistente(arquivoCompleto)
             guard arquivos.contains(where: { $0.id == arquivoCompleto.id }) else { return }
             do {
-                try await repositorio.salvar(diarizado)
-                substituir(diarizado)
+                // Só os trechos: título, notas e resumo podem ter mudado
+                // enquanto a diarização rodava.
+                try await repositorio.salvarResultadoDoProcessamento(diarizado, partes: .transcricao)
+                let salvo = try await exigirArquivoCompleto(diarizado.id)
+                await publicar(salvo)
             } catch {
                 erros[chave] = "Não foi possível salvar a diarização: %@".localized(error.localizedDescription)
             }
@@ -1158,14 +1585,35 @@ final class Biblioteca {
         } else {
             arquivos.insert(arquivo, at: 0)
         }
+        revisoes[arquivo.id, default: 0] += 1
+    }
+
+    /// Leva uma conversa já salva para a lista e para a fila do iCloud —
+    /// **só se ela pertence ao espaço aberto agora**.
+    ///
+    /// As edições suspendem ao ler e salvar. Se o espaço mudou nesse meio
+    /// (aceitar um convite com uma conversa pessoal aberta basta), a conversa
+    /// era inserida na lista do novo espaço e enviada à zona da nova equipe.
+    /// O que foi salvo continua no banco, no espaço certo, e reaparece
+    /// quando ele for aberto.
+    private func publicar(_ arquivo: Arquivo) async {
+        guard arquivo.espaco == espaco else { return }
+        if arquivo.apagadoEm == nil {
+            substituir(arquivo)
+        } else {
+            revisoes[arquivo.id, default: 0] += 1
+        }
+        await sincronizar(arquivo)
     }
 
     private func sincronizar(_ arquivo: Arquivo) async {
-        guard let equipeCloudKit else { return }
+        // Nunca para "a equipe ativa": só para a equipe dona do espaço da
+        // conversa, que é a que está aberta quando os espaços coincidem.
+        guard let equipeCloudKit, arquivo.espaco == espaco else { return }
         estadoDaSincronizacaoCloudKit = .enviando
         do {
             try await filaCloudKit.agendarEnvio(arquivo, para: equipeCloudKit)
-            await retomarSincronizacaoCloudKit()
+            dispararEnvioCloudKit()
         } catch {
             let mensagem = "Não foi possível guardar a sincronização pendente de %@: %@".localized(arquivo.titulo, error.localizedDescription)
             estadoDaSincronizacaoCloudKit = .falhou(mensagem)
@@ -1173,8 +1621,46 @@ final class Biblioteca {
         }
     }
 
+    /// Processa a fila do iCloud fora do caminho de quem salvou.
+    ///
+    /// Antes, registrar uma gravação, salvar notas ou mover para a lixeira
+    /// esperavam a fila inteira passar pela rede: em equipe, a transcrição só
+    /// entrava na fila depois dessa tentativa e as notas ficavam em
+    /// "Salvando…" no ritmo do iCloud. A operação já está gravada na fila
+    /// durável; o envio é uma tarefa única que se repete se algo novo chegar
+    /// enquanto ela roda.
+    private func dispararEnvioCloudKit() {
+        guard tarefaDeEnvioCloudKit == nil else {
+            haEnvioCloudKitAguardando = true
+            return
+        }
+        tarefaDeEnvioCloudKit = Task { @MainActor [weak self] in
+            repeat {
+                self?.haEnvioCloudKitAguardando = false
+                await self?.retomarSincronizacaoCloudKit()
+            } while self?.haEnvioCloudKitAguardando == true && !Task.isCancelled
+            self?.tarefaDeEnvioCloudKit = nil
+        }
+    }
+
+    /// Espera o envio em curso terminar. Para os testes e para quem precisa
+    /// do estado final da sincronização (encerramento, troca de equipe).
+    func aguardarEnvioCloudKit() async {
+        while let tarefa = tarefaDeEnvioCloudKit {
+            await tarefa.value
+        }
+    }
+
     func retomarSincronizacaoCloudKit(forcar: Bool = false) async {
         guard equipeCloudKit != nil else { return }
+        if !avisouQuarentenaDaFila, let quarentena = filaCloudKit.quarentena {
+            avisouQuarentenaDaFila = true
+            aoNotificar?(
+                "Fila do iCloud recuperada".localized,
+                "A lista de alterações pendentes estava ilegível. As que puderam ser lidas continuam na fila; o arquivo original foi guardado em %@.".localized(quarentena.lastPathComponent),
+                .aviso
+            )
+        }
         let contexto = contextoDoEspaco
         tarefaDeRetryCloudKit?.cancel()
         tarefaDeRetryCloudKit = nil
@@ -1193,9 +1679,17 @@ final class Biblioteca {
                 let detalhe = erro.isEmpty
                     ? ""
                     : ": \(DiagnosticoDaSincronizacaoCloudKit.mensagem(paraTexto: erro))"
-                estadoDaSincronizacaoCloudKit = .falhou(
-                    "%d alteração(ões) aguardando nova tentativa no iCloud%@".localized(resultado.pendentes, detalhe)
-                )
+                if resultado.bloqueadas == resultado.pendentes {
+                    // Tudo o que resta foi recusado por algo que repetir não
+                    // resolve: dizer isso, em vez de "nova tentativa".
+                    estadoDaSincronizacaoCloudKit = .falhou(
+                        "%d alteração(ões) não puderam ser enviadas ao iCloud e ficaram só neste Mac%@. Verifique sua permissão na equipe e o espaço no iCloud, depois toque em tentar de novo.".localized(resultado.pendentes, detalhe)
+                    )
+                } else {
+                    estadoDaSincronizacaoCloudKit = .falhou(
+                        "%d alteração(ões) aguardando nova tentativa no iCloud%@".localized(resultado.pendentes, detalhe)
+                    )
+                }
                 if !DiagnosticoDaSincronizacaoCloudKit.exigeAcaoDoProprietario(erro) {
                     agendarRetryCloudKit(para: resultado.proximaTentativa)
                 }
@@ -1244,6 +1738,10 @@ final class Biblioteca {
                 let local = (arquivos + arquivosNaLixeira).first {
                     $0.id == conversa.arquivo.id
                 }
+                if local != nil,
+                   revisoesRemotasAplicadas[conversa.arquivo.id] == conversa.atualizadoEm {
+                    continue
+                }
                 let midiaLocalExiste = local.map {
                     !$0.pastaRelativa.isEmpty
                         && FileManager.default.fileExists(
@@ -1255,10 +1753,24 @@ final class Biblioteca {
                     local: local,
                     midiaLocalExiste: midiaLocalExiste
                 )
-                try await repositorio.salvar(combinado)
+                // Com o estado de lixeira que veio: a restauração (ou a
+                // exclusão) feita por um colega vale aqui também.
+                try await repositorio.salvarRecebido(combinado)
+                revisoesRemotasAplicadas[conversa.arquivo.id] = conversa.atualizadoEm
+                revisoes[conversa.arquivo.id, default: 0] += 1
+            }
+            let ilegiveis = await sincronizadorCloudKit.ignoradasNoUltimoDownload
+            if ilegiveis > 0 {
+                aoNotificar?(
+                    "Conversas da equipe não lidas".localized,
+                    "%lld conversa(s) da equipe não puderam ser lidas e foram puladas. Atualizar o Ōmu costuma resolver.".localized(ilegiveis),
+                    .aviso
+                )
             }
             guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+            lixeiraDaEquipeConferida = true
             await carregar()
+            lixeiraDaEquipeConferida = false
             guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
             if conflitos == 0 {
                 let pendentes = try await filaCloudKit.operacoesPendentes().count
@@ -1300,6 +1812,20 @@ final class Biblioteca {
         return arquivo
     }
 
+    /// Apaga a pasta de anexos de uma conversa sem áudio — o repositório só
+    /// conhece `pastaRelativa`, que nelas é vazia. Inclui o endereço antigo
+    /// (`MidiaIndisponivel/<id>`), de antes de a pasta ir para `Gravacoes`.
+    private func removerPastaDeAnexos(de arquivo: Arquivo) {
+        guard arquivo.semAudio else { return }
+        let id = arquivo.id.rawValue
+        try? armazenamento.removerGravacao(relativa: Armazenamento.caminhoRelativo(id: id))
+        try? FileManager.default.removeItem(
+            at: armazenamento.raiz
+                .appendingPathComponent("MidiaIndisponivel", isDirectory: true)
+                .appendingPathComponent(id.uuidString, isDirectory: true)
+        )
+    }
+
     /// Canal principal para reprodução, na nova convenção: `microfone.wav`.
     ///
     /// Gravações antigas e arquivos importados têm **um único arquivo** (a
@@ -1308,9 +1834,12 @@ final class Biblioteca {
     /// `audioSecundario` junto.
     func audio(de arquivo: Arquivo) -> URL {
         if arquivo.semAudio {
-            return armazenamento.raiz
-                .appendingPathComponent("MidiaIndisponivel", isDirectory: true)
-                .appendingPathComponent(arquivo.id.rawValue.uuidString, isDirectory: true)
+            // Sem áudio (Granola, conversa de colega), a pasta da conversa
+            // só existe para os anexos. Ela mora em `Gravacoes/<id>` como
+            // todas as outras: fora dali a lixeira de mídia recusava os
+            // anexos e nada os apagava junto com a conversa.
+            return armazenamento
+                .resolver(relativo: Armazenamento.caminhoRelativo(id: arquivo.id.rawValue))
                 .appendingPathComponent("audio-indisponivel")
         }
         let pasta = armazenamento.resolver(relativo: arquivo.pastaRelativa)
@@ -1410,7 +1939,8 @@ final class Biblioteca {
         _ pendente: ReuniaoPendenteCalendar,
         audioURL: URL,
         duracao: TimeInterval? = nil,
-        notas: [NotaDaConversa] = []
+        notas: [NotaDaConversa] = [],
+        usavaFones: Bool? = nil
     ) async -> Arquivo? {
         let espacoDestino = espaco
         guard !espacosExcluidos.contains(espacoDestino) else { return nil }
@@ -1428,25 +1958,39 @@ final class Biblioteca {
         var arquivo = Arquivo(
             titulo: pendente.titulo,
             criadoEm: pendente.dataHora,
-            duracao: max(0, duracao ?? 0),
+            duracao: duracao.map { $0.isFinite ? max(0, $0) : 0 } ?? 0,
             pastaRelativa: "",
             espaco: espacoDestino,
             trechos: [],
             notas: Self.combinarNotas(descricaoDoEvento: pendente.descricao, notasDaGravacao: notas),
             resumo: nil,
-            idExterno: idExterno
+            idExterno: idExterno,
+            usavaFones: usavaFones,
+            // O título veio do evento: o resumo não deve trocá-lo.
+            tituloManual: true
         )
 
+        // Só a pasta que esta função criou pode ser apagada num erro. A da
+        // gravação interna é o próprio áudio recém-gravado: apagá-la numa
+        // falha de salvamento destruía a reunião que a pessoa acabou de ter.
+        var pastaCriadaAqui: String?
+        func desfazerPastaCriada() {
+            guard let pastaCriadaAqui else { return }
+            try? armazenamento.removerGravacao(relativa: pastaCriadaAqui)
+        }
+
         do {
-            if audioURL.lastPathComponent.hasPrefix(Armazenamento.Nome.microfone) {
-                // Veio da gravação interna (`microfone.wav`): a pasta já existe
-                // no lugar canônico; só apontamos para ela.
-                let relativa = audioURL.deletingLastPathComponent().lastPathComponent
-                let pastaPai = audioURL.deletingLastPathComponent().deletingLastPathComponent()
-                guard pastaPai.lastPathComponent == Armazenamento.pastaGravacoes else {
-                    throw ErroDeImportacao.pastaInesperada
-                }
-                arquivo.pastaRelativa = "\(Armazenamento.pastaGravacoes)/\(relativa)"
+            let pastaDoAudio = audioURL.deletingLastPathComponent()
+            let dentroDasGravacoes = pastaDoAudio.deletingLastPathComponent().standardizedFileURL
+                == armazenamento.raiz
+                    .appendingPathComponent(Armazenamento.pastaGravacoes, isDirectory: true)
+                    .standardizedFileURL
+            if audioURL.lastPathComponent == Armazenamento.Nome.microfone, dentroDasGravacoes {
+                // Veio da gravação interna (`microfone.wav` dentro de
+                // `Gravacoes/`): a pasta já existe no lugar canônico; só
+                // apontamos para ela. Um arquivo de fora que por acaso se
+                // chame `microfone.wav` é importado como qualquer outro.
+                arquivo.pastaRelativa = "\(Armazenamento.pastaGravacoes)/\(pastaDoAudio.lastPathComponent)"
             } else {
                 // Importado: pasta nova + extensão preservada (`gravacao.<ext>`).
                 let idNovo = UUID()
@@ -1454,8 +1998,10 @@ final class Biblioteca {
                     id: idNovo,
                     extensao: audioURL.pathExtension.lowercased()
                 )
+                pastaCriadaAqui = Armazenamento.caminhoRelativo(id: idNovo)
                 try FileManager.default.copyItem(at: audioURL, to: destino)
                 arquivo.pastaRelativa = Armazenamento.caminhoRelativo(id: idNovo)
+                arquivo.importadoEm = Date()
                 // Duração real lida do arquivo: alimenta a estimativa de
                 // progresso e o cartão desde o primeiro segundo.
                 if duracao == nil {
@@ -1463,6 +2009,7 @@ final class Biblioteca {
                 }
             }
         } catch {
+            desfazerPastaCriada()
             erros[arquivo.id.rawValue] = "Não foi possível copiar o áudio da reunião: %@".localized(error.localizedDescription)
             return nil
         }
@@ -1470,14 +2017,14 @@ final class Biblioteca {
         do {
             try await salvarReuniaoNoRepositorio(arquivo)
         } catch {
-            if !arquivo.pastaRelativa.isEmpty {
-                try? armazenamento.removerGravacao(relativa: arquivo.pastaRelativa)
-            }
+            desfazerPastaCriada()
             erros[arquivo.id.rawValue] = "Não foi possível criar arquivo da reunião: %@".localized(error.localizedDescription)
             return nil
         }
 
         if espacosExcluidos.contains(espacoDestino) {
+            // Perfil excluído no meio do caminho: aqui sim a mídia sai toda,
+            // inclusive a gravada agora — é o que a exclusão pediu.
             if !arquivo.pastaRelativa.isEmpty {
                 try? armazenamento.removerGravacao(relativa: arquivo.pastaRelativa)
             }
@@ -1514,21 +2061,11 @@ final class Biblioteca {
             para: arquivo.id
         )
 
+        await sincronizar(arquivo)
         if processamentoAutomatico {
             enfileirarProcessamento(arquivo)
         }
         return arquivo
-    }
-
-    enum ErroDeImportacao: LocalizedError {
-        case pastaInesperada
-
-        var errorDescription: String? {
-            switch self {
-            case .pastaInesperada:
-                "A gravação não estava na pasta esperada da biblioteca.".localized
-            }
-        }
     }
 
     /// Duração em segundos lida dos metadados do arquivo de áudio.
@@ -1536,7 +2073,10 @@ final class Biblioteca {
     private static func duracaoDoAudio(_ url: URL) async -> TimeInterval {
         await Task.detached {
             let asset = AVURLAsset(url: url)
-            return (try? await asset.load(.duration).seconds) ?? 0
+            // Mídia de duração indefinida devolve `NaN` — que o `try?` não
+            // cobre, e que derruba a exportação (`Int(.nan)`) mais adiante.
+            let segundos = (try? await asset.load(.duration).seconds) ?? 0
+            return segundos.isFinite && segundos > 0 ? segundos : 0
         }.value
     }
 

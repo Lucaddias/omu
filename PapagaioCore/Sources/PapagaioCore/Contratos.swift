@@ -64,4 +64,39 @@ public protocol ArquivoRepository: Sendable {
     func buscar(termo: String, espaco: EspacoID) async throws -> [Arquivo]
     func listar(espaco: EspacoID) async throws -> [Arquivo]
     func apagar(_ id: ArquivoID) async throws
+
+    /// Grava **só o que o processamento produz** — transcrição e/ou resumo —
+    /// sobre o registro que já existe, sem tocar em título, data, duração,
+    /// notas ou lixeira.
+    ///
+    /// O pipeline trabalha minutos sobre uma fotografia do `Arquivo`. Gravá-la
+    /// inteira com `salvar` desfazia tudo o que a pessoa editou nesse
+    /// intervalo (renomear, preencher a ficha, escrever notas).
+    func salvarResultadoDoProcessamento(
+        _ a: Arquivo,
+        partes: PartesDoProcessamento
+    ) async throws
+}
+
+/// O que um salvamento do pipeline tem permissão de escrever.
+public struct PartesDoProcessamento: OptionSet, Sendable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+
+    /// Trechos (com palavras e falantes) e a engine de transcrição.
+    public static let transcricao = PartesDoProcessamento(rawValue: 1 << 0)
+    /// Resumo (ou a ausência dele) e a engine de resumo.
+    public static let resumo = PartesDoProcessamento(rawValue: 1 << 1)
+    public static let tudo: PartesDoProcessamento = [.transcricao, .resumo]
+}
+
+public extension ArquivoRepository {
+    /// Repositórios simples (CLI, testes) não distinguem as partes: gravam o
+    /// arquivo como veio.
+    func salvarResultadoDoProcessamento(
+        _ a: Arquivo,
+        partes: PartesDoProcessamento
+    ) async throws {
+        try await salvar(a)
+    }
 }

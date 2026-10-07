@@ -27,6 +27,19 @@ import os
 /// distingue fala real de tom/DC/ruído. Ver `SileroVAD`.
 /// ═══════════════════════════════════════════════════════════════════════
 public enum DetectorDeAtividadeDeVoz {
+    /// Piso de ruído digital (≈ −60 dBFS). Com o Silero disponível, a energia
+    /// só serve para não gastar decisão em silêncio digital: quem diz se é
+    /// fala é o modelo. O limiar antigo (0,008 ≈ −42 dBFS) vetava voz baixa
+    /// ou distante mesmo com probabilidade alta do Silero, e o trecho sumia
+    /// da transcrição.
+    public static let pisoDeRuidoDigital: Float = 0.001
+
+    /// O limiar de energia que vale de fato. Sem o Silero (modo degradado) a
+    /// energia é o único critério e o limiar pedido é respeitado.
+    static func limiarEfetivoDeEnergia(_ pedido: Float, usaSilero: Bool) -> Float {
+        usaSilero ? min(pedido, pisoDeRuidoDigital) : pedido
+    }
+
 #if OMU_PERF
     public typealias RegistradorDeEventoPerf = @Sendable (String, String, TimeInterval?) -> Void
 
@@ -162,13 +175,14 @@ public enum DetectorDeAtividadeDeVoz {
             proximaAmostra = Int((bloco.inicio * taxa).rounded())
             let quantidadeDeQuadros = (bloco.amostras.count + tamanhoDoQuadro - 1) / tamanhoDoQuadro
             var falaPorQuadro = Array(repeating: false, count: quantidadeDeQuadros)
+            let limiar = DetectorDeAtividadeDeVoz.limiarEfetivoDeEnergia(limiarDeEnergia, usaSilero: usaSilero)
 
             for indice in 0..<quantidadeDeQuadros {
                 let inicio = indice * tamanhoDoQuadro
                 let fim = min(inicio + tamanhoDoQuadro, bloco.amostras.count)
                 let quadro = bloco.amostras[inicio..<fim]
                 let energia = sqrt(quadro.reduce(Float.zero) { $0 + $1 * $1 } / Float(max(1, quadro.count)))
-                falaPorQuadro[indice] = energia >= limiarDeEnergia
+                falaPorQuadro[indice] = energia >= limiar
             }
 
             if usaSilero, quantidadeDeQuadros > 0 {
@@ -326,9 +340,9 @@ public enum DetectorDeAtividadeDeVoz {
     ///   - duracaoDoQuadro: 32 ms por padrão — é o quadro do Silero VAD
     ///     (512 amostras @ 16 kHz). Trocar exige trocar o tamanho esperado
     ///     pelo `SileroVAD` também.
-    ///   - limiarDeEnergia: filtro rápido antes do Silero — energia RMS do
-    ///     quadro abaixo disso nunca é fala (silêncio digital não passa pelo
-    ///     modelo neural à toa).
+    ///   - limiarDeEnergia: energia RMS mínima do quadro **no modo degradado**
+    ///     (sem o Silero). Com o Silero, vale o `pisoDeRuidoDigital`: a
+    ///     decisão é do modelo, e a energia só veta silêncio digital.
     ///   - limiarDeFala: probabilidade mínima de fala do Silero, validada
     ///     empiricamente em 0,5 (fala real chega a ~1,0; DC/tom/ruído ficam
     ///     abaixo de 0,2).
@@ -363,6 +377,7 @@ public enum DetectorDeAtividadeDeVoz {
 
             var quadros: [Bool] = []
             quadros.reserveCapacity(amostras.count / tamanhoDoQuadro + 1)
+            let limiar = limiarEfetivoDeEnergia(limiarDeEnergia, usaSilero: usaSilero)
             // Energia é calculada para todos os quadros. O Silero também recebe
             // todos em ordem porque seu estado é recorrente; a energia veta
             // silêncio na decisão final, mas não pode comprimir o tempo do VAD.
@@ -371,7 +386,7 @@ public enum DetectorDeAtividadeDeVoz {
                 let fim = min(inicio + tamanhoDoQuadro, amostras.count)
                 let quadro = amostras[inicio..<fim]
                 let energia = sqrt(quadro.reduce(Float.zero) { $0 + $1 * $1 } / Float(max(1, quadro.count)))
-                quadros.append(energia >= limiarDeEnergia)
+                quadros.append(energia >= limiar)
                 inicio = fim
             }
             if usaSilero, !quadros.isEmpty {
