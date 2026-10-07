@@ -1,0 +1,15 @@
+Execute sem fim o loop de otimização de performance do Ōmu descrito em "/Users/lucadias/Documents/Academy/Challenges/Challenge 3/Projeto principal/Papagaio/docs/perf/LOOP-PERFORMANCE.md". Leia o arquivo inteiro antes de começar e de novo após qualquer retomada ou compactação de contexto; nas demais rodadas, releia as seções 2 e 4. Ele é a especificação e prevalece sobre este resumo.
+
+Cada rodada: medir → UMA hipótese pré-registrada no DIARIO.md → aplicar → portões de correção (testes e qualidade) → A/B intercalado contra a build aceita → manter só se melhorar com significância; se piorar, ficar neutro ou quebrar, desfazer, recompilar e medir de novo para confirmar que a baseline voltou → registrar → próxima rodada. Se ~/OmuPerf/estado/ESTADO.md não existir, comece pela Fase 0 (seção 3).
+
+Única condição de parada: existir ~/OmuPerf/estado/STOP. Aí faça o encerramento seguro da seção 9 e só então marque o objetivo como concluído. Ganho atingido, backlog vazio, ideias esgotadas, contexto longo ou tempo de execução NÃO concluem o objetivo: perfile de novo, gere hipóteses e continue.
+
+Escopo de escrita: ~/OmuPerf/ (worktree ~/OmuPerf/repo na branch perf/loop-AAAAMMDD, builds, fixtures, runs e estado). Na árvore principal do repositório, só leitura e os comandos git da Fase 0 (worktree add, branch e tags do loop); nunca reset, clean, stash, checkout nem troca de branch.
+
+Invioláveis: tudo local (sem push, PR, nuvem, instalar pacotes nem baixar modelos); não tocar a biblioteca real do Ōmu, o iCloud, Contatos, Calendário nem o Keychain, testando só com áudio sintético numa build de perf isolada (bundle com.papagaio.Papagaio.perf); uma hipótese por experimento; não trocar qualidade por velocidade fora das tolerâncias (isso vira proposta em PROPOSTAS.md); nada pesado em paralelo com uma medição; sem sudo, microfone ou som nos alto-falantes sem autorização no chat.
+
+Prova de progresso: a cada rodada, ESTADO.md, DIARIO.md e experimentos.jsonl atualizados em ~/OmuPerf/estado, com tabela A×B (mediana, p90, n, razão, IC95%, p) e veredito; ./Scripts/testa-papagaio-core.sh e os testes do app (PAPAGAIO_TEST_MODE=1) sem falhas novas em relação à baseline. No fim de cada rodada, uma linha no chat: rodada, hipótese, veredito e ganho acumulado. A cada 5 rodadas, atualize RESUMO.md.
+
+Pausas: na bateria, com aviso térmico, com swap crescendo, com menos de 30 GB livres ou com o usuário usando o Mac, não meça; faça trabalho que não mede ou espere com um comando (sleep e nova checagem). Nunca termine um turno só com texto: todo turno roda pelo menos um comando, senão a continuação automática para. Comandos longos (build, Qwen, áudio de 60 min) rodam em background, com log e timeout.
+
+Se o sandbox bloquear algo necessário (escrever em ~/OmuPerf, abrir o app com open, xcodebuild, codesign, xctrace, leaks, caffeinate), registre no ESTADO.md e peça ao usuário uma única vez.

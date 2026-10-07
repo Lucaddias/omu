@@ -367,27 +367,27 @@ struct ArquivoDetalheView: View {
     private var animacaoDeInterface: Animation? {
         reduzirMovimento ? nil : .easeInOut(duration: 0.2)
     }
-    /// O player também aparece nas Notas: sem ele, num arquivo importado, ⌘N e
-    /// ⌘K criariam tudo em 0:00 — a âncora de tempo, que é o valor da nota,
-    /// deixaria de existir.
+    // O player também aparece nas Notas: sem ele, num arquivo importado, ⌘N e
+    // ⌘K criariam tudo em 0:00 — a âncora de tempo, que é o valor da nota,
+    // deixaria de existir.
     private var deveMostrarPlayer: Bool {
         mostrandoPlayer || secaoSelecionada == .transcricao || secaoSelecionada == .notas
     }
-    /// Pergunta ao próprio player se ele conseguiu abrir o arquivo, em vez de
-    /// checar um caminho na mão.
-    ///
-    /// Checar `audio.path` dava falso negativo: um áudio que está na aba Mídia
-    /// mas não no nome canônico da conversa fazia a barra dizer "removido"
-    /// mesmo com o arquivo visível ali. Duração zero depois de `preparar()` é
-    /// o único sinal confiável de que o `AVAudioPlayer` não abriu nada.
+    // Pergunta ao próprio player se ele conseguiu abrir o arquivo, em vez de
+    // checar um caminho na mão.
+    //
+    // Checar `audio.path` dava falso negativo: um áudio que está na aba Mídia
+    // mas não no nome canônico da conversa fazia a barra dizer "removido"
+    // mesmo com o arquivo visível ali. Duração zero depois de `preparar()` é
+    // o único sinal confiável de que o `AVAudioPlayer` não abriu nada.
     private var audioIndisponivel: Bool {
         guard let reprodutor else { return false }
         return reprodutor.duracao <= 0
     }
 
-    /// O AppKit usa um `NSTextView` como field editor de `NSTextField` e
-    /// `TextEditor`. O atalho global não pode roubar a barra de espaço de quem
-    /// está escrevendo uma nota, corrigindo um trecho ou editando metadados.
+    // O AppKit usa um `NSTextView` como field editor de `NSTextField` e
+    // `TextEditor`. O atalho global não pode roubar a barra de espaço de quem
+    // está escrevendo uma nota, corrigindo um trecho ou editando metadados.
     static func atalhoDeReproducaoEstaDisponivel(
         primeiroRespondedor: NSResponder?
     ) -> Bool {

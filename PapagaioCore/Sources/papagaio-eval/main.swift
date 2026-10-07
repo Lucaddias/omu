@@ -8,7 +8,7 @@ import WhisperRuntime
 // arrastar SwiftUI. O harness de medição real (WER, acurácia de entidades)
 // chega no Passo 6.
 
-let versao = "0.1.0-passo1"
+let versao = "0.2.0-bench"
 
 func formatarBytes(_ bytes: Int64) -> String {
     String(format: "%.2f GB", Double(bytes) / 1_073_741_824)
@@ -20,7 +20,10 @@ func uso() {
 
     USO:
       papagaio-eval contratos    imprime os contratos disponíveis
-      papagaio-eval run          harness de medição — chega no Passo 6
+      papagaio-eval bench        micro/macro benchmarks de performance
+                                [--so-micro] [--iteracoes N] [--audio <arquivo>]
+                                [--modelos <dir>] [--saida <json>] [--comparar <baseline>]
+      papagaio-eval run          harness de medição (qualidade/WER) — reserva
       papagaio-eval resolver     diagnóstico da atribuição de falantes:
                                 <audio> (ou --fixture <json>), --modelos <dir>,
                                 --pasta <dir de diarização>, --sem-modelo
@@ -479,9 +482,75 @@ case "granola":
         exit(3)
     }
 
+case "bench":
+    var soMicro = false
+    var iteracoes = 5
+    var audio: URL?
+    var modelos: URL?
+    var saida: String?
+    var compararCom: String?
+
+    var i = 1
+    while i < argumentos.count {
+        switch argumentos[i] {
+        case "--so-micro":
+            soMicro = true; i += 1
+        case "--iteracoes" where i + 1 < argumentos.count:
+            iteracoes = Int(argumentos[i + 1]) ?? 5; i += 2
+        case "--audio" where i + 1 < argumentos.count:
+            audio = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--modelos" where i + 1 < argumentos.count:
+            modelos = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--saida" where i + 1 < argumentos.count:
+            saida = argumentos[i + 1]; i += 2
+        case "--comparar" where i + 1 < argumentos.count:
+            compararCom = argumentos[i + 1]; i += 2
+        default:
+            print("argumento desconhecido: \(argumentos[i])")
+            exit(2)
+        }
+    }
+
+    print("papagaio-eval bench — iteracoes=\(iteracoes)")
+    let info = RuntimeInfo.coletar()
+    print("whisper: \(info.whisperSystemInfo.prefix(80))…")
+    print("metal:   \(info.metalDisponivel ? "sim" : "NÃO")")
+    print("memoria: \(formatarBytes(CicloDeVidaDeModelos.memoriaDoProcesso))")
+
+    var todos: [ResultadoBench] = []
+
+    print("\n--- micro-benchmarks (sem modelos) ---")
+    todos += await CasosDeMicroBench.rodar(iteracoes: iteracoes)
+
+    if !soMicro {
+        print("\n--- macro-benchmarks (modelos reais) ---")
+        var macro = CasosDeMacroBench.Opcoes(
+            pastaDeModelos: modelos ?? CasosDeMacroBench.pastaPadraoDeModelos(),
+            audio: audio,
+            iteracoes: max(1, min(iteracoes, 3))
+        )
+        if let a = audio {
+            macro.audio = a
+        }
+        todos += await CasosDeMacroBench.rodar(macro)
+    }
+
+    EscritorDeRelatorio.imprimir(todos)
+
+    // Comparar ANTES de gravar: gravar primeiro e depois carregar o mesmo
+    // arquivo faria a comparação sempre sair "igual".
+    if let baselineCaminho = compararCom,
+       let baseline = EscritorDeRelatorio.carregarBaseline(caminho: baselineCaminho) {
+        EscritorDeRelatorio.comparar(atual: todos, baseline: baseline)
+    }
+
+    if let caminho = saida {
+        try EscritorDeRelatorio.gravar(todos, em: caminho)
+    }
+
 case "run":
     FileHandle.standardError.write(
-        Data("papagaio-eval run: \(NotImplemented("harness de medição", passo: 6))\n".utf8)
+        Data("papagaio-eval run: qualidade/WER ainda no Passo 6 — use `bench` para performance.\n".utf8)
     )
     exit(2)
 

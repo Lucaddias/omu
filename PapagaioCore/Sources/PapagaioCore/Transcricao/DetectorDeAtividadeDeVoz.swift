@@ -50,10 +50,7 @@ public enum DetectorDeAtividadeDeVoz {
     /// Instância compartilhada do Silero: o modelo de 2,3 MB fica residente
     /// entre arquivos. O caminho inexistente é proposital — `SessaoOnnx`
     /// devolve erro de carga em vez de crashar se o resource faltar.
-    private static let sileroVAD = SileroVAD(
-        modelo: Bundle.module.url(forResource: "silero_vad", withExtension: "onnx")
-            ?? URL(fileURLWithPath: "/inexistente/silero_vad.onnx")
-    )
+    private static let sileroVAD = SileroVAD(modelo: SileroVAD.urlDoModeloPadrao)
 
     /// Exclusividade de sessão inteira. O ator do Silero serializa chamadas,
     /// mas cada `await` do laço de quadros reentra nele: dois arquivos

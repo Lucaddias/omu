@@ -1,0 +1,141 @@
+{
+  "data" : "2026-09-22T16:25:30Z",
+  "llama" : "MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | FP16_VA = 1 | DOTPROD = 1 | LLAMAFILE = 1 | ACCELERATE = 1 | REPACK = 1 | ",
+  "maquina" : "Apple M5 (10 cores)",
+  "metal" : true,
+  "resultados" : [
+    {
+      "iteracoes" : 5,
+      "nome" : "segmentacao.agrupar",
+      "segundosMediano" : 0.000120542,
+      "segundosMedio" : 0.00012129180000000002,
+      "segundosMinimo" : 0.0001195,
+      "unidade" : "500 segmentos"
+    },
+    {
+      "iteracoes" : 5,
+      "nome" : "segmentacao.mesclarCanais",
+      "segundosMediano" : 0.002521333,
+      "segundosMedio" : 0.0025244248,
+      "segundosMinimo" : 0.002498041,
+      "unidade" : "250+250 segmentos"
+    },
+    {
+      "iteracoes" : 5,
+      "nome" : "alinhamento.atribuir",
+      "segundosMediano" : 0.003650042,
+      "segundosMedio" : 0.0036795668,
+      "segundosMinimo" : 0.00363975,
+      "unidade" : "200 trechos × 400 segmentos"
+    },
+    {
+      "iteracoes" : 5,
+      "nome" : "filtroRepeticao.remover",
+      "segundosMediano" : 0.004442916,
+      "segundosMedio" : 0.004544375,
+      "segundosMinimo" : 0.004405125,
+      "unidade" : "300 trechos"
+    },
+    {
+      "iteracoes" : 5,
+      "nome" : "falas.agrupar",
+      "segundosMediano" : 0.0003535,
+      "segundosMedio" : 0.0003532248,
+      "segundosMinimo" : 0.000348458,
+      "unidade" : "200 trechos"
+    },
+    {
+      "iteracoes" : 50,
+      "nome" : "navegacao.indiceAtivo",
+      "segundosMediano" : 0.000122041,
+      "segundosMedio" : 0.00012202005999999998,
+      "segundosMinimo" : 0.000121917,
+      "unidade" : "200 trechos, 10k buscas"
+    },
+    {
+      "iteracoes" : 5,
+      "nome" : "exportacao.markdown",
+      "segundosMediano" : 0.000178042,
+      "segundosMedio" : 0.000178675,
+      "segundosMinimo" : 0.00017275,
+      "unidade" : "200 trechos"
+    },
+    {
+      "iteracoes" : 3,
+      "nome" : "aec.processarBlocos",
+      "segundosMediano" : 0.492173792,
+      "segundosMedio" : 0.4922260973333333,
+      "segundosMinimo" : 0.4921565,
+      "unidade" : "5 s de áudio"
+    },
+    {
+      "detalhes" : {
+        "silero" : "sim"
+      },
+      "iteracoes" : 3,
+      "nome" : "vad.janelasDeFala",
+      "segundosMediano" : 0.052736875,
+      "segundosMedio" : 0.052352875,
+      "segundosMinimo" : 0.0486945,
+      "unidade" : "30 s de áudio"
+    },
+    {
+      "iteracoes" : 3,
+      "nome" : "vad.silero.lote",
+      "segundosMediano" : 0.036663917,
+      "segundosMedio" : 0.03694894466666667,
+      "segundosMinimo" : 0.034217375,
+      "unidade" : "600 quadros de 512 amostras"
+    },
+    {
+      "iteracoes" : 5,
+      "nome" : "idioma.detectar",
+      "segundosMediano" : 0.003109959,
+      "segundosMedio" : 0.003065917,
+      "segundosMinimo" : 0.002940167,
+      "unidade" : "~60k caracteres"
+    },
+    {
+      "iteracoes" : 2,
+      "nome" : "macro.whisper.cicloCargaDescarga",
+      "segundosMediano" : 1.09508175,
+      "segundosMedio" : 0.976306146,
+      "segundosMinimo" : 0.857530542,
+      "unidade" : "carga+unload do large-v3"
+    },
+    {
+      "detalhes" : {
+        "audio" : "fala_ola_mundo.wav",
+        "duracao_s" : "4.3"
+      },
+      "iteracoes" : 3,
+      "nome" : "macro.whisper.transcrever",
+      "segundosMediano" : 1.36198425,
+      "segundosMedio" : 1.3601394583333333,
+      "segundosMinimo" : 1.355646708,
+      "unidade" : "RTF=0.32 (menor é melhor; 1.0 = tempo real)"
+    },
+    {
+      "iteracoes" : 2,
+      "nome" : "macro.qwen.cicloCargaDescarga",
+      "segundosMediano" : 0.54080975,
+      "segundosMedio" : 0.53909575,
+      "segundosMinimo" : 0.53738175,
+      "unidade" : "carga+unload do Qwen3.5-9B"
+    },
+    {
+      "detalhes" : {
+        "modo" : "map-reduce",
+        "tokens_entrada" : "31049"
+      },
+      "iteracoes" : 1,
+      "nome" : "macro.qwen.resumir",
+      "segundosMediano" : 199.662005458,
+      "segundosMedio" : 199.662005458,
+      "segundosMinimo" : 199.662005458,
+      "unidade" : "400 trechos sintéticos"
+    }
+  ],
+  "versao" : "1.0",
+  "whisper" : "WHISPER : COREML = 1 | OPENVINO = 0 | MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | FP16_VA = 1 | DOTPROD = 1 | ACCELERATE = 1 | REPACK = 1 | "
+}

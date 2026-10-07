@@ -29,6 +29,13 @@ public actor SileroVAD: CicloDeVidaDeModelos.Residente {
 
     public nonisolated var identificador: String { SileroVAD.identificador }
 
+    /// Resource `silero_vad.onnx` no bundle do PapagaioCore (processado pelo
+    /// SwiftPM). Exposto para a CLI de bench medir o caminho neural real.
+    public static var urlDoModeloPadrao: URL {
+        Bundle.module.url(forResource: "silero_vad", withExtension: "onnx")
+            ?? URL(fileURLWithPath: "/inexistente/silero_vad.onnx")
+    }
+
     private let caminhoDoModelo: URL
     private let sessao: SessaoOnnx
     private var contexto = [Float](repeating: 0, count: SileroVAD.contextoEmAmostras)

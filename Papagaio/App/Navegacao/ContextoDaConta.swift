@@ -15,8 +15,8 @@ enum ContextoDaConta: String {
         }
     }
 
-    /// Sem glifo circular: o avatar já recorta e contorna em círculo, e
-    /// `person.crop.circle` desenhava um segundo anel dentro do primeiro.
+    // Sem glifo circular: o avatar já recorta e contorna em círculo, e
+    // `person.crop.circle` desenhava um segundo anel dentro do primeiro.
     var simbolo: String {
         switch self {
         case .perfil: "person.fill"
