@@ -22,6 +22,7 @@
 		CB019BDFCF1ABB55BD10DF7F /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F978E98D2CF3C2643BF64AF8 /* Cocoa.framework */; };
 		D9410AC0210BDA7A911687A9 /* PastasDaBibliotecaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFC95792D15A8E5CF5FEE225 /* PastasDaBibliotecaTests.swift */; };
 		DD7A6AC074A5C8B7522B5B49 /* InterfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 337EA963DA385E396F282BA3 /* InterfaceTests.swift */; };
+		EB0CEB37BF911EE71BF22AA9 /* EquipesCloudKitAoVivoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DACC09D02E6072827F646017 /* EquipesCloudKitAoVivoTests.swift */; };
 		F7AB08AD62D90DCBC38E1B30 /* MidiasDaConversaViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2941DEF211FCBF7301E1815F /* MidiasDaConversaViewModelTests.swift */; };
 		PA00000000000000000012 /* PapagaioCore in Frameworks */ = {isa = PBXBuildFile; productRef = PA00000000000000000011 /* PapagaioCore */; };
 		PA00000000000000000015 /* PapagaioCore in Embed Frameworks */ = {isa = PBXBuildFile; productRef = PA00000000000000000011 /* PapagaioCore */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -79,6 +80,7 @@
 		C97E9FB058DA75D07956D7FC /* TarefasDoPainelViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TarefasDoPainelViewModelTests.swift; sourceTree = "<group>"; };
 		D2201F34A428D43BED043C68 /* BibliotecaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BibliotecaTests.swift; sourceTree = "<group>"; };
 		D257F87A757A65CDDB068036 /* TarefasDaConversaViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TarefasDaConversaViewModelTests.swift; sourceTree = "<group>"; };
+		DACC09D02E6072827F646017 /* EquipesCloudKitAoVivoTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EquipesCloudKitAoVivoTests.swift; sourceTree = "<group>"; };
 		EFC95792D15A8E5CF5FEE225 /* PastasDaBibliotecaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PastasDaBibliotecaTests.swift; sourceTree = "<group>"; };
 		F42B4CC7E5D3B0A8B6FB1109 /* PapagaioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PapagaioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F978E98D2CF3C2643BF64AF8 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
@@ -141,6 +143,7 @@
 				D257F87A757A65CDDB068036 /* TarefasDaConversaViewModelTests.swift */,
 				C97E9FB058DA75D07956D7FC /* TarefasDoPainelViewModelTests.swift */,
 				C087A374B5BC3DCC38E02376 /* GravadorViewModelTests.swift */,
+				DACC09D02E6072827F646017 /* EquipesCloudKitAoVivoTests.swift */,
 			);
 			path = PapagaioTests;
 			sourceTree = "<group>";
@@ -322,6 +325,7 @@
 				8301D872F0A9835270B0CB3B /* TarefasDaConversaViewModelTests.swift in Sources */,
 				4658DC6CFF329A0496241A67 /* TarefasDoPainelViewModelTests.swift in Sources */,
 				03F1107527CFCA0A1C840262 /* GravadorViewModelTests.swift in Sources */,
+				EB0CEB37BF911EE71BF22AA9 /* EquipesCloudKitAoVivoTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -162,6 +162,7 @@ final class Biblioteca {
     @ObservationIgnored
     private var sincronizadorCloudKitArmazenado: SincronizadorDaBibliotecaCloudKit?
     private let filaCloudKit: FilaPersistenteCloudKit
+    private let marcadoresCloudKit: MarcadoresDeSincronizacaoCloudKit
     private var tarefaDeRetryCloudKit: Task<Void, Never>?
     /// O envio da fila do iCloud em curso — um por biblioteca. Quem salva
     /// localmente só agenda (gravação durável) e segue; a rede fica aqui.
@@ -172,6 +173,13 @@ final class Biblioteca {
     private var revisoesRemotasAplicadas: [ArquivoID: Date] = [:]
     private var avisouQuarentenaDaFila = false
     private var haEnvioCloudKitAguardando = false
+    /// Sem isto, o que um colega gravava só aparecia ao trocar de espaço ou
+    /// reabrir o app. A consulta é incremental: custa uma requisição pequena.
+    private var tarefaDeAtualizacaoDaEquipe: Task<Void, Never>?
+    /// Contexto do espaço cuja baixa está em andamento, se houver.
+    private var baixaDaEquipeEmAndamento: UUID?
+    @ObservationIgnored
+    var intervaloDeAtualizacaoDaEquipe: Duration = .seconds(60)
     private var sincronizadorCloudKit: SincronizadorDaBibliotecaCloudKit {
         if let sincronizadorCloudKitArmazenado {
             return sincronizadorCloudKitArmazenado
@@ -226,6 +234,11 @@ final class Biblioteca {
                     .appendingPathComponent("fila-pendente.json")
             )
             self.filaPersistida = Self.filaPersistida(em: armazenamento)
+            self.marcadoresCloudKit = MarcadoresDeSincronizacaoCloudKit(
+                url: configuracao.raiz
+                    .appendingPathComponent("CloudKit", isDirectory: true)
+                    .appendingPathComponent("marcadores-de-sincronizacao.json")
+            )
             self.espaco = PerfProbe.espacoPadrao
             return
         }
@@ -246,6 +259,11 @@ final class Biblioteca {
                 .appendingPathComponent("fila-pendente.json")
         )
         self.filaPersistida = Self.filaPersistida(em: armazenamento)
+        self.marcadoresCloudKit = MarcadoresDeSincronizacaoCloudKit(
+            url: armazenamento.raiz
+                .appendingPathComponent("CloudKit", isDirectory: true)
+                .appendingPathComponent("marcadores-de-sincronizacao.json")
+        )
         self.espaco = Self.espacoPessoal()
     }
 
@@ -273,6 +291,11 @@ final class Biblioteca {
                 .appendingPathComponent("fila-pendente.json")
         )
         self.filaPersistida = Self.filaPersistida(em: armazenamento)
+        self.marcadoresCloudKit = MarcadoresDeSincronizacaoCloudKit(
+            url: armazenamento.raiz
+                .appendingPathComponent("CloudKit", isDirectory: true)
+                .appendingPathComponent("marcadores-de-sincronizacao.json")
+        )
         self.espaco = espaco
     }
 
@@ -307,6 +330,8 @@ final class Biblioteca {
         let contexto = contextoDoEspaco
         tarefaDeRetryCloudKit?.cancel()
         tarefaDeRetryCloudKit = nil
+        tarefaDeAtualizacaoDaEquipe?.cancel()
+        tarefaDeAtualizacaoDaEquipe = nil
         let mudouDeEspaco = espaco != novoEspaco
         self.equipeCloudKit = equipeCloudKit
         if equipeCloudKit == nil {
@@ -329,6 +354,8 @@ final class Biblioteca {
         }
         guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
         await baixarAtualizacoesDaEquipe()
+        guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+        agendarAtualizacaoDaEquipe()
     }
 
     func preparar() async {
@@ -858,6 +885,9 @@ final class Biblioteca {
     /// diferente pode ter alterações pendentes legítimas.
     func descartarOperacoesPendentes(daEquipeComID equipeID: String) async throws {
         try await filaCloudKit.descartarOperacoes(daEquipeComID: equipeID)
+        // Os dados locais da equipe vão sair; um marcador sobrevivente faria
+        // uma futura reentrada baixar "só o que mudou" sobre uma base vazia.
+        try await marcadoresCloudKit.descartar(daEquipeComID: equipeID)
     }
 
     func estaEmOperacaoDeLixeira(_ arquivo: Arquivo) -> Bool {
@@ -1717,21 +1747,89 @@ final class Biblioteca {
         }
     }
 
-    private func baixarAtualizacoesDaEquipe() async {
+    /// Envia o que estiver pendente e relê a zona inteira da equipe. É o
+    /// caminho do botão "Tentar agora": além de repetir a fila, serve de
+    /// recuperação se a cópia local tiver se afastado do iCloud.
+    func sincronizarEquipeAgora() async {
+        await retomarSincronizacaoCloudKit(forcar: true)
+        await baixarAtualizacoesDaEquipe(completa: true)
+    }
+
+    /// Consulta discreta: não mexe no indicador enquanto roda e não gera
+    /// notificação se a rede falhar — a próxima consulta tenta de novo.
+    func atualizarEquipeEmSegundoPlano() async {
+        await baixarAtualizacoesDaEquipe(discreta: true)
+    }
+
+    private func agendarAtualizacaoDaEquipe() {
+        tarefaDeAtualizacaoDaEquipe?.cancel()
+        guard equipeCloudKit != nil else { return }
+        let intervalo = intervaloDeAtualizacaoDaEquipe
+        tarefaDeAtualizacaoDaEquipe = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: intervalo)
+                } catch {
+                    return
+                }
+                guard let self, !Task.isCancelled else { return }
+                await atualizarEquipeEmSegundoPlano()
+            }
+        }
+    }
+
+    private func baixarAtualizacoesDaEquipe(
+        completa: Bool = false,
+        discreta: Bool = false
+    ) async {
         guard let equipeCloudKit else { return }
+        // Duas baixas simultâneas do mesmo espaço aplicariam as mesmas
+        // alterações e poderiam gravar um marcador antigo por cima do novo.
+        // A de um espaço anterior não bloqueia: ela se encerra sozinha ao
+        // perceber que o contexto mudou.
         let contexto = contextoDoEspaco
-        estadoDaSincronizacaoCloudKit = .enviando
+        guard baixaDaEquipeEmAndamento != contexto else { return }
+        baixaDaEquipeEmAndamento = contexto
+        defer {
+            if baixaDaEquipeEmAndamento == contexto { baixaDaEquipeEmAndamento = nil }
+        }
+
+        if !discreta {
+            estadoDaSincronizacaoCloudKit = .enviando
+        }
         do {
+            // Sem nenhuma conversa local não existe base para "só o que
+            // mudou": um marcador herdado esconderia a equipe inteira.
+            let semBaseLocal = arquivos.isEmpty && arquivosNaLixeira.isEmpty
+            let marcador = completa || semBaseLocal
+                ? nil
+                : await marcadoresCloudKit.marcador(para: equipeCloudKit)
+            let baixado = try await sincronizadorCloudKit.baixarAlteracoes(
+                da: equipeCloudKit,
+                desde: marcador
+            )
+            // Lidas depois da rede: um envio concluído durante a baixa já
+            // conta como entregue, e o eco dele não volta por cima do local.
             let revisoesPendentes = try await filaCloudKit.revisoesLocaisPendentes(
                 equipeID: equipeCloudKit.id
             )
+            let revisoesEntregues = await filaCloudKit.revisoesEntregues(equipeID: equipeCloudKit.id)
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+
             var conflitos = 0
-            for conversa in try await sincronizadorCloudKit.baixarComVersoes(da: equipeCloudKit) {
+            var mudouAlgo = false
+            for conversa in baixado.conversas {
                 guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
-                if PoliticaDeConflitoCloudKit.decidir(
+                switch PoliticaDeConflitoCloudKit.decidir(
                     revisaoRemota: conversa.atualizadoEm,
-                    revisaoLocalPendente: revisoesPendentes[conversa.arquivo.id]
-                ) == .preservarLocalPendente {
+                    revisaoLocalPendente: revisoesPendentes[conversa.arquivo.id],
+                    revisoesEntreguesDaqui: revisoesEntregues[conversa.arquivo.id] ?? []
+                ) {
+                case .aplicarRemoto:
+                    break
+                case .ignorarEco, .preservarLocalPendente:
+                    continue
+                case .conflito:
                     conflitos += 1
                     continue
                 }
@@ -1758,41 +1856,72 @@ final class Biblioteca {
                 try await repositorio.salvarRecebido(combinado)
                 revisoesRemotasAplicadas[conversa.arquivo.id] = conversa.atualizadoEm
                 revisoes[conversa.arquivo.id, default: 0] += 1
+                mudouAlgo = true
             }
             let ilegiveis = await sincronizadorCloudKit.ignoradasNoUltimoDownload
-            if ilegiveis > 0 {
+            // A consulta periódica repete a baixa enquanto a conversa seguir
+            // ilegível; o aviso fica com as ações que a pessoa de fato pediu.
+            if ilegiveis > 0, !discreta {
                 aoNotificar?(
                     "Conversas da equipe não lidas".localized,
                     "%lld conversa(s) da equipe não puderam ser lidas e foram puladas. Atualizar o Ōmu costuma resolver.".localized(ilegiveis),
                     .aviso
                 )
             }
-            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
-            lixeiraDaEquipeConferida = true
-            await carregar()
-            lixeiraDaEquipeConferida = false
-            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
-            if conflitos == 0 {
-                let pendentes = try await filaCloudKit.operacoesPendentes().count
+            for id in baixado.removidas {
                 guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
-                if pendentes == 0 {
-                    estadoDaSincronizacaoCloudKit = .sincronizado
-                } else {
-                    estadoDaSincronizacaoCloudKit = .falhou(
-                        "%d alteração(ões) continuam na fila do iCloud.".localized(pendentes)
-                    )
-                }
-            } else {
+                // Uma edição local que ainda vai subir recria o registro.
+                guard revisoesPendentes[id] == nil else { continue }
+                if try await recolherConversaApagadaNaEquipe(id) { mudouAlgo = true }
+            }
+            // Só depois de tudo aplicado: se algo acima falhar, a próxima
+            // baixa recebe as mesmas alterações outra vez.
+            try await marcadoresCloudKit.guardar(baixado.marcador, para: equipeCloudKit)
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+            if mudouAlgo || !discreta {
+                // A lixeira da equipe só é expurgada com o estado dos colegas
+                // já aplicado — e inteiro: uma conversa ilegível pode ser
+                // justamente a restauração feita por alguém.
+                lixeiraDaEquipeConferida = ilegiveis == 0
+                await carregar()
+                lixeiraDaEquipeConferida = false
+                guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+            }
+            if conflitos > 0 {
                 let mensagem = "%d conversa(s) têm uma edição local pendente; a cópia local foi preservada até o próximo envio.".localized(conflitos)
                 estadoDaSincronizacaoCloudKit = .falhou(mensagem)
                 aoNotificar?("Conflito de sincronização".localized, mensagem, .aviso)
+                return
+            }
+            let pendentes = try await filaCloudKit.operacoesPendentes().count
+            guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+            if pendentes == 0 {
+                estadoDaSincronizacaoCloudKit = .sincronizado
+            } else if !discreta {
+                estadoDaSincronizacaoCloudKit = .falhou(
+                    "%d alteração(ões) continuam na fila do iCloud.".localized(pendentes)
+                )
             }
         } catch {
             guard contexto == contextoDoEspaco, !Task.isCancelled else { return }
+            // Offline, a consulta periódica falharia a cada minuto. O estado
+            // e o aviso ficam com as ações que a pessoa de fato pediu.
+            guard !discreta else { return }
             let mensagem = "Não foi possível baixar as conversas da equipe: %@".localized(DiagnosticoDaSincronizacaoCloudKit.mensagem(para: error))
             estadoDaSincronizacaoCloudKit = .falhou(mensagem)
             aoNotificar?("Falha de sincronização do iCloud".localized, mensagem, .aviso)
         }
+    }
+
+    /// Alguém da equipe apagou a conversa definitivamente. Neste Mac ela vai
+    /// para a lixeira em vez de sumir: a mídia só existe aqui, e uma ação
+    /// remota não deve destruir o que ainda pode ser recuperado. Não há envio
+    /// de volta — isso recriaria o registro que acabou de ser apagado.
+    private func recolherConversaApagadaNaEquipe(_ id: ArquivoID) async throws -> Bool {
+        guard arquivos.contains(where: { $0.id == id }) else { return false }
+        await cancelarProcessamentoDoArquivo(id)
+        try await repositorio.moverParaLixeira(id)
+        return true
     }
 
     // MARK: - Consulta pela view

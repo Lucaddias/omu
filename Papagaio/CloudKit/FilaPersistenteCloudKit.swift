@@ -85,6 +85,12 @@ actor FilaPersistenteCloudKit {
     /// Cópia do arquivo da fila que não pôde ser lido por inteiro, se houve.
     nonisolated let quarentena: URL?
 
+    /// Revisões que este Mac entregou ao servidor nesta execução, por equipe
+    /// e conversa. A zona devolve o próprio envio como alteração na baixa
+    /// seguinte; sem este registro o eco seria aplicado por cima do banco
+    /// local, que nesse meio-tempo pode ter avançado.
+    private var revisoesEntregues: [String: [ArquivoID: Set<Date>]] = [:]
+
     init(url: URL, fm: FileManager = .default) {
         self.url = url
         self.fm = fm
@@ -218,6 +224,8 @@ actor FilaPersistenteCloudKit {
                         para: operacao.equipe,
                         revisao: operacao.revisao
                     )
+                    revisoesEntregues[operacao.equipe.id, default: [:]][operacao.arquivoID, default: []]
+                        .insert(operacao.revisao)
                 case .remover:
                     try await sincronizador.remover(
                         id: operacao.arquivoID,
@@ -295,6 +303,10 @@ actor FilaPersistenteCloudKit {
             )
         }
         return revisoes
+    }
+
+    func revisoesEntregues(equipeID: String) -> [ArquivoID: Set<Date>] {
+        revisoesEntregues[equipeID] ?? [:]
     }
 
     nonisolated static func atraso(para tentativa: Int) -> TimeInterval {

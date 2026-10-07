@@ -360,7 +360,7 @@ struct GestaoDeEquipeView: View {
         erroDaEntradaPorCodigo = nil
         defer { atualizandoEntradaPorCodigo = false }
         do {
-            try await servicoDeEquipes.ativarEntradaPorCodigo(na: equipe)
+            aoAtualizarEquipe(try await servicoDeEquipes.ativarEntradaPorCodigo(na: equipe))
             entradaPorCodigoAtualizada = true
         } catch {
             erroDaEntradaPorCodigo = error.localizedDescription

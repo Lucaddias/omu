@@ -3,19 +3,16 @@ import Foundation
 import os
 import PapagaioCore
 
-/// Cursor opaco: produção guarda `CKQueryOperation.Cursor`; testes usam um
-/// marcador simples sem importar detalhes do transporte.
-final class CursorDeConversasCloudKit: @unchecked Sendable {
-    fileprivate let valor: Any
-
-    init(_ valor: Any) {
-        self.valor = valor
-    }
-}
-
-struct PaginaDeConversasCloudKit: Sendable {
+/// O que mudou na zona de uma equipe desde o último marcador conhecido.
+struct AlteracoesDeConversasCloudKit: Sendable {
     let registros: [Data]
-    let proxima: CursorDeConversasCloudKit?
+    /// Nomes dos registros de conversa apagados no servidor.
+    let removidos: [String]
+    /// Ponto de continuação opaco: produção arquiva o `CKServerChangeToken`.
+    let marcador: Data?
+    let haMais: Bool
+    /// Registros que o servidor devolveu mas não puderam ser lidos.
+    var ignorados: Int = 0
 }
 
 struct PayloadDeConversaCloudKit: Codable, Sendable, Equatable {
@@ -42,6 +39,14 @@ struct ConversaRecebidaCloudKit: Sendable, Equatable {
     let midiaDisponivelNaOrigem: Bool
 }
 
+struct ConversasBaixadasCloudKit: Sendable, Equatable {
+    let conversas: [ConversaRecebidaCloudKit]
+    /// Conversas que alguém da equipe apagou definitivamente.
+    let removidas: [ArquivoID]
+    /// Guardar depois de aplicar tudo; a próxima baixa parte daqui.
+    let marcador: Data?
+}
+
 enum PoliticaDeMidiaCloudKit {
     static func prepararParaEnvio(_ arquivo: Arquivo) -> Arquivo {
         var compartilhavel = arquivo
@@ -66,17 +71,26 @@ enum PoliticaDeMidiaCloudKit {
 enum PoliticaDeConflitoCloudKit {
     enum Decisao: Equatable {
         case aplicarRemoto
+        /// O remoto é um envio deste próprio Mac voltando pela zona. O banco
+        /// local já tem esse conteúdo, ou um mais novo que ainda não subiu.
+        case ignorarEco
+        /// O remoto é mais antigo que a edição que ainda vai subir.
         case preservarLocalPendente
+        /// Outra pessoa salvou depois da edição local que ainda vai subir. A
+        /// cópia local continua valendo, mas a pessoa precisa saber.
+        case conflito
     }
 
     static func decidir(
         revisaoRemota: Date,
-        revisaoLocalPendente: Date?
+        revisaoLocalPendente: Date?,
+        revisoesEntreguesDaqui: Set<Date> = []
     ) -> Decisao {
-        guard let revisaoLocalPendente,
-              revisaoLocalPendente != revisaoRemota
-        else { return .aplicarRemoto }
-        return .preservarLocalPendente
+        if revisaoRemota == revisaoLocalPendente || revisoesEntreguesDaqui.contains(revisaoRemota) {
+            return .ignorarEco
+        }
+        guard let revisaoLocalPendente else { return .aplicarRemoto }
+        return revisaoRemota > revisaoLocalPendente ? .conflito : .preservarLocalPendente
     }
 }
 
@@ -127,10 +141,11 @@ enum DiagnosticoDaSincronizacaoCloudKit {
 /// CloudKit. Nenhum double precisa construir `CKContainer` ou acessar iCloud.
 protocol TransporteDeConversasCloudKit: Sendable {
     func salvar(_ dados: Data, id: String, equipe: EquipeDisponivel) async throws
-    func pagina(
+    /// `marcador` nulo pede a zona inteira; nesse caso não há remoções a relatar.
+    func alteracoes(
         da equipe: EquipeDisponivel,
-        continuando cursor: CursorDeConversasCloudKit?
-    ) async throws -> PaginaDeConversasCloudKit
+        desde marcador: Data?
+    ) async throws -> AlteracoesDeConversasCloudKit
     func remover(id: String, equipe: EquipeDisponivel) async throws
 }
 
@@ -147,7 +162,6 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
     }
 
     private static let tipoDeRegistro = "Conversa"
-    private static let tamanhoDaPagina = 200
     private let container: CKContainer
 
     init(container: CKContainer) {
@@ -176,109 +190,80 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
         _ = try await banco.save(registro)
     }
 
-    func pagina(
+    func alteracoes(
         da equipe: EquipeDisponivel,
-        continuando cursor: CursorDeConversasCloudKit?
-    ) async throws -> PaginaDeConversasCloudKit {
+        desde marcador: Data?
+    ) async throws -> AlteracoesDeConversasCloudKit {
         let banco = try bancoDaEquipe(equipe)
         let zona = try await zonaDaEquipe(equipe, no: banco)
-
-        if let cursor {
-            guard let paginaPendente = cursor.valor as? PaginaPendenteDeConversasCloudKit else {
-                throw ErroDeEquipeCloudKit.cursorInvalido
-            }
-            return Self.pagina(de: paginaPendente.registros, aPartirDe: paginaPendente.proximoIndice)
+        // Um marcador ilegível vale como "nunca sincronizei": a zona inteira
+        // é mais cara, mas nunca errada.
+        let token = marcador.flatMap {
+            try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
         }
 
-        // CKQuery exige que o tipo esteja marcado como indexável no schema de
-        // produção. Como a equipe já identifica uma zona customizada única,
-        // buscamos suas alterações diretamente: esse fluxo não depende de
-        // índices e inclui a carga completa quando o token é nulo.
-        let registros = try await registrosDaZona(zona, no: banco)
-        return Self.pagina(de: Self.dadosDosRegistros(registros), aPartirDe: 0)
+        // A zona é lida pelas alterações, não por CKQuery: não depende de
+        // índice no esquema e relata o que foi apagado. E é a API assíncrona
+        // de propósito — uma `CKFetchRecordZoneChangesOperation` criada à mão
+        // roda com prioridade padrão, que o sistema adia por tempo
+        // indeterminado quando o Ōmu não é o app em primeiro plano. Durante
+        // uma reunião, a baixa simplesmente não saía para a rede.
+        let resultado: (
+            modificationResultsByID: [CKRecord.ID: Result<CKDatabase.RecordZoneChange.Modification, any Error>],
+            deletions: [CKDatabase.RecordZoneChange.Deletion],
+            changeToken: CKServerChangeToken,
+            moreComing: Bool
+        )
+        do {
+            resultado = try await banco.recordZoneChanges(inZoneWith: zona, since: token)
+        } catch let erro as CKError where erro.code == .changeTokenExpired && token != nil {
+            resultado = try await banco.recordZoneChanges(inZoneWith: zona, since: nil)
+        }
+
+        // A falha de um registro (ou de um anexo que não pôde ser lido) é
+        // problema daquela conversa, não da equipe inteira: antes, uma
+        // conversa problemática bloqueava o download de todas.
+        var registros: [Data] = []
+        var ignorados = 0
+        for (id, item) in resultado.modificationResultsByID {
+            do {
+                if let dados = try Self.dados(de: item.get().record) {
+                    registros.append(dados)
+                }
+            } catch {
+                ignorados += 1
+                Self.logger.error("registro \(id.recordName, privacy: .public) ignorado no download: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        return AlteracoesDeConversasCloudKit(
+            registros: registros,
+            removidos: resultado.deletions
+                .filter { $0.recordType == Self.tipoDeRegistro }
+                .map(\.recordID.recordName),
+            marcador: try NSKeyedArchiver.archivedData(
+                withRootObject: resultado.changeToken,
+                requiringSecureCoding: true
+            ),
+            haMais: resultado.moreComing,
+            ignorados: ignorados
+        )
     }
 
     func remover(id: String, equipe: EquipeDisponivel) async throws {
         let banco = try bancoDaEquipe(equipe)
         let zona = try await zonaDaEquipe(equipe, no: banco)
-        let recordID = CKRecord.ID(recordName: id, zoneID: zona)
-        _ = try await banco.modifyRecords(
-            saving: [],
-            deleting: [recordID],
-            savePolicy: .ifServerRecordUnchanged,
-            atomically: true
-        )
+        try await LoteCloudKit.apagar([CKRecord.ID(recordName: id, zoneID: zona)], em: banco)
     }
 
     private static let logger = Logger(subsystem: "com.papagaio.Papagaio", category: "cloudkit")
 
-    private static func dadosDosRegistros(_ registros: [CKRecord]) -> [Data] {
-        registros.compactMap { registro -> Data? in
-            guard registro.recordType == tipoDeRegistro else { return nil }
-            if let asset = registro[Campo.conteudo] as? CKAsset,
-               let url = asset.fileURL {
-                // Um anexo que não pôde ser lido é problema daquela conversa,
-                // não da equipe inteira.
-                do {
-                    return try Data(contentsOf: url)
-                } catch {
-                    logger.error("conversa \(registro.recordID.recordName, privacy: .public) ignorada no download: \(error.localizedDescription, privacy: .public)")
-                    return nil
-                }
-            }
-            return registro[Campo.dados] as? Data
+    private static func dados(de registro: CKRecord) throws -> Data? {
+        guard registro.recordType == tipoDeRegistro else { return nil }
+        if let asset = registro[Campo.conteudo] as? CKAsset,
+           let url = asset.fileURL {
+            return try Data(contentsOf: url)
         }
-    }
-
-    private static func pagina(
-        de registros: [Data],
-        aPartirDe indice: Int
-    ) -> PaginaDeConversasCloudKit {
-        let limite = min(indice + tamanhoDaPagina, registros.count)
-        let proxima = limite < registros.count
-            ? CursorDeConversasCloudKit(
-                PaginaPendenteDeConversasCloudKit(
-                    registros: registros,
-                    proximoIndice: limite
-                )
-            )
-            : nil
-        return PaginaDeConversasCloudKit(
-            registros: Array(registros[indice..<limite]),
-            proxima: proxima
-        )
-    }
-
-    private func registrosDaZona(
-        _ zona: CKRecordZone.ID,
-        no banco: CKDatabase
-    ) async throws -> [CKRecord] {
-        try await withCheckedThrowingContinuation { continuation in
-            let operacao = CKFetchRecordZoneChangesOperation()
-            operacao.recordZoneIDs = [zona]
-            operacao.fetchAllChanges = true
-
-            var registros: [CKRecord] = []
-            operacao.recordWasChangedBlock = { id, resultado in
-                switch resultado {
-                case let .success(registro):
-                    registros.append(registro)
-                case let .failure(erro):
-                    // A falha de um registro não invalida os demais: antes,
-                    // uma conversa problemática bloqueava o download da
-                    // equipe toda.
-                    Self.logger.error("registro \(id.recordName, privacy: .public) ignorado no download: \(erro.localizedDescription, privacy: .public)")
-                }
-            }
-            operacao.fetchRecordZoneChangesResultBlock = { resultado in
-                if case let .failure(erro) = resultado {
-                    continuation.resume(throwing: erro)
-                } else {
-                    continuation.resume(returning: registros)
-                }
-            }
-            banco.add(operacao)
-        }
+        return registro[Campo.dados] as? Data
     }
 
     private func registroExistente(
@@ -325,16 +310,6 @@ actor TransporteDeConversasCloudKitReal: TransporteDeConversasCloudKit {
             throw ErroDeEquipeCloudKit.zonaCompartilhadaIndisponivel
         }
         return correspondentes[0].zoneID
-    }
-}
-
-private final class PaginaPendenteDeConversasCloudKit: @unchecked Sendable {
-    let registros: [Data]
-    let proximoIndice: Int
-
-    init(registros: [Data], proximoIndice: Int) {
-        self.registros = registros
-        self.proximoIndice = proximoIndice
     }
 }
 
@@ -389,14 +364,26 @@ actor SincronizadorDaBibliotecaCloudKit {
     func baixarComVersoes(
         da equipe: EquipeDisponivel
     ) async throws -> [ConversaRecebidaCloudKit] {
-        let espacoEsperado = try espacoDaEquipe(equipe)
-        var cursor: CursorDeConversasCloudKit?
-        var conversas: [ConversaRecebidaCloudKit] = []
-        ignoradasNoUltimoDownload = 0
+        try await baixarAlteracoes(da: equipe, desde: nil).conversas
+    }
 
-        repeat {
-            let pagina = try await transporte.pagina(da: equipe, continuando: cursor)
-            for dados in pagina.registros {
+    /// Baixa o que mudou na zona desde `marcador`. Com `nil` devolve todas as
+    /// conversas atuais e nenhuma remoção.
+    func baixarAlteracoes(
+        da equipe: EquipeDisponivel,
+        desde marcador: Data?
+    ) async throws -> ConversasBaixadasCloudKit {
+        let espacoEsperado = try espacoDaEquipe(equipe)
+        var marcadorAtual = marcador
+        var conversas: [ConversaRecebidaCloudKit] = []
+        var removidas: [ArquivoID] = []
+        var haMais = true
+        var ignoradas = 0
+
+        while haMais {
+            let lote = try await transporte.alteracoes(da: equipe, desde: marcadorAtual)
+            ignoradas += lote.ignorados
+            for dados in lote.registros {
                 // Um payload que não decodifica (versão mais nova do app,
                 // campo novo obrigatório) é pulado e registrado; as outras
                 // conversas da equipe continuam chegando.
@@ -404,18 +391,30 @@ actor SincronizadorDaBibliotecaCloudKit {
                 do {
                     conversa = try Self.decodificar(dados)
                 } catch {
-                    ignoradasNoUltimoDownload += 1
+                    ignoradas += 1
                     Self.logger.error("conversa ilegível ignorada no download: \(error.localizedDescription, privacy: .public)")
                     continue
                 }
-                let arquivo = conversa.arquivo
-                guard arquivo.espaco == espacoEsperado else { continue }
+                guard conversa.arquivo.espaco == espacoEsperado else { continue }
                 conversas.append(conversa)
             }
-            cursor = pagina.proxima
-        } while cursor != nil
+            removidas += lote.removidos.compactMap { UUID(uuidString: $0).map(ArquivoID.init(rawValue:)) }
+            marcadorAtual = lote.marcador
+            haMais = lote.haMais
+        }
 
-        return conversas
+        // Se o mesmo ID vier como alterado e como removido, fica a versão
+        // que mantém a conversa ativa.
+        let presentes = Set(conversas.map(\.arquivo.id))
+        ignoradasNoUltimoDownload = ignoradas
+        return ConversasBaixadasCloudKit(
+            conversas: conversas,
+            removidas: removidas.filter { !presentes.contains($0) },
+            // O marcador só avança quando tudo foi lido. Uma conversa pulada
+            // não volta a aparecer numa baixa incremental; mantendo o ponto
+            // anterior, a próxima baixa a recebe de novo.
+            marcador: ignoradas == 0 ? marcadorAtual : marcador
+        )
     }
 
     func remover(_ arquivo: Arquivo, da equipe: EquipeDisponivel) async throws {

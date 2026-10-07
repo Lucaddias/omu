@@ -23,7 +23,7 @@ func equipeLegadaNaoExigeMetadadosCloudKit() throws {
     #expect(equipe.compartilhamentoCloudKit == nil)
 }
 
-@Test("Download CloudKit consome todos os cursores acima de 200 registros")
+@Test("Download CloudKit consome todos os lotes enquanto houver mais alterações")
 func downloadCloudKitEhPaginado() async throws {
     let espaco = EspacoID()
     let equipe = equipeCloudKitDeTeste(espaco: espaco)
@@ -331,11 +331,13 @@ func conflitoCloudKitPreservaEdicaoLocal() {
             revisaoLocalPendente: nil
         ) == .aplicarRemoto
     )
+    // O servidor já tem exatamente a revisão que ainda consta como pendente:
+    // é o próprio envio voltando, não há nada a aplicar por cima do local.
     #expect(
         PoliticaDeConflitoCloudKit.decidir(
             revisaoRemota: revisaoRemota,
             revisaoLocalPendente: revisaoRemota
-        ) == .aplicarRemoto
+        ) == .ignorarEco
     )
 }
 
@@ -357,20 +359,31 @@ private struct FalhaCloudKitFake: LocalizedError {
 }
 
 private actor TransporteDeConversasFake: TransporteDeConversasCloudKit {
-    private let paginas: [[Data]]
+    private var paginas: [[Data]]
+    private var removidos: [String]
     private let falharAoPaginar: Bool
     private var falharAoSalvar: Bool
     private var indiceDaPagina = 0
     private var arquivoSalvo: Data?
+    private(set) var marcadoresRecebidos: [Data?] = []
 
     init(
         paginas: [[Data]],
+        removidos: [String] = [],
         falharAoPaginar: Bool = false,
         falharAoSalvar: Bool = false
     ) {
         self.paginas = paginas
+        self.removidos = removidos
         self.falharAoPaginar = falharAoPaginar
         self.falharAoSalvar = falharAoSalvar
+    }
+
+    /// Prepara a próxima baixa, como se a zona tivesse mudado no servidor.
+    func preparar(paginas: [[Data]], removidos: [String] = []) {
+        self.paginas = paginas
+        self.removidos = removidos
+        indiceDaPagina = 0
     }
 
     func salvar(_ dados: Data, id: String, equipe: EquipeDisponivel) throws {
@@ -378,20 +391,26 @@ private actor TransporteDeConversasFake: TransporteDeConversasCloudKit {
         arquivoSalvo = dados
     }
 
-    func pagina(
+    func alteracoes(
         da equipe: EquipeDisponivel,
-        continuando cursor: CursorDeConversasCloudKit?
-    ) throws -> PaginaDeConversasCloudKit {
+        desde marcador: Data?
+    ) throws -> AlteracoesDeConversasCloudKit {
         if falharAoPaginar { throw FalhaCloudKitFake() }
+        marcadoresRecebidos.append(marcador)
         guard indiceDaPagina < paginas.count else {
-            return PaginaDeConversasCloudKit(registros: [], proxima: nil)
+            return AlteracoesDeConversasCloudKit(
+                registros: [], removidos: removidos, marcador: Data("fim".utf8), haMais: false
+            )
         }
         let atual = indiceDaPagina
         indiceDaPagina += 1
-        let proxima = indiceDaPagina < paginas.count
-            ? CursorDeConversasCloudKit("pagina-\(indiceDaPagina)")
-            : nil
-        return PaginaDeConversasCloudKit(registros: paginas[atual], proxima: proxima)
+        let ultima = indiceDaPagina == paginas.count
+        return AlteracoesDeConversasCloudKit(
+            registros: paginas[atual],
+            removidos: ultima ? removidos : [],
+            marcador: Data("pagina-\(indiceDaPagina)".utf8),
+            haMais: !ultima
+        )
     }
 
     func remover(id: String, equipe: EquipeDisponivel) {}
@@ -449,8 +468,8 @@ private actor TransporteCloudKitSuspenso: TransporteDeConversasCloudKit {
         }
     }
 
-    func pagina(da equipe: EquipeDisponivel, continuando cursor: CursorDeConversasCloudKit?) -> PaginaDeConversasCloudKit {
-        PaginaDeConversasCloudKit(registros: [], proxima: nil)
+    func alteracoes(da equipe: EquipeDisponivel, desde marcador: Data?) -> AlteracoesDeConversasCloudKit {
+        AlteracoesDeConversasCloudKit(registros: [], removidos: [], marcador: nil, haMais: false)
     }
 
     func remover(id: String, equipe: EquipeDisponivel) {}
@@ -633,4 +652,195 @@ func downloadPulaRegistroIlegivel() async throws {
 
     #expect(recebidas.map(\.arquivo.titulo) == ["Legível"])
     #expect(await sincronizador.ignoradasNoUltimoDownload == 1)
+}
+
+@Test("Remoto mais novo que a edição local pendente é conflito; mais antigo é só eco")
+func conflitoCloudKitDistingueEcoDeEdicaoAlheia() {
+    let pendente = Date(timeIntervalSince1970: 2_000)
+
+    #expect(
+        PoliticaDeConflitoCloudKit.decidir(
+            revisaoRemota: pendente.addingTimeInterval(60),
+            revisaoLocalPendente: pendente
+        ) == .conflito
+    )
+    #expect(
+        PoliticaDeConflitoCloudKit.decidir(
+            revisaoRemota: pendente.addingTimeInterval(-60),
+            revisaoLocalPendente: pendente
+        ) == .preservarLocalPendente
+    )
+    #expect(
+        PoliticaDeConflitoCloudKit.decidir(
+            revisaoRemota: pendente,
+            revisaoLocalPendente: nil,
+            revisoesEntreguesDaqui: [pendente]
+        ) == .ignorarEco
+    )
+}
+
+@Test("Baixa incremental repassa o marcador entre lotes e relata as conversas apagadas")
+func baixaIncrementalRelataRemocoes() async throws {
+    let espaco = EspacoID()
+    let equipe = equipeCloudKitDeTeste(espaco: espaco)
+    let mantida = Arquivo(titulo: "Mantida", pastaRelativa: "", espaco: espaco)
+    let apagada = ArquivoID()
+    let codificador = JSONEncoder()
+    let transporte = TransporteDeConversasFake(
+        paginas: [[try codificador.encode(mantida)], []],
+        removidos: [apagada.rawValue.uuidString, mantida.id.rawValue.uuidString, "nao-e-uuid"]
+    )
+    let sincronizador = SincronizadorDaBibliotecaCloudKit(transporte: transporte)
+    let anterior = Data("anterior".utf8)
+
+    let baixado = try await sincronizador.baixarAlteracoes(da: equipe, desde: anterior)
+
+    #expect(baixado.conversas.map(\.arquivo.id) == [mantida.id])
+    // Alterada e removida na mesma baixa: prevalece a versão que preserva dados.
+    #expect(baixado.removidas == [apagada])
+    #expect(baixado.marcador == Data("pagina-2".utf8))
+    #expect(await transporte.marcadoresRecebidos == [anterior, Data("pagina-1".utf8)])
+}
+
+@Test("Marcador de sincronização sobrevive ao relançamento e não vale para outra zona")
+func marcadorDeSincronizacaoEhPersistente() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let url = raiz.appendingPathComponent("marcadores.json")
+    let equipe = equipeCloudKitDeTeste(espaco: EspacoID())
+    let marcador = Data("ponto".utf8)
+
+    try await MarcadoresDeSincronizacaoCloudKit(url: url).guardar(marcador, para: equipe)
+
+    let aposRelancamento = MarcadoresDeSincronizacaoCloudKit(url: url)
+    #expect(await aposRelancamento.marcador(para: equipe) == marcador)
+
+    var emOutraZona = equipe
+    emOutraZona.zonaCloudKit = "equipe.outra"
+    #expect(await aposRelancamento.marcador(para: emOutraZona) == nil)
+
+    try await aposRelancamento.descartar(daEquipeComID: equipe.id)
+    #expect(await MarcadoresDeSincronizacaoCloudKit(url: url).marcador(para: equipe) == nil)
+}
+
+@MainActor
+@Test("Conversa apagada por um colega vai para a lixeira local; edição pendente a mantém ativa")
+func remocaoRemotaRecolheConversaSemDestruirDados() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let espaco = EspacoID()
+    let equipe = equipeCloudKitDeTeste(espaco: espaco)
+    let apagada = Arquivo(titulo: "Apagada pelo colega", pastaRelativa: "", espaco: espaco)
+    let emEdicao = Arquivo(titulo: "Com edição local", pastaRelativa: "", espaco: espaco)
+    let codificador = JSONEncoder()
+    let transporte = TransporteDeConversasFake(
+        paginas: [[try codificador.encode(apagada), try codificador.encode(emEdicao)]]
+    )
+    let fila = FilaPersistenteCloudKit(url: raiz.appendingPathComponent("fila.json"))
+    let biblioteca = Biblioteca(
+        armazenamento: Armazenamento(raiz: raiz),
+        repositorio: SwiftDataRepository(
+            modelContainer: try SwiftDataRepository.containerLocal(
+                nome: UUID().uuidString,
+                emMemoria: true
+            )
+        ),
+        espaco: espaco,
+        sincronizadorCloudKit: SincronizadorDaBibliotecaCloudKit(transporte: transporte),
+        filaCloudKit: fila
+    )
+    biblioteca.intervaloDeAtualizacaoDaEquipe = .seconds(3_600)
+
+    await biblioteca.usarEspaco(espaco, equipeCloudKit: equipe)
+    #expect(Set(biblioteca.arquivos.map(\.id)) == [apagada.id, emEdicao.id])
+
+    try await fila.agendarEnvio(emEdicao, para: equipe)
+    await transporte.preparar(
+        paginas: [],
+        removidos: [apagada.id.rawValue.uuidString, emEdicao.id.rawValue.uuidString]
+    )
+    await biblioteca.atualizarEquipeEmSegundoPlano()
+
+    #expect(biblioteca.arquivos.map(\.id) == [emEdicao.id])
+    #expect(biblioteca.arquivosNaLixeira.map(\.id) == [apagada.id])
+    // A primeira baixa parte do zero; a segunda continua do marcador guardado.
+    #expect(await transporte.marcadoresRecebidos == [nil, Data("pagina-1".utf8)])
+}
+
+@MainActor
+@Test("Biblioteca da equipe vazia ignora marcador herdado e baixa a zona inteira")
+func bibliotecaVaziaBaixaZonaInteira() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let espaco = EspacoID()
+    let equipe = equipeCloudKitDeTeste(espaco: espaco)
+    try await MarcadoresDeSincronizacaoCloudKit(
+        url: raiz
+            .appendingPathComponent("CloudKit", isDirectory: true)
+            .appendingPathComponent("marcadores-de-sincronizacao.json")
+    ).guardar(Data("herdado".utf8), para: equipe)
+    let transporte = TransporteDeConversasFake(
+        paginas: [[try JSONEncoder().encode(Arquivo(titulo: "Da equipe", pastaRelativa: "", espaco: espaco))]]
+    )
+    let biblioteca = Biblioteca(
+        armazenamento: Armazenamento(raiz: raiz),
+        repositorio: SwiftDataRepository(
+            modelContainer: try SwiftDataRepository.containerLocal(
+                nome: UUID().uuidString,
+                emMemoria: true
+            )
+        ),
+        espaco: espaco,
+        sincronizadorCloudKit: SincronizadorDaBibliotecaCloudKit(transporte: transporte)
+    )
+    biblioteca.intervaloDeAtualizacaoDaEquipe = .seconds(3_600)
+
+    await biblioteca.usarEspaco(espaco, equipeCloudKit: equipe)
+
+    #expect(await transporte.marcadoresRecebidos == [nil])
+    #expect(biblioteca.arquivos.map(\.titulo) == ["Da equipe"])
+}
+
+@MainActor
+@Test("Eco do próprio envio não volta por cima do que avançou neste Mac")
+func ecoDoProprioEnvioNaoSobrescreveLocal() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let espaco = EspacoID()
+    let equipe = equipeCloudKitDeTeste(espaco: espaco)
+    let original = Arquivo(titulo: "Original", pastaRelativa: "", espaco: espaco)
+    let transporte = TransporteDeConversasFake(paginas: [[try JSONEncoder().encode(original)]])
+    let repositorio = SwiftDataRepository(
+        modelContainer: try SwiftDataRepository.containerLocal(
+            nome: UUID().uuidString,
+            emMemoria: true
+        )
+    )
+    let biblioteca = Biblioteca(
+        armazenamento: Armazenamento(raiz: raiz),
+        repositorio: repositorio,
+        espaco: espaco,
+        sincronizadorCloudKit: SincronizadorDaBibliotecaCloudKit(transporte: transporte),
+        filaCloudKit: FilaPersistenteCloudKit(url: raiz.appendingPathComponent("fila.json"))
+    )
+    biblioteca.intervaloDeAtualizacaoDaEquipe = .seconds(3_600)
+    await biblioteca.usarEspaco(espaco, equipeCloudKit: equipe)
+    let local = try #require(biblioteca.arquivos.first)
+
+    await biblioteca.renomear(local, para: "Enviado daqui")
+    // Salvar só agenda o envio; a rede roda numa tarefa à parte.
+    await biblioteca.aguardarEnvioCloudKit()
+    let enviado = try #require(await transporte.ultimoArquivoSalvo())
+    // O pipeline grava progresso no banco local sem passar pela fila.
+    var avancado = try #require(try await repositorio.buscarCompleto(id: original.id))
+    avancado.titulo = "Avanço local"
+    try await repositorio.salvar(avancado)
+
+    await transporte.preparar(paginas: [[enviado]])
+    await biblioteca.atualizarEquipeEmSegundoPlano()
+
+    #expect(try await repositorio.buscarCompleto(id: original.id)?.titulo == "Avanço local")
 }

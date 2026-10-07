@@ -247,6 +247,12 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .abrirGravacaoNoApp)) { _ in
             voltarParaGravacao()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // Quem volta ao Ōmu espera ver o que a equipe fez enquanto outro
+            // app estava na frente, sem aguardar a próxima consulta periódica.
+            guard politicaDeInicializacaoExterna.permiteServicosExternos else { return }
+            Task { await biblioteca?.atualizarEquipeEmSegundoPlano() }
+        }
         .task {
             await abrir()
             await politicaDeInicializacaoExterna.executar {
@@ -457,7 +463,7 @@ struct ContentView: View {
                                 nomeDoPerfil: perfil.nome,
                                 estadoDaSincronizacao: biblioteca?.estadoDaSincronizacaoCloudKit ?? .local,
                                 aoRetomarSincronizacao: {
-                                    Task { await biblioteca?.retomarSincronizacaoCloudKit(forcar: true) }
+                                    Task { await biblioteca?.sincronizarEquipeAgora() }
                                 })
         }
     }
