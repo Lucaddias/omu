@@ -24,8 +24,17 @@ final class ModelosViewModel {
     /// por eles (a fila de processamento) pode continuar.
     var aoFicarPronto: (@MainActor () -> Void)?
 
+    /// Onde o resumo é gerado. Decide quais pesos são exigidos — e baixados:
+    /// na nuvem privada da Apple, só o Whisper.
+    private(set) var modo: ModoDeResumo
+    /// Chamado quando a escolha muda: quem processa (a `Biblioteca`) acompanha.
+    var aoMudarModo: (@MainActor (ModoDeResumo) -> Void)?
+
     private let pastaDoContainer: URL
     private let download: DownloadDeModelos
+    private let preferencias: UserDefaults
+    /// Injetável: os testes simulam um Mac que alcança a nuvem privada.
+    private let disponibilidadeDaNuvem: @MainActor () -> DisponibilidadeDaNuvemPrivada
     private var tarefa: Task<Void, Never>?
 
 #if OMU_PERF
@@ -33,12 +42,24 @@ final class ModelosViewModel {
         self.pastaDoContainer = pastaDoContainer
         self.download = DownloadDeModelos(pastaDeModelos: pastaDoContainer)
         self.pastaEscolhida = ignorarPastaEscolhidaPersistida ? nil : PastaDeModelosDoUsuario.resolver()
+        self.preferencias = .standard
+        self.disponibilidadeDaNuvem = { NuvemPrivada.disponibilidade }
+        // A medição de desempenho é a do pipeline local.
+        self.modo = PerfProbe.ativada ? .local : PreferenciaDeResumo.modoAtivo()
     }
 #else
-    init(pastaDoContainer: URL) {
+    init(
+        pastaDoContainer: URL,
+        ignorarPastaEscolhidaPersistida: Bool = false,
+        preferencias: UserDefaults = .standard,
+        disponibilidadeDaNuvem: @escaping @MainActor () -> DisponibilidadeDaNuvemPrivada = { NuvemPrivada.disponibilidade }
+    ) {
         self.pastaDoContainer = pastaDoContainer
         self.download = DownloadDeModelos(pastaDeModelos: pastaDoContainer)
-        self.pastaEscolhida = PastaDeModelosDoUsuario.resolver()
+        self.pastaEscolhida = ignorarPastaEscolhidaPersistida ? nil : PastaDeModelosDoUsuario.resolver()
+        self.preferencias = preferencias
+        self.disponibilidadeDaNuvem = disponibilidadeDaNuvem
+        self.modo = PreferenciaDeResumo.modoAtivo(em: preferencias, disponibilidade: disponibilidadeDaNuvem())
     }
 #endif
 
@@ -51,7 +72,60 @@ final class ModelosViewModel {
     /// Verificação barata: tamanho em disco, não SHA-256 dos pesos (ver a nota
     /// em `Preflight.pesoValido`).
     func verificar() {
-        resultado = Preflight(pastaDeModelos: pasta).avaliar()
+        resultado = Preflight(pastaDeModelos: pasta).avaliar(para: modo)
+    }
+
+    // MARK: - Modo de resumo
+
+    /// A nuvem privada da Apple pode ser oferecida neste Mac, neste build.
+    var nuvemDisponivel: Bool { disponibilidadeDaNuvem() == .disponivel }
+
+    /// Por que a nuvem privada não pode ser oferecida, quando não pode.
+    var motivoDaNuvemIndisponivel: String { disponibilidadeDaNuvem().mensagem }
+
+    /// Guarda a escolha e reavalia o que falta: trocar para a nuvem pode
+    /// deixar tudo pronto na hora, sem baixar o Qwen.
+    func escolherModo(_ novo: ModoDeResumo) {
+        // Um download em curso foi pedido para o modo anterior: seguiria
+        // baixando o Qwen em segundo plano depois de a pessoa dispensá-lo.
+        // O que já desceu fica em disco e é retomado se voltar a ser pedido.
+        if baixando { cancelar() }
+        PreferenciaDeResumo.guardar(novo, em: preferencias)
+        modo = novo
+        verificar()
+        aoMudarModo?(novo)
+        if pronto { aoFicarPronto?() }
+    }
+
+    /// O Qwen que o próprio Ōmu baixou — o único que ele pode apagar.
+    private var modeloLocalDoApp: URL {
+        pastaDoContainer.appendingPathComponent(Pesos.qwen35_9B.nomeArquivo)
+    }
+
+    /// Há o que liberar: o Qwen (ou um download dele pela metade) na pasta
+    /// do app, sem uso enquanto o resumo é feito pela nuvem.
+    var podeRemoverModeloLocal: Bool {
+        guard modo == .nuvemPrivada, !baixando else { return false }
+        let fm = FileManager.default
+        return fm.fileExists(atPath: modeloLocalDoApp.path)
+            || fm.fileExists(atPath: modeloLocalDoApp.appendingPathExtension("parcial").path)
+    }
+
+    /// Apaga o Qwen da pasta do app. Nunca toca na pasta escolhida pela
+    /// pessoa: aqueles arquivos não são do Ōmu.
+    func removerModeloLocal() {
+        guard podeRemoverModeloLocal else { return }
+        let fm = FileManager.default
+        do {
+            for url in [modeloLocalDoApp, modeloLocalDoApp.appendingPathExtension("parcial")]
+            where fm.fileExists(atPath: url.path) {
+                try fm.removeItem(at: url)
+            }
+            erro = nil
+        } catch {
+            erro = "Não foi possível remover o modelo local: %@".localized(error.localizedDescription)
+        }
+        verificar()
     }
 
     /// - Important: `url` precisa vir do `.fileImporter` com o acesso

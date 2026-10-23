@@ -33,7 +33,8 @@ func uso() {
       papagaio-eval run          harness de medição (qualidade/WER) — reserva
       papagaio-eval resolver     diagnóstico da atribuição de falantes:
                                 <audio> (ou --fixture <json>), --modelos <dir>,
-                                --pasta <dir de diarização>, --sem-modelo
+                                --pasta <dir de diarização>, --sem-modelo,
+                                --no-dispositivo (modelo da Apple, não o Qwen)
       papagaio-eval granola      fluxo OAuth + MCP reais no Granola
 
     GRANOLA:
@@ -355,7 +356,7 @@ case "resolver":
     var restantes = Array(argumentos.dropFirst())
     if restantes.first == "--fixture" {
         guard restantes.count > 1 else {
-            print("uso: papagaio-eval resolver --fixture <json> [--modelos <dir>] [--sem-modelo]")
+            print("uso: papagaio-eval resolver --fixture <json> [--modelos <dir>] [--sem-modelo] [--no-dispositivo]")
             exit(2)
         }
         opcoes.fixture = URL(fileURLWithPath: restantes[1])
@@ -364,7 +365,7 @@ case "resolver":
         opcoes.audio = URL(fileURLWithPath: primeiro)
         restantes.removeFirst()
     } else {
-        print("uso: papagaio-eval resolver <audio> [--pasta <dir>] [--modelos <dir>] [--sem-modelo]")
+        print("uso: papagaio-eval resolver <audio> [--pasta <dir>] [--modelos <dir>] [--sem-modelo] [--no-dispositivo]")
         exit(2)
     }
     while let flag = restantes.first {
@@ -379,6 +380,9 @@ case "resolver":
             restantes.removeFirst(2)
         case "--sem-modelo":
             opcoes.semModelo = true
+            restantes.removeFirst()
+        case "--no-dispositivo":
+            opcoes.noDispositivo = true
             restantes.removeFirst()
         default:
             exit(2)

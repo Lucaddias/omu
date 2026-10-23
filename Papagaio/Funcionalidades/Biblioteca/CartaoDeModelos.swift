@@ -1,3 +1,4 @@
+import PapagaioCore
 import SwiftUI
 
 
@@ -51,6 +52,23 @@ struct CartaoDeModelos: View {
                     .foregroundStyle(PapagaioTema.perigo)
             }
 
+            if ofereceNuvem {
+                // Antes de baixar qualquer coisa: o resumo pela nuvem privada
+                // dispensa os 6,2 GB do Qwen, mas manda a conversa para fora
+                // do Mac. As duas opções aparecem juntas, com o custo de cada.
+                // Dois rótulos longos: lado a lado quando cabem, empilhados
+                // numa janela estreita — nunca truncados.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: PapagaioTema.Espaco.curto) { opcoesDeResumo }
+                    VStack(alignment: .leading, spacing: PapagaioTema.Espaco.curto) { opcoesDeResumo }
+                }
+
+                Text("Na nuvem privada, a transcrição continua neste Mac. Para gerar o resumo, o texto da conversa é enviado ao Private Cloud Compute da Apple, que não o armazena. O uso tem um limite diário por conta iCloud.".localized)
+                    .font(.caption)
+                    .foregroundStyle(PapagaioTema.textoSecundario)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if modelos.resultado?.bloqueia == false, !modelos.faltando.isEmpty {
                 HStack(spacing: PapagaioTema.Espaco.curto) {
                     if modelos.baixando {
@@ -60,7 +78,7 @@ struct CartaoDeModelos: View {
                             .font(.caption)
                             .foregroundStyle(PapagaioTema.textoSecundario)
                     } else {
-                        if modelos.pastaEscolhida == nil {
+                        if modelos.pastaEscolhida == nil, !ofereceNuvem {
                             Button("Baixar modelos (%@)".localized(gb(totalFaltando)), action: modelos.baixar)
                                 .buttonStyle(BotaoPrincipalPapagaio())
                         }
@@ -99,6 +117,57 @@ struct CartaoDeModelos: View {
         modelos.faltando.reduce(0) { $0 + $1.bytes }
     }
 
+    // MARK: - Resumo pela nuvem privada
+
+    /// O que ainda falta baixar se o resumo for para a nuvem: o Qwen deixa
+    /// de ser exigido.
+    private var faltandoNaNuvem: [PesoDeModelo] {
+        modelos.faltando.filter { $0 != Pesos.qwen35_9B }
+    }
+
+    /// A nuvem privada resolve o que está impedindo o resumo local: o Qwen
+    /// ainda não foi baixado, ou não cabe na memória deste Mac.
+    private var ofereceNuvem: Bool {
+        guard modelos.modo == .local, modelos.nuvemDisponivel, !modelos.baixando else { return false }
+        switch modelos.resultado {
+        case let .pesosFaltando(pesos):
+            return pesos.contains(Pesos.qwen35_9B)
+        case let .ramInsuficiente(instalada, _):
+            return instalada >= Preflight.ramMinimaNaNuvem
+        default:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private var opcoesDeResumo: some View {
+        Button(rotuloDaNuvem, action: usarNuvem)
+            .buttonStyle(BotaoPrincipalPapagaio())
+        if modelos.resultado?.bloqueia == false, modelos.pastaEscolhida == nil {
+            Button("Tudo neste Mac — baixar %@".localized(gb(totalFaltando)), action: usarEsteMac)
+                .buttonStyle(BotaoDeContornoPapagaio())
+        }
+    }
+
+    private var rotuloDaNuvem: String {
+        let bytes = faltandoNaNuvem.reduce(0) { $0 + $1.bytes }
+        guard bytes > 0, modelos.pastaEscolhida == nil else {
+            return "Resumo pela nuvem privada da Apple".localized
+        }
+        return "Resumo pela nuvem privada da Apple — baixar %@".localized(gb(bytes))
+    }
+
+    private func usarNuvem() {
+        modelos.escolherModo(.nuvemPrivada)
+        // Na pasta do app, o que ainda faltar (o Whisper) começa a baixar já.
+        if modelos.pastaEscolhida == nil { modelos.baixar() }
+    }
+
+    private func usarEsteMac() {
+        modelos.escolherModo(.local)
+        modelos.baixar()
+    }
+
     private var descricaoDaPasta: String {
         if let escolhida = modelos.pastaEscolhida {
             return "Pasta ativa: %@".localized(escolhida.path)
@@ -116,7 +185,9 @@ struct CartaoDeModelos: View {
         return "cerca de %.1f h".localized(horas)
     }
 
+    /// Gigabytes decimais, como o Finder mostra — e como as Configurações
+    /// e a página do app descrevem os modelos (3,1 GB e 6,2 GB).
     private func gb(_ bytes: Int64) -> String {
-        String(format: "%.1f GB", Double(bytes) / 1_073_741_824)
+        String(format: "%.1f GB", locale: LocalizacaoDoApp.localeAtual, Double(bytes) / 1_000_000_000)
     }
 }

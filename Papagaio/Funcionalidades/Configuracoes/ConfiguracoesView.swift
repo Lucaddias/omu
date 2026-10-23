@@ -13,6 +13,8 @@ struct ConfiguracoesView: View {
     var googleCalendar: GoogleCalendarViewModel?
     /// Necessária para importar; `nil` enquanto a biblioteca não abriu.
     var biblioteca: Biblioteca?
+    /// Dona da escolha de onde o resumo é gerado e dos pesos em disco.
+    var modelos: ModelosViewModel?
     /// Mesma chave lida pelo `PapagaioApp`, que é quem abre e fecha o painel.
     @AppStorage("painelFlutuanteDuranteGravacao") private var painelFlutuante = true
     @AppStorage("mostrarPorcentagemConfianca") private var mostrarPorcentagemConfianca = true
@@ -37,6 +39,10 @@ struct ConfiguracoesView: View {
                 SecaoDePersonalizacaoDosCartoes()
 
                 secaoDeTranscricao
+
+                if let modelos {
+                    SecaoDeResumo(modelos: modelos)
+                }
 
                 secaoDeGranola
 

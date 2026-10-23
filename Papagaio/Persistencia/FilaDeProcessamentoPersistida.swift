@@ -9,6 +9,9 @@ struct PendenciaDeProcessamento: Codable, Equatable {
     var somenteResumo: Bool
     /// Quantas vezes o processamento começou sem chegar ao fim.
     var tentativas: Int
+    /// Resumo pela nuvem adiado: por quê, e até quando não tentar de novo.
+    /// `nil` em todo pedido comum (e nos arquivos de versões anteriores).
+    var espera: EsperaDoResumo?
 }
 
 /// A fila de processamento em disco.
@@ -41,6 +44,8 @@ struct FilaDeProcessamentoPersistida {
         var pendencias = todas()
         if let indice = pendencias.firstIndex(where: { $0.id == id.rawValue }) {
             pendencias[indice].somenteResumo = somenteResumo
+            // Pedir de novo é tentar agora, não esperar o prazo anterior.
+            pendencias[indice].espera = nil
         } else {
             pendencias.append(PendenciaDeProcessamento(
                 id: id.rawValue, espaco: espaco.rawValue, somenteResumo: somenteResumo, tentativas: 0
@@ -57,6 +62,35 @@ struct FilaDeProcessamentoPersistida {
     /// pedido continua valendo e a tentativa não conta.
     func adiar(_ id: ArquivoID) {
         alterar(id) { $0.tentativas = 0 }
+    }
+
+    /// A nuvem privada não entregou o resumo por algo que passa sozinho
+    /// (rede, cota, serviço fora). A transcrição já está salva: o pedido
+    /// vira "só o resumo", sem tentativa contada, e espera.
+    func adiarResumo(_ id: ArquivoID, espaco: EspacoID, espera: EsperaDoResumo) {
+        var pendencias = todas()
+        if let indice = pendencias.firstIndex(where: { $0.id == id.rawValue }) {
+            pendencias[indice].somenteResumo = true
+            pendencias[indice].tentativas = 0
+            pendencias[indice].espera = espera
+        } else {
+            pendencias.append(PendenciaDeProcessamento(
+                id: id.rawValue, espaco: espaco.rawValue, somenteResumo: true, tentativas: 0, espera: espera
+            ))
+        }
+        gravar(pendencias)
+    }
+
+    /// A internet voltou: quem esperava por ela pode tentar já.
+    func liberarEsperaDeRede(do espaco: EspacoID) {
+        var pendencias = todas()
+        var mudou = false
+        for indice in pendencias.indices
+        where pendencias[indice].espaco == espaco.rawValue && pendencias[indice].espera?.cedeARede == true {
+            pendencias[indice].espera = .rede(ate: .distantPast)
+            mudou = true
+        }
+        if mudou { gravar(pendencias) }
     }
 
     func remover(_ id: ArquivoID) {

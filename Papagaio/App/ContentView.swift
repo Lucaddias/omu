@@ -449,7 +449,8 @@ struct ContentView: View {
             MidiasView(biblioteca: biblioteca, consulta: consulta)
         case .configuracoes:
             ConfiguracoesView(processamentoAutomatico: $processamentoAutomatico, exibirFichaAutomaticamente: $exibirFichaAutomaticamente, aparencia: aparencia,
-                              granola: granola, googleCalendar: googleCalendar, biblioteca: biblioteca)
+                              granola: granola, googleCalendar: googleCalendar, biblioteca: biblioteca,
+                              modelos: modelos)
         case .perfil:
             PerfilPessoalView(perfil: perfil, equipeAtiva: equipeAtiva, equipes: equipes,
                                aoSelecionarEquipe: usarEquipe, aoAdicionarEquipe: adicionarEquipe,
@@ -521,6 +522,10 @@ struct ContentView: View {
 #endif
             gerenciador.verificar()
             nova.pastaDeModelos = gerenciador.pasta
+            nova.modoDeResumo = gerenciador.modo
+            gerenciador.aoMudarModo = { [weak nova] modo in
+                nova?.modoDeResumo = modo
+            }
             // Conversas recusadas por falta de modelos voltam à fila quando o
             // download termina, sem a pessoa precisar pedir de novo.
             gerenciador.aoFicarPronto = { [weak nova, weak gerenciador] in

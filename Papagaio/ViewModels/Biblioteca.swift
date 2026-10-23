@@ -39,6 +39,13 @@ final class Biblioteca {
     /// Quando cada processamento começou, para estimar o quanto falta.
     private(set) var iniciadoEm: [UUID: Date] = [:]
     private(set) var erros: [UUID: String] = [:]
+    /// Conversas transcritas cujo resumo pela nuvem privada ficou para
+    /// depois, com o motivo. Não é erro: o pedido continua em disco e é
+    /// refeito sozinho (ver `adiarResumo`).
+    private(set) var resumosAdiados: [UUID: String] = [:]
+    /// Pedidos que a própria fila reabriu para tentar de novo um resumo
+    /// adiado. Se esbarrarem no mesmo motivo, não notificam outra vez.
+    private var novasTentativasDeResumo: Set<ArquivoID> = []
 
     /// Falha ao abrir a lista do banco. Observável por conta própria —
     /// dentro do dicionário `erros` (chaveado por arquivo) ela não tinha
@@ -90,6 +97,19 @@ final class Biblioteca {
     /// pasta ativa do `ModelosViewModel` — pode ser a do container ou uma
     /// escolhida pelo usuário.
     var pastaDeModelos: URL
+
+    /// Onde o resumo é gerado. A `ContentView` mantém isto igual à escolha
+    /// guardada pelo `ModelosViewModel`.
+    var modoDeResumo: ModoDeResumo = .local
+
+    /// O resumo pela nuvem privada da Apple. Injetável: os testes respondem
+    /// no lugar dela, sem rede nem entitlement.
+    @ObservationIgnored
+    var resumirNaNuvem: @Sendable ([Trecho], IdiomaDeProcessamento?) async throws -> Resumo = { trechos, idioma in
+        try await NuvemPrivadaEngine().summarize(trechos, idiomaDeSaida: idioma)
+    }
+    @ObservationIgnored
+    private let despertadorDeResumos = DespertadorDeResumos()
 
     /// Controla somente a entrada automática de áudios novos na fila. A fila
     /// continua sendo o único caminho para qualquer processamento manual ou
@@ -324,6 +344,10 @@ final class Biblioteca {
 
     private var contextoDoEspaco = UUID()
     private var cargaAtual = UUID()
+    /// O espaço cuja lista está em `arquivos`. Entre trocar de espaço e a
+    /// carga terminar a lista fica vazia — e quem conclui "esta conversa não
+    /// existe mais" olhando para ela apagaria pedidos válidos.
+    private var espacoDaListaCarregada: EspacoID?
 
     func usarEspaco(_ novoEspaco: EspacoID, equipeCloudKit: EquipeDisponivel? = nil) async {
         contextoDoEspaco = UUID()
@@ -343,8 +367,10 @@ final class Biblioteca {
             espaco = novoEspaco
             arquivos.removeAll()
             arquivosNaLixeira.removeAll()
+            espacoDaListaCarregada = nil
             fases.removeAll()
             erros.removeAll()
+            resumosAdiados.removeAll()
             erroDaLixeira = nil
         }
         await carregar()
@@ -408,6 +434,7 @@ final class Biblioteca {
                   !Task.isCancelled else { return }
             arquivos = ativos
             arquivosNaLixeira = excluidos
+            espacoDaListaCarregada = espacoDaCarga
             erroDeCarregamento = nil
             // Numa equipe, o estado da lixeira só vale depois de baixar o que
             // os colegas fizeram: uma conversa restaurada por alguém ainda
@@ -1106,6 +1133,7 @@ final class Biblioteca {
               !filaDeProcessamento.contains(arquivo.id) else { return }
 
         erros[arquivo.id.rawValue] = nil
+        resumosAdiados[arquivo.id.rawValue] = nil
         filaDeProcessamento.append(arquivo.id)
         modosDaFila[arquivo.id] = modo
         filaPersistida.registrar(arquivo.id, espaco: arquivo.espaco, somenteResumo: modo == .somenteResumo)
@@ -1117,13 +1145,11 @@ final class Biblioteca {
     /// modelos. Chamado a cada carga da lista e quando o download dos modelos
     /// termina; pedidos já na fila são ignorados por `enfileirarProcessamento`.
     func retomarProcessamentosPendentes() {
-        guard processamentoAutomatico else { return }
+        // A hora marcada de um resumo adiado e a volta da internet chegam a
+        // qualquer momento, inclusive no meio de uma troca de espaço.
+        guard espacoDaListaCarregada == espaco else { return }
+        defer { reagendarResumosAdiados() }
         let pendencias = filaPersistida.pendentes(do: espaco)
-        guard !pendencias.isEmpty else { return }
-        // Sem modelos (ou sem memória/disco) cada pedido seria recusado de
-        // novo: melhor esperar em disco do que piscar o erro em cada cartão.
-        let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar()
-        guard preflight == .pronto || preflight == .termicoCritico else { return }
         for pendencia in pendencias {
             let id = ArquivoID(rawValue: pendencia.id)
             guard arquivoEmProcessamento != id, !filaDeProcessamento.contains(id) else { continue }
@@ -1132,13 +1158,97 @@ final class Biblioteca {
                 filaPersistida.remover(id)
                 continue
             }
+            if let espera = pendencia.espera {
+                // Um resumo adiado continua um pedido que a pessoa já fez:
+                // não depende do processamento automático, só do prazo.
+                guard espera.ate <= Date() else {
+                    resumosAdiados[pendencia.id] = espera.mensagem
+                    continue
+                }
+            } else if !processamentoAutomatico {
+                continue
+            }
+            let modo: ModoDeProcessamento = pendencia.somenteResumo ? .somenteResumo : .completo
+            // Sem modelos (ou sem memória/disco) cada pedido seria recusado de
+            // novo: melhor esperar em disco do que piscar o erro em cada cartão.
+            let preflight = preflight(para: modo)
+            guard preflight == .pronto || preflight == .termicoCritico else { continue }
             guard pendencia.tentativas < FilaDeProcessamentoPersistida.tentativasMaximas else {
                 filaPersistida.remover(id)
                 erros[pendencia.id] = "O processamento desta conversa foi interrompido mais de uma vez. Tente de novo pelo menu da conversa.".localized
                 continue
             }
-            enfileirarProcessamento(arquivo, modo: pendencia.somenteResumo ? .somenteResumo : .completo)
+            if pendencia.espera != nil { novasTentativasDeResumo.insert(id) }
+            enfileirarProcessamento(arquivo, modo: modo)
         }
+    }
+
+    /// O preflight do que este pedido vai de fato carregar.
+    private func preflight(para modo: ModoDeProcessamento) -> ResultadoPreflight {
+        let preflight = Preflight(pastaDeModelos: pastaDeModelos)
+        // Resumir pela nuvem uma transcrição que já existe não carrega
+        // modelo nenhum: nem peso em disco, nem piso de memória.
+        if modoDeResumo == .nuvemPrivada, modo == .somenteResumo {
+            return preflight.avaliar(pesos: [], ramMinima: 0)
+        }
+        return preflight.avaliar(para: modoDeResumo)
+    }
+
+    /// O Qwen está em disco e cabe na memória: é o plano B do resumo pela
+    /// nuvem, sem espera por rede nem por cota.
+    private var modeloLocalPronto: Bool {
+        let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar(pesos: [Pesos.qwen35_9B])
+        return preflight == .pronto || preflight == .termicoCritico
+    }
+
+    // MARK: - Resumo adiado pela nuvem privada
+
+    /// A nuvem privada não entregou o resumo por algo que passa sozinho. A
+    /// transcrição já está no banco: vai para a tela agora, e o pedido fica
+    /// em disco como "só o resumo", para ser refeito sem re-transcrever.
+    ///
+    /// - Parameter transcricaoNova: o pedido era completo, então a lista
+    ///   ainda mostra a conversa de antes do Whisper. Num pedido de só-resumo
+    ///   nada mudou, e publicar de novo só geraria um envio à toa à equipe.
+    private func adiarResumo(
+        de arquivo: Arquivo,
+        espera: EsperaDoResumo,
+        transcricaoNova: Bool,
+        avisar: Bool,
+        execucao: UUID
+    ) async {
+        filaPersistida.adiarResumo(arquivo.id, espaco: arquivo.espaco, espera: espera)
+        reagendarResumosAdiados()
+        guard identificadorDaExecucao == execucao else { return }
+        resumosAdiados[arquivo.id.rawValue] = espera.mensagem
+        if transcricaoNova {
+            await publicarTranscricao(de: arquivo, execucao: execucao)
+        }
+        // Uma nova tentativa que esbarra no mesmo motivo não avisa de novo.
+        if avisar {
+            aoNotificar?("Resumo adiado".localized, "\(arquivo.titulo): \(espera.mensagem)", .aviso)
+        }
+    }
+
+    /// Leva para a lista a transcrição que o pipeline salvou antes de o
+    /// resumo falhar ou ser adiado — sem isto a conversa seguia na tela como
+    /// "pronta para transcrever" até a lista ser recarregada.
+    private func publicarTranscricao(de arquivo: Arquivo, execucao: UUID) async {
+        guard let transcrito = try? await exigirArquivoCompleto(arquivo.id),
+              identificadorDaExecucao == execucao,
+              transcrito.espaco == espaco,
+              arquivos.contains(where: { $0.id == transcrito.id })
+        else { return }
+        await publicar(transcrito)
+    }
+
+    private func reagendarResumosAdiados() {
+        despertadorDeResumos.aoAcordar = { [weak self] redeVoltou in
+            guard let self else { return }
+            if redeVoltou { filaPersistida.liberarEsperaDeRede(do: espaco) }
+            retomarProcessamentosPendentes()
+        }
+        despertadorDeResumos.agendar(filaPersistida.pendentes(do: espaco).compactMap(\.espera))
     }
 
     /// Refaz só o resumo, sobre a transcrição atual — é o que "Gerar novo
@@ -1197,6 +1307,7 @@ final class Biblioteca {
         filaDeProcessamento.removeAll { $0 == arquivoID }
         modosDaFila[arquivoID] = nil
         filaPersistida.remover(arquivoID)
+        resumosAdiados[arquivoID.rawValue] = nil
         guard arquivoEmProcessamento == arquivoID else { return }
 
         let emCurso = tarefaDeProcessamento
@@ -1274,7 +1385,12 @@ final class Biblioteca {
         guard arquivoEmProcessamento == nil, operacoesAvulsasComModelos == 0 else {
             throw ErroDeDitado.modelosOcupados
         }
-        let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar()
+        // O ditado só usa o Whisper, em qualquer modo de resumo: não exige
+        // o Qwen em disco nem a memória que ele pede.
+        let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar(
+            pesos: [Pesos.whisperLargeV3],
+            ramMinima: Preflight.ramMinimaNaNuvem
+        )
         if preflight != .pronto, preflight != .termicoCritico {
             throw ErroDeDitado.modelosIndisponiveis(preflight.mensagem)
         }
@@ -1315,6 +1431,7 @@ final class Biblioteca {
     ) async {
         let chave = arquivo.id.rawValue
         defer { finalizarProcessamento(chave, execucao: execucao) }
+        let novaTentativaDeResumoAdiado = novasTentativasDeResumo.remove(arquivo.id) != nil
 
         let arquivoCompleto: Arquivo
         do {
@@ -1343,7 +1460,7 @@ final class Biblioteca {
 
         // Sem os pesos, o Whisper falharia lá dentro com um erro de carga. Dizer
         // o que falta é mais útil que repassar o erro do llama.cpp.
-        let preflight = Preflight(pastaDeModelos: pastaDeModelos).avaliar()
+        let preflight = preflight(para: modo)
         if preflight != .pronto, preflight != .termicoCritico {
             erros[chave] = preflight.mensagem
             // O pedido continua valendo: é retomado quando os modelos
@@ -1354,6 +1471,7 @@ final class Biblioteca {
         avisarSeOMacEstiverQuente(preflight)
 
         erros[chave] = nil
+        resumosAdiados[chave] = nil
         fases[chave] = modo == .somenteResumo ? .resumindo : .transcrevendo
         iniciadoEm[chave] = Date()
 
@@ -1386,36 +1504,50 @@ final class Biblioteca {
         let diarizacao = GerenciadorDeModelosDeDiarizacao.embutido()
         await ciclo.registrar(diarizacao)
 
-        let pipeline = PipelineDeArquivo(
-            armazenamento: armazenamento,
-            repositorio: repositorio,
-            idTranscricao: WhisperEngine.identificador,
-            idResumo: QwenEngine.identificador,
-            transcrever: { [motores, promptDeEntidades] url, speaker in
-                try await motores.transcrever(
-                    url,
-                    speaker: speaker,
-                    initialPrompt: promptDeEntidades
-                )
-            },
-            resumir: { [motores] trechos in
-                try await motores.resumir(trechos)
-            },
-            resumirNoIdioma: { [motores] trechos, idiomaDeSaida in
-                try await motores.resumir(trechos, idiomaDeSaida: idiomaDeSaida)
-            },
-            // Sem tradução: o Whisper detecta o idioma falado e a transcrição e o
-            // resumo ficam nesse idioma (inglês → inglês, português → português).
-            diarizar: { [diarizacao] url in
-                try await diarizacao.diarizar(url)
-            },
-            resolverFalantes: { [motores] arquivo in
-                try await motores.resolverFalantes(arquivo)
-            },
-            liberarTranscricao: { [motores] in
-                await motores.descarregarTranscricao()
-            }
-        )
+        // Na nuvem privada o Qwen nunca carrega: o resumo vai para a Apple e
+        // os falantes ficam com o modelo on-device, que não gasta a cota
+        // diária. O pipeline local é o mesmo de sempre — e o plano B quando
+        // a nuvem falha com o Qwen em disco.
+        let resumoNaNuvem = modoDeResumo == .nuvemPrivada
+        let resumirNaNuvem = self.resumirNaNuvem
+        let armazenamento = self.armazenamento
+        let repositorio = self.repositorio
+        let montarPipeline = { (naNuvem: Bool) in
+            PipelineDeArquivo(
+                armazenamento: armazenamento,
+                repositorio: repositorio,
+                idTranscricao: WhisperEngine.identificador,
+                idResumo: naNuvem ? NuvemPrivadaEngine.identificador : QwenEngine.identificador,
+                transcrever: { [motores, promptDeEntidades] url, speaker in
+                    try await motores.transcrever(
+                        url,
+                        speaker: speaker,
+                        initialPrompt: promptDeEntidades
+                    )
+                },
+                resumir: { [motores] trechos in
+                    if naNuvem { return try await resumirNaNuvem(trechos, nil) }
+                    return try await motores.resumir(trechos)
+                },
+                resumirNoIdioma: { [motores] trechos, idiomaDeSaida in
+                    if naNuvem { return try await resumirNaNuvem(trechos, idiomaDeSaida) }
+                    return try await motores.resumir(trechos, idiomaDeSaida: idiomaDeSaida)
+                },
+                // Sem tradução: o Whisper detecta o idioma falado e a transcrição e o
+                // resumo ficam nesse idioma (inglês → inglês, português → português).
+                diarizar: { [diarizacao] url in
+                    try await diarizacao.diarizar(url)
+                },
+                resolverFalantes: { [motores] arquivo in
+                    if naNuvem { return try await ResolvedorDeFalantesNoDispositivo.resolver(arquivo) }
+                    return try await motores.resolverFalantes(arquivo)
+                },
+                liberarTranscricao: { [motores] in
+                    await motores.descarregarTranscricao()
+                }
+            )
+        }
+        let pipeline = montarPipeline(resumoNaNuvem)
 
         await OperacaoComLimpeza.executar {
             do {
@@ -1430,11 +1562,44 @@ final class Biblioteca {
                         self?.fases[chave] = fase
                     }
                 }
-                switch modo {
-                case .completo:
-                    try await pipeline.processar(arquivoCompleto, aoProgredir: aoProgredir)
-                case .somenteResumo:
-                    try await pipeline.resumirExistente(arquivoCompleto, aoProgredir: aoProgredir)
+                do {
+                    switch modo {
+                    case .completo:
+                        try await pipeline.processar(arquivoCompleto, aoProgredir: aoProgredir)
+                    case .somenteResumo:
+                        try await pipeline.resumirExistente(arquivoCompleto, aoProgredir: aoProgredir)
+                    }
+                } catch let erroDaNuvem as ErroDaNuvemPrivada {
+                    // Só o resumo pela nuvem lança isto, e a transcrição já
+                    // foi salva antes dele: nada aqui refaz o Whisper.
+                    switch ReacaoAoErroDaNuvem.para(erroDaNuvem, modeloLocalPronto: modeloLocalPronto) {
+                    case .resumirNoMac:
+                        let transcrito = try await exigirArquivoCompleto(arquivoCompleto.id)
+                        try await montarPipeline(false).resumirExistente(transcrito, aoProgredir: aoProgredir)
+                    case let .adiar(espera):
+                        await adiarResumo(
+                            de: arquivoCompleto,
+                            espera: espera,
+                            transcricaoNova: modo == .completo,
+                            avisar: !novaTentativaDeResumoAdiado,
+                            execucao: execucao
+                        )
+                        return
+                    case .desistir:
+                        filaPersistida.remover(arquivoCompleto.id)
+                        guard identificadorDaExecucao == execucao else { return }
+                        if modo == .completo {
+                            await publicarTranscricao(de: arquivoCompleto, execucao: execucao)
+                        }
+                        guard identificadorDaExecucao == execucao else { return }
+                        erros[chave] = erroDaNuvem.localizedDescription.localized
+                        aoNotificar?(
+                            "Resumo falhou".localized,
+                            "\(arquivoCompleto.titulo): \(erroDaNuvem.localizedDescription.localized)",
+                            .erro
+                        )
+                        return
+                    }
                 }
                 // O trabalho está salvo no banco, qualquer que seja o espaço
                 // aberto agora.
@@ -1546,7 +1711,9 @@ final class Biblioteca {
         // Os motores são apenas o contrato do pipeline; o caminho leve nunca
         // chama transcrever/resumir, então o Whisper não entra em memória. A
         // resolução contextual usa o Qwen quando há caso entre vozes
-        // diferentes (o mesmo modelo do resumo, carregado e descarregado aqui).
+        // diferentes (o mesmo modelo do resumo, carregado e descarregado aqui)
+        // — ou, com o resumo na nuvem privada, o modelo on-device da Apple.
+        let resumoNaNuvem = modoDeResumo == .nuvemPrivada
         let motores = criarMotoresLocais()
         let pipeline = PipelineDeArquivo(
             armazenamento: armazenamento,
@@ -1563,7 +1730,8 @@ final class Biblioteca {
                 try await diarizacao.diarizar(url)
             },
             resolverFalantes: { [motores] arquivo in
-                try await motores.resolverFalantes(arquivo)
+                if resumoNaNuvem { return try await ResolvedorDeFalantesNoDispositivo.resolver(arquivo) }
+                return try await motores.resolverFalantes(arquivo)
             }
         )
 
@@ -2052,6 +2220,9 @@ final class Biblioteca {
             return .naFila(posicao: posicao + 1)
         }
         if let erro = erros[chave] { return .falhou(erro) }
+        // Antes do resumo existente: quem pediu um resumo novo precisa
+        // saber que ele está esperando, não ver "resumido" e achar que saiu.
+        if let motivo = resumosAdiados[chave] { return .resumoAdiado(motivo) }
         if arquivo.resumo != nil { return .transcritoEResumido }
         if !arquivo.trechos.isEmpty { return .transcrito }
         return .prontoParaTranscrever

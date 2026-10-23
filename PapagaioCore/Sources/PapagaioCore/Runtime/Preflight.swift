@@ -38,6 +38,15 @@ public enum Pesos {
     )
 
     public static var todos: [PesoDeModelo] { [whisperLargeV3, qwen35_9B] }
+
+    /// O que precisa estar em disco para o modo de resumo escolhido. Na nuvem
+    /// privada o Qwen não é usado: só o Whisper é exigido — e baixado.
+    public static func necessarios(para modo: ModoDeResumo) -> [PesoDeModelo] {
+        switch modo {
+        case .local: todos
+        case .nuvemPrivada: [whisperLargeV3]
+        }
+    }
 }
 
 /// Resultado do preflight de hardware, na ordem exata do Passo 3.
@@ -67,9 +76,7 @@ public enum ResultadoPreflight: Sendable, Equatable {
         case .pronto:
             "Tudo pronto."
         case let .ramInsuficiente(instalada, minima):
-            "O Ōmu precisa de \(Preflight.gb(minima)) de memória e este Mac tem "
-                + "\(Preflight.gb(instalada)). Não há modo reduzido: a transcrição e o resumo "
-                + "rodam inteiramente no seu Mac, e os modelos não cabem."
+            Self.mensagemDeRAM(instalada: instalada, minima: minima)
         case let .discoInsuficiente(livre, minimo):
             "São necessários \(Preflight.gb(minimo)) livres neste Mac, e há "
                 + "\(Preflight.gb(livre)) disponíveis."
@@ -83,6 +90,30 @@ public enum ResultadoPreflight: Sendable, Equatable {
     }
 }
 
+extension ResultadoPreflight {
+    /// Três situações diferentes cabem em "memória insuficiente": o Mac não
+    /// transcreve nem com o resumo na nuvem; o Mac não carrega o Qwen mas a
+    /// nuvem privada resolve; ou não há alternativa nenhuma.
+    static func mensagemDeRAM(
+        instalada: Int64,
+        minima: Int64,
+        nuvemDisponivel: Bool = NuvemPrivada.disponibilidade == .disponivel
+    ) -> String {
+        if minima < Preflight.ramMinima {
+            return "O Ōmu precisa de \(Preflight.gb(minima)) de memória para transcrever e este Mac tem "
+                + "\(Preflight.gb(instalada)). A transcrição roda inteiramente no seu Mac, e o modelo não cabe."
+        }
+        if nuvemDisponivel, instalada >= Preflight.ramMinimaNaNuvem {
+            return "O resumo neste Mac precisa de \(Preflight.gb(minima)) de memória e este Mac tem "
+                + "\(Preflight.gb(instalada)). Escolha o resumo pela nuvem privada da Apple em "
+                + "Configurações: a transcrição continua no seu Mac e o modelo do resumo não precisa caber aqui."
+        }
+        return "O Ōmu precisa de \(Preflight.gb(minima)) de memória e este Mac tem "
+            + "\(Preflight.gb(instalada)). Não há modo reduzido: a transcrição e o resumo "
+            + "rodam inteiramente no seu Mac, e os modelos não cabem."
+    }
+}
+
 /// Preflight de hardware e de pesos.
 ///
 /// A ordem é a do Passo 3 e importa: não faz sentido oferecer download de modelos
@@ -91,6 +122,21 @@ public struct Preflight: Sendable {
     /// Mantido conservadoramente durante a avaliação do Qwen3.5: só uma
     /// medição real pode autorizar reduzir o mínimo de hardware.
     public static let ramMinima: Int64 = 18 * 1_073_741_824
+    /// Com o resumo na nuvem privada só o Whisper fica residente: o piso
+    /// passa a ser o do menor Mac com Apple Intelligence.
+    ///
+    /// Medido com `papagaio-eval transcrever` numa gravação de 9 min 24 s
+    /// (large-v3, Metal): pico de 4,0 GB de memória — metade do piso, a
+    /// mesma folga que os 18 GB dão ao Qwen. Medido num Mac de 24 GB; falta
+    /// conferir num de 8 GB de verdade, sob pressão de memória.
+    public static let ramMinimaNaNuvem: Int64 = 8 * 1_073_741_824
+
+    public static func ramMinima(para modo: ModoDeResumo) -> Int64 {
+        switch modo {
+        case .local: ramMinima
+        case .nuvemPrivada: ramMinimaNaNuvem
+        }
+    }
     /// Whisper ≈ 3 GB + Qwen ≈ 6,2 GB + folga. É o piso de uma instalação
     /// **sem nenhum peso**; com os pesos no disco só a folga é exigida.
     public static let discoMinimo: Int64 = 20 * 1_073_741_824
@@ -113,15 +159,29 @@ public struct Preflight: Sendable {
         faltando.reduce(folgaDeDisco) { $0 + $1.bytes }
     }
 
+    /// O preflight do modo de resumo escolhido: na nuvem privada, só o
+    /// Whisper e o piso de memória dele.
+    public func avaliar(
+        para modo: ModoDeResumo,
+        verificarChecksum: Bool = false
+    ) -> ResultadoPreflight {
+        avaliar(
+            pesos: Pesos.necessarios(para: modo),
+            ramMinima: Self.ramMinima(para: modo),
+            verificarChecksum: verificarChecksum
+        )
+    }
+
     /// Roda os quatro portões na ordem, parando no primeiro que bloqueia.
     public func avaliar(
         pesos: [PesoDeModelo] = Pesos.todos,
+        ramMinima: Int64 = Preflight.ramMinima,
         verificarChecksum: Bool = false
     ) -> ResultadoPreflight {
         // 1. RAM física — bloqueia.
         let ram = Self.ramInstalada
-        guard ram >= Self.ramMinima else {
-            return .ramInsuficiente(instalada: ram, minima: Self.ramMinima)
+        guard ram >= ramMinima else {
+            return .ramInsuficiente(instalada: ram, minima: ramMinima)
         }
 
         // 2. Pesos presentes e íntegros.
