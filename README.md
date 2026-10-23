@@ -26,7 +26,9 @@ compartilhado para sincronizar os dados textuais das conversas.
 
 - Gravação de microfone e áudio do sistema, com importação de arquivos de áudio.
 - Transcrição local com Whisper, segmentação, timestamps e diarização.
-- Resumo local com Qwen, incluindo temas, citações e próximos passos.
+- Resumo com temas, citações e próximos passos: local com Qwen ou, por escolha
+  de quem usa, pela nuvem privada da Apple (Private Cloud Compute, macOS 27+),
+  que dispensa o download do modelo de 6,2 GB.
 - Biblioteca pesquisável, favoritos, pastas, tarefas, anexos e lixeira com restauração.
 - Perfil com Sign in with Apple e preferências visuais.
 - Equipes CloudKit: criação de workspace, convite via `CKShare`, aceite de convite e entrada por código de seis caracteres.
@@ -48,6 +50,15 @@ SwiftData; cada equipe recebe uma custom zone CloudKit compartilhada por
 `CKShare`. O processamento de áudio e IA é executado no Mac com `whisper.cpp`,
 `llama.cpp`, ONNX Runtime/Silero VAD e FluidAudio.
 
+O resumo tem duas engines atrás do mesmo contrato (`SummarizationEngine`):
+`QwenEngine`, local, e `NuvemPrivadaEngine`, que usa o
+`PrivateCloudComputeLanguageModel` do FoundationModels. A transcrição é sempre
+local. No modo nuvem, a resolução de falantes usa o modelo on-device da Apple
+para não gastar o limite diário, e um resumo que não sai por falta de rede, de
+cota ou de serviço fica em disco e é refeito sozinho — ou cai no Qwen, se ele
+estiver instalado. Tudo que depende do SDK do macOS 27 fica atrás de
+`#if compiler(>=6.4)`: o projeto continua compilando com o SDK 26.
+
 `Loro.xcodeproj`, o scheme `Loro`, o target `Loro` e os diretórios `Papagaio*`
 são nomes técnicos mantidos por compatibilidade. O produto se chama Ōmu: o
 `PRODUCT_NAME` é `Ōmu`, então a build gera `Ōmu.app` — e é o nome do arquivo do
@@ -57,7 +68,12 @@ bundle, não `CFBundleDisplayName`, que o Finder e o Dock exibem no macOS.
 
 - macOS 26 ou posterior, em Apple Silicon.
 - Xcode compatível com o SDK do macOS 26 e Swift 6.
-- Espaço em disco e memória suficientes para os runtimes e modelos locais.
+- Tudo neste Mac: 18 GB de memória e 9,3 GB de modelos (Whisper 3,1 GB +
+  Qwen 6,2 GB).
+- Resumo pela nuvem privada da Apple: macOS 27, Apple Intelligence ativo,
+  8 GB de memória e 3,1 GB de modelos (só o Whisper). Exige o entitlement
+  gerenciado `com.apple.developer.private-cloud-compute`, concedido pela Apple
+  e válido só em builds distribuídos pela App Store ou TestFlight.
 - Conta iCloud ativa no Mac para criar, aceitar ou usar equipes.
 
 Os frameworks de runtime não ficam versionados no Git. Isso reduz o tamanho do
@@ -109,6 +125,14 @@ responsáveis por injetar armazenamento temporário e serviços falsos.
 
 ## Limites conhecidos
 
+- O resumo pela nuvem privada depende do entitlement da Apple, que ainda não
+  está em `Config/Papagaio.entitlements`: sem ele, o app oferece só o modo
+  local. Para exercitar a interface num build de depuração, rode com
+  `OMU_NUVEM_SEM_ENTITLEMENT=1` e a disponibilidade simulada do Xcode
+  (Scheme › Run › Options).
+- A nuvem privada tem um limite diário por conta iCloud que a Apple não
+  publica, e janela de 32.768 tokens: reuniões mais longas são resumidas em
+  partes, com uma requisição por parte.
 - A sincronização de equipes cobre os dados textuais das conversas; mídias e
   anexos não são enviados ao CloudKit nesta versão.
 - O fluxo de criação, convite, aceite e sincronização deve ser validado com

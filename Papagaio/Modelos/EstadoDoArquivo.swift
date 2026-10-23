@@ -16,6 +16,9 @@ enum EstadoDoArquivo: Equatable {
     case naFila(posicao: Int)
     case processando(PipelineDeArquivo.Fase)
     case transcrito
+    /// Transcrito, com o resumo pela nuvem privada esperando rede, cota ou
+    /// o serviço voltar. O texto é o motivo, já no idioma da interface.
+    case resumoAdiado(String)
     case transcritoEResumido
     case falhou(String)
 
@@ -25,6 +28,7 @@ enum EstadoDoArquivo: Equatable {
         case let .naFila(posicao): "na fila (posição %d)".localized(posicao)
         case let .processando(fase): fase.descricao.localized
         case .transcrito: "transcrito".localized
+        case let .resumoAdiado(motivo): motivo
         case .transcritoEResumido: "transcrito e resumido".localized
         case let .falhou(motivo): motivo.localized
         }
@@ -33,7 +37,7 @@ enum EstadoDoArquivo: Equatable {
     var estilo: EstiloDoStatus {
         switch self {
         case .processando: .destaque
-        case .naFila: .aviso
+        case .naFila, .resumoAdiado: .aviso
         case .falhou: .erro
         case .transcritoEResumido: .sucesso
         case .transcrito, .prontoParaTranscrever: .neutro
@@ -47,6 +51,7 @@ enum EstadoDoArquivo: Equatable {
         case .falhou: "exclamationmark.triangle"
         case .transcritoEResumido: "checkmark.circle"
         case .transcrito: "text.quote"
+        case .resumoAdiado: "icloud.slash"
         case .prontoParaTranscrever: "text.badge.plus"
         }
     }

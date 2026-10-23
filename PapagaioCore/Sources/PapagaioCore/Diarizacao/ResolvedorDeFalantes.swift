@@ -167,25 +167,39 @@ public enum ResolvedorDeFalantes {
     /// sem dono. Posição é à prova disso: a chave vem do `enumerated` e o
     /// `decodificar` casa pelo índice.
     public static func prompt(para casos: [Caso]) -> String {
-        """
+        let mensagens = mensagens(para: casos)
+        return """
         <|im_start|>system
-        Você decide quem disse trechos duvidosos de uma conversa que já tem \
-        vozes separadas. As vozes confiáveis são rotuladas "Voz 1" e "Voz 2"; \
-        o trecho entre [????] foi reconhecido como fala, mas o áudio não \
-        permitiu distinguir quem disse. Use SÓ o contexto: quem pergunta \
-        geralmente responde, quem retoma um assunto é quem o deixou, \
-        confirmações curtas seguem quem acabou de falar. Não invente fala que \
-        não está nos trechos.
-        Responda SOMENTE com um objeto JSON: uma chave por caso — "1" para o \
-        primeiro caso, "2" para o segundo, e assim por diante — e o valor \
-        "voz-1", "voz-2" ou "indeterminado" (quando o contexto não permite \
-        decidir).<|im_end|>
+        \(mensagens.sistema)<|im_end|>
         <|im_start|>user
-        \(casos.enumerated().map { indice, caso in caso.corpo(numero: indice + 1) }.joined(separator: "\n\n"))
-
-        Responda somente o JSON.<|im_end|>
+        \(mensagens.usuario)<|im_end|>
         <|im_start|>assistant
         """
+    }
+
+    /// As instruções sem a moldura ChatML — o que os modelos da Apple
+    /// (`FoundationModels`) recebem como instruções da sessão e prompt.
+    public static func mensagens(para casos: [Caso]) -> PromptsDoResumo.Mensagens {
+        PromptsDoResumo.Mensagens(
+            sistema: """
+            Você decide quem disse trechos duvidosos de uma conversa que já tem \
+            vozes separadas. As vozes confiáveis são rotuladas "Voz 1" e "Voz 2"; \
+            o trecho entre [????] foi reconhecido como fala, mas o áudio não \
+            permitiu distinguir quem disse. Use SÓ o contexto: quem pergunta \
+            geralmente responde, quem retoma um assunto é quem o deixou, \
+            confirmações curtas seguem quem acabou de falar. Não invente fala que \
+            não está nos trechos.
+            Responda SOMENTE com um objeto JSON: uma chave por caso — "1" para o \
+            primeiro caso, "2" para o segundo, e assim por diante — e o valor \
+            "voz-1", "voz-2" ou "indeterminado" (quando o contexto não permite \
+            decidir).
+            """,
+            usuario: """
+            \(casos.enumerated().map { indice, caso in caso.corpo(numero: indice + 1) }.joined(separator: "\n\n"))
+
+            Responda somente o JSON.
+            """
+        )
     }
 
     /// GBNF que restringe a saída a chaves conhecidas e ao vocabulário de
@@ -205,6 +219,45 @@ public enum ResolvedorDeFalantes {
         valor ::= "\\\"" "indeterminado" "\\\"" | "\\\"" "voz-1" "\\\"" | "\\\"" "voz-2" "\\\""
         ws ::= [ \\t\\n]{0,4}
         """
+    }
+
+    // MARK: - Resolução com um modelo qualquer
+
+    /// Quem responde a um lote de casos, devolvendo o JSON bruto que
+    /// `decodificar` entende.
+    public typealias Responder = @Sendable ([Caso]) async throws -> String
+
+    /// Costura as vozes iguais e resolve o que sobrar com `responder`, em
+    /// lotes — o caminho dos modelos que não são o Qwen (ver
+    /// `ResolvedorDeFalantesNoDispositivo`).
+    ///
+    /// Um lote que falha fica sem resposta e os outros seguem: é etapa
+    /// decorativa, e fala sem dono é o estado honesto. Só o cancelamento sobe.
+    public static func resolver(
+        _ arquivo: Arquivo,
+        casosPorChamada: Int = maxCasosPorChamada,
+        responder: Responder
+    ) async throws -> Arquivo {
+        let costurado = costurarVozesIguais(arquivo)
+        guard let falas = FalasDaConversa.agrupar(costurado.trechos) else { return costurado }
+        let casos = casosElegiveis(falas: falas)
+        guard !casos.isEmpty else { return costurado }
+
+        let tamanho = max(1, casosPorChamada)
+        var resolucoes: [UUID: String] = [:]
+        for lote in stride(from: 0, to: casos.count, by: tamanho) {
+            try Task.checkCancellation()
+            let casosDoLote = Array(casos[lote..<min(lote + tamanho, casos.count)])
+            do {
+                let bruto = try await responder(casosDoLote)
+                resolucoes.merge(decodificar(bruto, casos: casosDoLote)) { _, novo in novo }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                continue
+            }
+        }
+        return aplicar(resolucoes, casos: casos, em: costurado)
     }
 
     // MARK: - Aplicação

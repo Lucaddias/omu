@@ -8,7 +8,8 @@ import Foundation
 /// reprompt teria que consertar. Ver skill `papagaio-summarization`.
 ///
 /// `@Generable`/`@Guide` não existem aqui — são exclusivos do `FoundationModels`
-/// da Apple, que está fora da stack (D-0.5).
+/// da Apple. É com eles que a `NuvemPrivadaEngine` força o mesmo formato; a
+/// gramática continua sendo o caminho do Qwen.
 public enum GramaticaDoResumo {
     public static let gbnf = #"""
     root ::= "{" ws "\"titulo\":" ws string "," ws "\"visaoGeral\":" ws string "," ws "\"temas\":" ws temas "," ws "\"citacoes\":" ws citacoes "," ws "\"proximosPassos\":" ws passos ws "}"

@@ -264,92 +264,42 @@ public struct QwenEngine: SummarizationEngine {
         }.joined(separator: "\n")
     }
 
-    static func prompt(
-        paraTranscricao transcricao: String,
-        idiomaDeSaida: IdiomaDeProcessamento? = nil
-    ) -> String {
+    /// Moldura ChatML do Qwen3.5 em volta das instruções compartilhadas
+    /// (`PromptsDoResumo`). O bloco `<think>` vazio desativa o raciocínio
+    /// antes do JSON estruturado.
+    private static func chatML(_ mensagens: PromptsDoResumo.Mensagens) -> String {
         """
         <|im_start|>system
-        Você é o "Ateiro Profissa", um analista sênior que transforma diálogos \
-        caóticos e transcrições brutas em atas limpas, estratégicas e acionáveis \
-        \(Self.instrucaoDeIdioma(idiomaDeSaida)). Regras: (1) seja fiel à transcrição, não invente \
-        números, nomes nem decisões. (2) Sem termos corporativos vazios — nada de \
-        "sinergia", "disrupção" ou "com base em nossos aprendizados". Seja direto \
-        e realista. (3) Use os nomes EXATAMENTE como aparecem na transcrição, sem \
-        alterar, corrigir nem inventar variações. Se o nome aparecer como "Dr. Nando", \
-        use "Dr. Nando" em todo o resumo, nunca "Fernando" nem "Nando". (4) Produza \
-        uma análise completa e detalhada, proporcional à duração da reunião.<|im_end|>
+        \(mensagens.sistema)<|im_end|>
         <|im_start|>user
-        Analise a reunião abaixo e produza uma ata profissional completa e detalhada. \
-        Não comprima: cubra todos os assuntos e organize os temas com pontos e subpontos, \
-        incluindo valores, datas, nomes, prazos e decisões quando estiverem na transcrição.
-
-        \(GramaticaDoResumo.descricaoDoFormato)
-
-        TRANSCRIÇÃO:
-        \(transcricao)<|im_end|>
+        \(mensagens.usuario)<|im_end|>
         <|im_start|>assistant
         <think>
 
         </think>\n
 
         """
+    }
+
+    static func prompt(
+        paraTranscricao transcricao: String,
+        idiomaDeSaida: IdiomaDeProcessamento? = nil
+    ) -> String {
+        chatML(PromptsDoResumo.ata(transcricao: transcricao, idiomaDeSaida: idiomaDeSaida))
     }
 
     static func promptParcial(
         _ transcricao: String,
         idiomaDeSaida: IdiomaDeProcessamento?
     ) -> String {
-        """
-        <|im_start|>system
-        Você é o "Ateiro Profissa". Resume trechos de reunião de forma fiel, \
-        detalhada e sem floreios. \(Self.instrucaoDeIdioma(idiomaDeSaida))<|im_end|>
-        <|im_start|>user
-        Resuma este trecho de forma completa e detalhada, preservando números, \
-        nomes, decisões e argumentos de cada lado. Não comprima.
-
-        \(transcricao)<|im_end|>
-        <|im_start|>assistant
-        <think>
-
-        </think>\n
-
-        """
+        chatML(PromptsDoResumo.parcial(transcricao: transcricao, idiomaDeSaida: idiomaDeSaida))
     }
 
     static func promptDeReducao(
         _ parciais: String,
         idiomaDeSaida: IdiomaDeProcessamento?
     ) -> String {
-        """
-        <|im_start|>system
-        Você é o "Ateiro Profissa". Consolida resumos parciais de uma mesma \
-        reunião, conectando assuntos e classificando \
-        cada tópico como Ponto Principal ou Secundário. Produza uma ata completa.<|im_end|>
-        <|im_start|>user
-        \(Self.instrucaoDeIdioma(idiomaDeSaida)) Os textos abaixo são resumos de partes consecutivas da MESMA reunião. \
-        Consolide numa ata profissional completa e detalhada, conectando assuntos \
-        que aparecem em partes diferentes. Cubra todos os tópicos discutidos.
-
-        \(GramaticaDoResumo.descricaoDoFormato)
-
-        \(parciais)<|im_end|>
-        <|im_start|>assistant
-        <think>
-
-        </think>\n
-
-        """
-    }
-
-    /// `nil` preserva o idioma detectado na transcrição. Isso é diferente de
-    /// "português por padrão": um sistema em inglês falando inglês não deve
-    /// receber uma ata traduzida só porque o prompt foi escrito em português.
-    private static func instrucaoDeIdioma(_ idioma: IdiomaDeProcessamento?) -> String {
-        guard let idioma else {
-            return "Escreva no mesmo idioma predominante da transcrição; não a traduza."
-        }
-        return "Escreva toda a resposta em \(idioma.nomeParaPrompt)."
+        chatML(PromptsDoResumo.reducao(parciais: parciais, idiomaDeSaida: idiomaDeSaida))
     }
 
     private static func promptDeTraducao(

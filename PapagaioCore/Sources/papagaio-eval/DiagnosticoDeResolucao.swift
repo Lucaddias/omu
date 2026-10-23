@@ -6,7 +6,9 @@ import WhisperRuntime
 /// `papagaio-eval resolver`: reproduz o caminho completo da atribuição de
 /// falantes — transcrever → diarizar → alinhar → costurar vozes iguais →
 /// casos → Qwen (com a resposta CRUA impressa) → aplicar — e no fim imprime
-/// o destino de cada fala que começou "Voz desconhecida".
+/// o destino de cada fala que começou "Voz desconhecida". Com
+/// `--no-dispositivo` quem responde é o modelo on-device da Apple, para
+/// comparar os dois na mesma conversa.
 ///
 /// Serve para caçar onde as falas curtas ficam sem dono: a costura não agiu?
 /// O caso não foi selecionado? O modelo disse "indeterminado"? A chamada
@@ -19,6 +21,9 @@ enum DiagnosticoDeResolucao {
         var pastaDeDiarizacao: URL?
         /// Sem a chamada ao Qwen (só costura + seleção de casos).
         var semModelo: Bool
+        /// Resolve com o modelo on-device da Apple no lugar do Qwen — o
+        /// caminho do app quando o resumo vai pela nuvem privada.
+        var noDispositivo = false
     }
 
     static func rodar(_ opcoes: Opcoes) async {
@@ -47,7 +52,7 @@ enum DiagnosticoDeResolucao {
             trechos = trechosDaFixture(fixture)
             print("\(trechos.count) trechos carregados de \(fixture.lastPathComponent)")
         } else {
-            print("uso: papagaio-eval resolver <audio> [--pasta <dir>] [--modelos <dir>] [--sem-modelo]")
+            print("uso: papagaio-eval resolver <audio> [--pasta <dir>] [--modelos <dir>] [--sem-modelo] [--no-dispositivo]")
             return
         }
 
@@ -133,6 +138,29 @@ enum DiagnosticoDeResolucao {
             print("\n## 6. Sem casos — Qwen não é chamado")
         } else if opcoes.semModelo {
             print("\n## 6. --sem-modelo: pulando a chamada ao Qwen")
+        } else if opcoes.noDispositivo {
+            let tamanho = ResolvedorDeFalantesNoDispositivo.casosPorChamada
+            print("\n## 6. Modelo on-device da Apple (resposta crua, lotes de \(tamanho))")
+            guard ResolvedorDeFalantesNoDispositivo.disponivel else {
+                print("modelo on-device indisponível: ative o Apple Intelligence e espere o modelo baixar (confira com `fm available`).")
+                return
+            }
+            let relogio = ContinuousClock()
+            let inicio = relogio.now
+            for primeiro in stride(from: 0, to: casos.count, by: tamanho) {
+                let lote = Array(casos[primeiro..<min(primeiro + tamanho, casos.count)])
+                let numero = primeiro / tamanho + 1
+                do {
+                    let bruto = try await ResolvedorDeFalantesNoDispositivo.responder(lote)
+                    print("lote \(numero): \(bruto)")
+                    resolucoes.merge(ResolvedorDeFalantes.decodificar(bruto, casos: lote)) { _, novo in novo }
+                } catch {
+                    // No app o lote que falha fica sem resposta e os outros seguem.
+                    print("lote \(numero): ERRO \(error)")
+                }
+            }
+            print("decodificadas: \(resolucoes.count) de \(casos.count) · tempo: \(relogio.now - inicio)")
+            final = ResolvedorDeFalantes.aplicar(resolucoes, casos: casos, em: costurado)
         } else {
             print("\n## 6. Qwen (resposta crua)")
             let contexto = ContextoLlama(

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		03F1107527CFCA0A1C840262 /* GravadorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C087A374B5BC3DCC38E02376 /* GravadorViewModelTests.swift */; };
 		31E8B88B303E0F9A00158BCB /* PapagaioCore in Frameworks */ = {isa = PBXBuildFile; productRef = PA00000000000000000011 /* PapagaioCore */; };
+		447C2E08ED7A653D60FF5F42 /* ResumoPelaNuvemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B495FA060F8052921A4750 /* ResumoPelaNuvemTests.swift */; };
 		4658DC6CFF329A0496241A67 /* TarefasDoPainelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97E9FB058DA75D07956D7FC /* TarefasDoPainelViewModelTests.swift */; };
 		53DB261398A283794C0CCC67 /* OrdenacaoDeTarefasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD94486E5CC83E9CE8280CE8 /* OrdenacaoDeTarefasTests.swift */; };
 		6B4091D111D7E29F3933614D /* BibliotecaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2201F34A428D43BED043C68 /* BibliotecaTests.swift */; };
@@ -67,6 +68,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		21B495FA060F8052921A4750 /* ResumoPelaNuvemTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ResumoPelaNuvemTests.swift; sourceTree = "<group>"; };
 		2941DEF211FCBF7301E1815F /* MidiasDaConversaViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MidiasDaConversaViewModelTests.swift; sourceTree = "<group>"; };
 		337EA963DA385E396F282BA3 /* InterfaceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InterfaceTests.swift; sourceTree = "<group>"; };
 		91696821487350A71C406F6B /* InvalidacaoVisualTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InvalidacaoVisualTests.swift; sourceTree = "<group>"; };
@@ -144,6 +146,7 @@
 				C97E9FB058DA75D07956D7FC /* TarefasDoPainelViewModelTests.swift */,
 				C087A374B5BC3DCC38E02376 /* GravadorViewModelTests.swift */,
 				DACC09D02E6072827F646017 /* EquipesCloudKitAoVivoTests.swift */,
+				21B495FA060F8052921A4750 /* ResumoPelaNuvemTests.swift */,
 			);
 			path = PapagaioTests;
 			sourceTree = "<group>";
@@ -326,6 +329,7 @@
 				4658DC6CFF329A0496241A67 /* TarefasDoPainelViewModelTests.swift in Sources */,
 				03F1107527CFCA0A1C840262 /* GravadorViewModelTests.swift in Sources */,
 				EB0CEB37BF911EE71BF22AA9 /* EquipesCloudKitAoVivoTests.swift in Sources */,
+				447C2E08ED7A653D60FF5F42 /* ResumoPelaNuvemTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -475,7 +479,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.4;
+				MARKETING_VERSION = 1.4.0;
 				OTHER_LDFLAGS = "-Wl,-export_dynamic";
 				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaio;
 				PRODUCT_MODULE_NAME = Papagaio;
@@ -515,7 +519,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.4;
+				MARKETING_VERSION = 1.4.0;
 				OTHER_LDFLAGS = "-Wl,-export_dynamic";
 				PRODUCT_BUNDLE_IDENTIFIER = com.papagaio.Papagaio;
 				PRODUCT_MODULE_NAME = Papagaio;

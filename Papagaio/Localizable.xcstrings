@@ -488,6 +488,17 @@
         }
       }
     },
+    "a Apple recusou o conteúdo desta conversa; para resumi-la, use o modelo neste Mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple declined the content of this conversation; to summarize it, use the model on this Mac"
+          }
+        }
+      }
+    },
     "A biblioteca ainda está abrindo — a conexão com o Google Calendar aparece aqui em instantes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -627,6 +638,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trash is empty"
+          }
+        }
+      }
+    },
+    "A nuvem privada da Apple está disponível." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple's private cloud is available."
+          }
+        }
+      }
+    },
+    "A nuvem privada da Apple está indisponível. O resumo será tentado de novo em instantes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple's private cloud is unavailable. The summary will be retried shortly."
+          }
+        }
+      }
+    },
+    "a nuvem privada da Apple não atende o idioma desta conversa; use o modelo neste Mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple's private cloud does not support this conversation's language; use the model on this Mac"
+          }
+        }
+      }
+    },
+    "A nuvem privada da Apple não está disponível agora." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple's private cloud is not available right now."
           }
         }
       }
@@ -803,6 +858,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transcription will appear after processing."
+          }
+        }
+      }
+    },
+    "A transcrição continua neste Mac. Para gerar o resumo, o texto da conversa é enviado ao Private Cloud Compute da Apple, que não o armazena. Sem internet ou com o limite diário atingido, o resumo espera e é gerado sozinho depois." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription stays on this Mac. To generate the summary, the conversation text is sent to Apple's Private Cloud Compute, which does not store it. Without internet or once the daily limit is reached, the summary waits and is generated automatically later."
           }
         }
       }
@@ -1885,6 +1951,17 @@
         }
       }
     },
+    "Ative o Apple Intelligence em Ajustes do Sistema para usar a nuvem privada da Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apple Intelligence in System Settings to use Apple's private cloud."
+          }
+        }
+      }
+    },
     "Atividade" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2017,6 +2094,17 @@
         }
       }
     },
+    "Enquanto ele estiver no Mac, o Ōmu o usa quando a nuvem não puder gerar o resumo." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While it is on this Mac, Ōmu uses it whenever the cloud cannot generate the summary."
+          }
+        }
+      }
+    },
     "Esta conversa não tem áudio para transcrever." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2024,6 +2112,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This conversation has no audio to transcribe."
+          }
+        }
+      }
+    },
+    "Esta versão do Ōmu não tem acesso à nuvem privada da Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This version of Ōmu does not have access to Apple's private cloud."
           }
         }
       }
@@ -2046,6 +2145,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This code points to more than one team. Ask the team's admin to generate a new code."
+          }
+        }
+      }
+    },
+    "Este Mac ou esta região não tem o Apple Intelligence." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is not available on this Mac or in this region."
           }
         }
       }
@@ -2116,6 +2226,72 @@
         }
       }
     },
+    "Limite diário do Apple Intelligence atingido. O resumo será gerado depois de %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence daily limit reached. The summary will be generated after %@."
+          }
+        }
+      }
+    },
+    "Limite diário do Apple Intelligence atingido. Os resumos voltam depois de %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence daily limit reached. Summaries resume after %@."
+          }
+        }
+      }
+    },
+    "Limite diário do Apple Intelligence atingido. Os resumos voltam quando ele for renovado." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence daily limit reached. Summaries resume when it renews."
+          }
+        }
+      }
+    },
+    "Na nuvem privada, a transcrição continua neste Mac. Para gerar o resumo, o texto da conversa é enviado ao Private Cloud Compute da Apple, que não o armazena. O uso tem um limite diário por conta iCloud." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With the private cloud, transcription stays on this Mac. To generate the summary, the conversation text is sent to Apple's Private Cloud Compute, which does not store it. Usage has a daily limit per iCloud account."
+          }
+        }
+      }
+    },
+    "Não foi possível remover o modelo local: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not remove the local model: %@"
+          }
+        }
+      }
+    },
+    "Neste Mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this Mac"
+          }
+        }
+      }
+    },
     "Nota" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2145,6 +2321,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "There is no transcript to summarize."
+          }
+        }
+      }
+    },
+    "Nuvem privada da Apple" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple's private cloud"
           }
         }
       }
@@ -2182,6 +2369,39 @@
         }
       }
     },
+    "O resumo é gerado neste Mac, pelo modelo local." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The summary is generated on this Mac by the local model."
+          }
+        }
+      }
+    },
+    "O resumo pela nuvem privada da Apple exige o macOS 27 ou posterior." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summaries through Apple's private cloud require macOS 27 or later."
+          }
+        }
+      }
+    },
+    "Onde o resumo é gerado" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Where the summary is generated"
+          }
+        }
+      }
+    },
     "Parte do áudio não pôde ser apagada" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2204,6 +2424,17 @@
         }
       }
     },
+    "Remover modelo local (6,2 GB)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove local model (6.2 GB)"
+          }
+        }
+      }
+    },
     "Reprocessar esta conversa?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2215,6 +2446,17 @@
         }
       }
     },
+    "Resumo adiado" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summary postponed"
+          }
+        }
+      }
+    },
     "Resumo falhou" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2222,6 +2464,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Summary failed"
+          }
+        }
+      }
+    },
+    "Resumo pela nuvem privada da Apple" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summary through Apple's private cloud"
+          }
+        }
+      }
+    },
+    "Resumo pela nuvem privada da Apple — baixar %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summary through Apple's private cloud — download %@"
           }
         }
       }
@@ -2248,6 +2512,17 @@
         }
       }
     },
+    "Sem internet: o resumo será gerado quando a conexão voltar." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No internet: the summary will be generated when the connection returns."
+          }
+        }
+      }
+    },
     "Seu Mac está muito quente" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2255,6 +2530,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your Mac is very hot"
+          }
+        }
+      }
+    },
+    "Transcrição e resumo rodam inteiramente neste Mac. Exige o modelo de 6,2 GB em disco e 18 GB de memória." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription and summary run entirely on this Mac. Requires the 6.2 GB model on disk and 18 GB of memory."
+          }
+        }
+      }
+    },
+    "Tudo neste Mac — baixar %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything on this Mac — download %@"
           }
         }
       }
@@ -2277,6 +2574,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use Contacts and Calendar to recognize names"
+          }
+        }
+      }
+    },
+    "Ver opções" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See options"
           }
         }
       }
@@ -12606,6 +12914,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "You do not have any teams yet. Use + to create your first or join one with a code."
+          }
+        }
+      }
+    },
+    "Você está perto do limite diário do Apple Intelligence." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are close to the Apple Intelligence daily limit."
           }
         }
       }

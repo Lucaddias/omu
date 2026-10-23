@@ -32,8 +32,11 @@ public protocol TranscriptionEngine: Sendable {
 
 // MARK: - Sumarização
 
-/// Contrato de sumarização. Uma engine só: Qwen3.5-9B-Q4_K_M via
-/// `llama.cpp` linkado (D-0.5/D-0.6). Ver skill `papagaio-summarization`.
+/// Contrato de sumarização. Duas engines, escolhidas por quem usa
+/// (`ModoDeResumo`): Qwen3.5-9B-Q4_K_M via `llama.cpp` linkado (D-0.5/D-0.6),
+/// neste Mac, e o modelo de servidor do Apple Intelligence pelo Private Cloud
+/// Compute (`NuvemPrivadaEngine`), que dispensa o peso de 6,2 GB.
+/// Ver skill `papagaio-summarization`.
 public protocol SummarizationEngine: Sendable {
     var identifier: String { get }
     func summarize(_ trechos: [Trecho]) async throws -> Resumo
