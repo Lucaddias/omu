@@ -22,16 +22,6 @@ compartilhado para sincronizar os dados textuais das conversas.
 | Preservar o contexto | Player com navegação pelos trechos da transcrição e anexos por conversa. |
 | Trabalhar em grupo | Equipes com código de seis caracteres, convites do iCloud e espaço separado do perfil pessoal. |
 
-## Capturas da build atual
-
-<p align="center">
-  <img src="docs/assets/biblioteca-vazia.jpeg" alt="Biblioteca do Ōmu pronta para gravar ou importar uma conversa" width="49%" />
-  <img src="docs/assets/equipe-cloudkit-anonimizada.png" alt="Tela de gerenciamento de equipe com código de entrada protegido" width="49%" />
-</p>
-
-As capturas acima foram feitas na build local de 26 de agosto de 2026. Os dados
-de perfil e equipe exibidos são de desenvolvimento.
-
 ## Recursos
 
 - Gravação de microfone e áudio do sistema, com importação de arquivos de áudio.
@@ -111,15 +101,11 @@ xcodebuild build \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-O GitHub Actions configura o bootstrap, os testes do `PapagaioCore`, os testes
-do app com `PAPAGAIO_TEST_MODE=1` e o build para pull requests direcionados a
-`main`. No modo de teste, o lançamento usa um host vazio; os testes continuam
+O GitHub Actions configura o bootstrap, os testes dos scripts
+(`python3 -m unittest Scripts/tests/test_scripts.py`), os testes do
+`PapagaioCore`, os testes do app com `PAPAGAIO_TEST_MODE=1` e o build para pull
+requests direcionados a `main`. No modo de teste, o lançamento usa um host vazio; os testes continuam
 responsáveis por injetar armazenamento temporário e serviços falsos.
-
-## Plano e revisões
-
-- [Plano de aplicação de produto](PLANO-APLICACAO-INTELIGENCIA-PRODUTO-PAPAGAIO.md): classificação, prioridades e critérios de aceite.
-- [Revisão de bugs e fluxos de dados](docs/REVISAO-PLANO-E-FLUXOS-2026-08-28.md): mapa de entradas/saídas, correções, evidências e validações pendentes.
 
 ## Limites conhecidos
 
@@ -127,8 +113,6 @@ responsáveis por injetar armazenamento temporário e serviços falsos.
   anexos não são enviados ao CloudKit nesta versão.
 - O fluxo de criação, convite, aceite e sincronização deve ser validado com
   duas contas iCloud reais antes de uma distribuição pública.
-- Um arquivo em `docs/historico/` registra uma decisão anterior de remover
-  CloudKit. Ele foi preservado por rastreabilidade e não descreve a versão atual.
 
 ## Contribuição
 

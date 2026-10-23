@@ -292,3 +292,18 @@ private struct RuidoDeterministico {
         sqrt(amostras.reduce(Float.zero) { $0 + $1 * $1 } / Float(amostras.count))
     }
 }
+
+@Test("Com o Silero, a energia só veta o piso de ruído digital (T-01)")
+func limiarDeEnergiaCedeAoSilero() {
+    // Voz baixa/distante (≈ −45 dBFS → RMS ≈ 0,0056) ficava abaixo de 0,008 e
+    // era vetada mesmo com o Silero dizendo que era fala.
+    let vozBaixa: Float = 0.0056
+    let comSilero = DetectorDeAtividadeDeVoz.limiarEfetivoDeEnergia(0.008, usaSilero: true)
+    #expect(comSilero == DetectorDeAtividadeDeVoz.pisoDeRuidoDigital)
+    #expect(vozBaixa >= comSilero)
+
+    // Sem o Silero a energia é o único critério: o limiar pedido vale.
+    #expect(DetectorDeAtividadeDeVoz.limiarEfetivoDeEnergia(0.008, usaSilero: false) == 0.008)
+    // Um limiar pedido ainda mais baixo que o piso é respeitado.
+    #expect(DetectorDeAtividadeDeVoz.limiarEfetivoDeEnergia(0.0005, usaSilero: true) == 0.0005)
+}

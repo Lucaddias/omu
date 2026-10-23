@@ -455,3 +455,182 @@ private actor TransporteCloudKitSuspenso: TransporteDeConversasCloudKit {
 
     func remover(id: String, equipe: EquipeDisponivel) {}
 }
+
+// MARK: - Autenticidade de marcadores, códigos e convites
+
+@Test("Marcador de exclusão só autoriza a limpeza se concluído e criado pelo dono da zona")
+func marcadorDeExclusaoExigeDonoDaZona() {
+    // O caso legítimo: o dono publicou "concluída".
+    #expect(ServicoDeEquipesCloudKit.marcadorAutorizaLimpeza(
+        estado: "concluida", criador: "_dono_", donoDaZona: "_dono_"
+    ))
+    // Qualquer conta cria registros no banco público: um participante (ou
+    // ex-participante) não pode mandar os Macs da equipe se limparem.
+    #expect(!ServicoDeEquipesCloudKit.marcadorAutorizaLimpeza(
+        estado: "concluida", criador: "_outra-conta_", donoDaZona: "_dono_"
+    ))
+    #expect(!ServicoDeEquipesCloudKit.marcadorAutorizaLimpeza(
+        estado: "preparando", criador: "_dono_", donoDaZona: "_dono_"
+    ))
+    // Sem criador ou sem o dono guardado não há o que conferir: nada é apagado.
+    #expect(!ServicoDeEquipesCloudKit.marcadorAutorizaLimpeza(
+        estado: "concluida", criador: nil, donoDaZona: "_dono_"
+    ))
+    #expect(!ServicoDeEquipesCloudKit.marcadorAutorizaLimpeza(
+        estado: "concluida", criador: "_dono_", donoDaZona: nil
+    ))
+}
+
+@Test("Registro de código só vale quando criado pelo dono do compartilhamento")
+func registroDeCodigoExigeDonoDoCompartilhamento() {
+    #expect(ServicoDeEquipesCloudKit.registroDeCodigoEhDoDono(
+        criador: "_dono_", donoDoCompartilhamento: "_dono_"
+    ))
+    #expect(!ServicoDeEquipesCloudKit.registroDeCodigoEhDoDono(
+        criador: "_terceiro_", donoDoCompartilhamento: "_dono_"
+    ))
+    #expect(!ServicoDeEquipesCloudKit.registroDeCodigoEhDoDono(
+        criador: nil, donoDoCompartilhamento: "_dono_"
+    ))
+    #expect(!ServicoDeEquipesCloudKit.registroDeCodigoEhDoDono(
+        criador: "_dono_", donoDoCompartilhamento: nil
+    ))
+}
+
+private func equipeDeTeste(
+    id: String = "produto-a1b2c3",
+    espaco: UUID = UUID(),
+    dono: String? = "_dono_",
+    banco: BancoCloudKitDaEquipe = .compartilhado
+) -> EquipeDisponivel {
+    EquipeDisponivel(
+        id: id,
+        nome: "Produto",
+        papel: "Membro",
+        quantidadeDeMembros: 2,
+        espacoID: espaco.uuidString,
+        zonaCloudKit: "equipe.\(id)",
+        donoDaZonaCloudKit: dono,
+        bancoCloudKit: banco.rawValue
+    )
+}
+
+@Test("Convite não toma o id nem o espaço de uma equipe já conhecida")
+func conviteNaoSubstituiEquipeExistente() {
+    let pessoal = EspacoID()
+    let minha = equipeDeTeste(dono: "__defaultOwner__", banco: .privado)
+    let espacoDaMinha = UUID(uuidString: minha.espacoID ?? "") ?? UUID()
+
+    // Mesma equipe, mesma zona e dono: é atualização, não conflito.
+    #expect(!EquipesDoUsuario.conflita(minha, com: [minha], espacoPessoal: pessoal))
+    // Equipe nova, sem relação com as existentes.
+    #expect(!EquipesDoUsuario.conflita(
+        equipeDeTeste(id: "vendas-ffffff"), com: [minha], espacoPessoal: pessoal
+    ))
+    // Convite de outra conta reivindicando o `id` da minha equipe.
+    #expect(EquipesDoUsuario.conflita(
+        equipeDeTeste(dono: "_atacante_"), com: [minha], espacoPessoal: pessoal
+    ))
+    // Convite com outro `id`, mas apontando para o espaço da minha equipe:
+    // as conversas dela passariam a sincronizar com a zona do remetente.
+    #expect(EquipesDoUsuario.conflita(
+        equipeDeTeste(id: "outra-000000", espaco: espacoDaMinha, dono: "_atacante_"),
+        com: [minha],
+        espacoPessoal: pessoal
+    ))
+    // Nem o espaço pessoal pode ser reivindicado por um convite.
+    #expect(EquipesDoUsuario.conflita(
+        equipeDeTeste(id: "outra-111111", espaco: pessoal.rawValue, dono: "_atacante_"),
+        com: [],
+        espacoPessoal: pessoal
+    ))
+    // Entrada antiga, sem o dono guardado: reentrar na mesma zona atualiza.
+    let legada = equipeDeTeste(dono: nil)
+    #expect(!EquipesDoUsuario.conflita(equipeDeTeste(), com: [legada], espacoPessoal: pessoal))
+}
+
+@Test("Lista de equipes ilegível não é sobrescrita por uma lista vazia")
+func listaDeEquipesIlegivelFicaEmQuarentena() throws {
+    let nome = "teste-equipes-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: nome))
+    defer { defaults.removePersistentDomain(forName: nome) }
+    let ilegivel = Data("{ isto não é uma lista de equipes".utf8)
+    defaults.set(ilegivel, forKey: "equipesDoUsuario")
+
+    #expect(EquipesDoUsuario.carregar(em: defaults).isEmpty)
+    EquipesDoUsuario.salvar([], em: defaults)
+
+    #expect(defaults.data(forKey: "equipesDoUsuario.ilegivel") == ilegivel)
+}
+
+// MARK: - Fila e download tolerantes a falhas
+
+@Test("Fila do iCloud ilegível vai para a quarentena e volta a funcionar")
+func filaIlegivelNaoTravaParaSempre() async throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let url = raiz.appendingPathComponent("fila.json")
+    let espaco = EspacoID()
+    let equipe = equipeCloudKitDeTeste(espaco: espaco)
+
+    // Uma operação válida gravada por uma execução anterior…
+    let anterior = FilaPersistenteCloudKit(url: url)
+    try await anterior.agendarEnvio(Arquivo(titulo: "Boa", pastaRelativa: "", espaco: espaco), para: equipe)
+    // …e ao lado dela um item que esta versão não sabe ler.
+    let valida = try #require(
+        try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]]
+    )
+    let misturado = valida + [["id": "não é uma operação"]]
+    try JSONSerialization.data(withJSONObject: misturado).write(to: url)
+
+    let fila = FilaPersistenteCloudKit(url: url)
+
+    // A legível continua; a fila aceita operações novas em vez de lançar.
+    #expect(try await fila.operacoesPendentes().map(\.arquivo?.titulo) == ["Boa"])
+    try await fila.agendarEnvio(Arquivo(titulo: "Nova", pastaRelativa: "", espaco: espaco), para: equipe)
+    #expect(try await fila.operacoesPendentes().count == 2)
+    let quarentena = try #require(fila.quarentena)
+    #expect(FileManager.default.fileExists(atPath: quarentena.path))
+
+    // Arquivo que nem JSON é: fila vazia, original preservado.
+    let outro = raiz.appendingPathComponent("truncada.json")
+    try Data("[{\"id\": \"".utf8).write(to: outro)
+    let truncada = FilaPersistenteCloudKit(url: outro)
+    #expect(try await truncada.operacoesPendentes().isEmpty)
+    #expect(truncada.quarentena != nil)
+}
+
+@Test("Falhas do iCloud que repetir não resolve saem das tentativas automáticas")
+func classificacaoDeFalhasDaFila() {
+    // Remover o que já não existe é o resultado desejado.
+    #expect(DestinoDaFalhaCloudKit.classificar(codigos: [.unknownItem], acao: .remover) == .jaConcluida)
+    #expect(DestinoDaFalhaCloudKit.classificar(codigos: [.zoneNotFound], acao: .remover) == .jaConcluida)
+    // No envio, registro ausente não é sucesso.
+    #expect(DestinoDaFalhaCloudKit.classificar(codigos: [.unknownItem], acao: .enviar) == .tentarDeNovo)
+    // Sem permissão de escrita ou sem cota: parar e avisar.
+    #expect(DestinoDaFalhaCloudKit.classificar(codigos: [.permissionFailure], acao: .enviar) == .bloqueada)
+    #expect(DestinoDaFalhaCloudKit.classificar(codigos: [.quotaExceeded], acao: .enviar) == .bloqueada)
+    #expect(DestinoDaFalhaCloudKit.classificar(codigos: [.permissionFailure], acao: .remover) == .bloqueada)
+    // Rede e servidor: repetir com espera.
+    #expect(DestinoDaFalhaCloudKit.classificar(codigos: [.networkUnavailable], acao: .enviar) == .tentarDeNovo)
+    #expect(DestinoDaFalhaCloudKit.classificar(FalhaCloudKitFake(), acao: .enviar) == .tentarDeNovo)
+}
+
+@Test("Uma conversa ilegível não derruba o download das outras")
+func downloadPulaRegistroIlegivel() async throws {
+    let espaco = EspacoID()
+    let boa = Arquivo(titulo: "Legível", pastaRelativa: "", espaco: espaco)
+    let payload = try JSONEncoder().encode(
+        PayloadDeConversaCloudKit(arquivo: boa, atualizadoEm: Date(timeIntervalSince1970: 10))
+    )
+    let transporte = TransporteDeConversasFake(
+        paginas: [[Data("{\"versao\": 99, \"campoNovo\": true}".utf8), payload]]
+    )
+    let sincronizador = SincronizadorDaBibliotecaCloudKit(transporte: transporte)
+
+    let recebidas = try await sincronizador.baixarComVersoes(da: equipeCloudKitDeTeste(espaco: espaco))
+
+    #expect(recebidas.map(\.arquivo.titulo) == ["Legível"])
+    #expect(await sincronizador.ignoradasNoUltimoDownload == 1)
+}

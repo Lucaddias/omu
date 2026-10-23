@@ -192,3 +192,69 @@ func cancelarOAuthComClienteSilencioso() async throws {
     } catch { #expect(error is CancellationError) }
     await servidor.parar()
 }
+
+private final class CofreOAuthEmMemoria: CofreDeTokensOAuthGoogle, @unchecked Sendable {
+    private let trava = NSLock()
+    private var itens: [String: Data] = [:]
+
+    func salvar(_ dados: Data, conta: String) throws {
+        trava.withLock { itens[conta] = dados }
+    }
+
+    func carregar(conta: String) -> Data? {
+        trava.withLock { itens[conta] }
+    }
+
+    func apagar(conta: String) {
+        trava.withLock { itens[conta] = nil }
+    }
+}
+
+@Test("A autorização do Google pede consentimento, nunca prompt=none (IN-01)")
+func autorizacaoGooglePedeConsentimento() throws {
+    let sessao = SessaoOAuthGoogle(cofre: CofreOAuthEmMemoria())
+
+    let url = try sessao.prepararAutorizacao(
+        redirectURI: "http://127.0.0.1:5000/oauth/callback",
+        estado: "estado"
+    )
+    let itens = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+    func valor(_ nome: String) -> String? { itens.first { $0.name == nome }?.value }
+
+    // `none` proíbe as telas de login e consentimento: nenhuma conta nova
+    // conseguia conectar.
+    #expect(valor("prompt") == "consent")
+    #expect(valor("access_type") == "offline")
+    #expect(valor("code_challenge_method") == "S256")
+    #expect(valor("state") == "estado")
+}
+
+@Test("O pedido de token vai em formulário, sem segredo de cliente")
+func pedidoDeTokenDoGoogle() throws {
+    let endpoint = try #require(URL(string: "https://oauth2.googleapis.com/token"))
+    func campos(_ pedido: URLRequest) throws -> [String: String] {
+        let corpo = try #require(pedido.httpBody.flatMap { String(data: $0, encoding: .utf8) })
+        var resultado: [String: String] = [:]
+        for par in corpo.split(separator: "&") {
+            let partes = par.split(separator: "=", maxSplits: 1).map(String.init)
+            resultado[partes[0]] = partes.count > 1 ? partes[1].removingPercentEncoding : ""
+        }
+        return resultado
+    }
+
+    let pedido = SessaoOAuthGoogle.pedidoDeToken(
+        para: endpoint,
+        campos: ["grant_type": "authorization_code", "code": "4/0Ab+c=d"],
+        clienteID: "id.apps.googleusercontent.com"
+    )
+    #expect(pedido.httpMethod == "POST")
+    #expect(pedido.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
+    let enviados = try campos(pedido)
+    #expect(enviados["client_id"] == "id.apps.googleusercontent.com")
+    #expect(enviados["grant_type"] == "authorization_code")
+    #expect(enviados["client_secret"] == nil)
+    // `+`, `/` e `=` do código não podem chegar crus ao formulário.
+    #expect(enviados["code"] == "4/0Ab+c=d")
+    let cru = try #require(pedido.httpBody.flatMap { String(data: $0, encoding: .utf8) })
+    #expect(cru.contains("code=4%2F0Ab%2Bc%3Dd"))
+}

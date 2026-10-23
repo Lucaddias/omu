@@ -2,42 +2,25 @@ import Foundation
 import PapagaioCore
 
 enum TarefasGeraisStore {
+    /// Mesma carga da aba Tarefas da conversa (`TarefasDaConversa.carregar`):
+    /// as duas telas leem a mesma chave e precisam concordar sobre quais
+    /// sugestões do resumo já foram oferecidas.
     static func carregar(_ arquivo: Arquivo) -> [TarefaDaConversa] {
-        if let dados = UserDefaults.standard.data(forKey: chave(arquivo.id)),
-           let tarefas = try? JSONDecoder().decode([TarefaDaConversa].self, from: dados) {
-            // Reaplicada a cada carga, e não só na criação: sem isto, uma
-            // tarefa cujo prazo foi ficando perto só subia de prioridade se
-            // alguém reabrisse a tela da conversa — a aba geral de Tarefas,
-            // que lê direto daqui, nunca via a promoção.
-            let ajustadas = tarefas.map(RegraDePrazoDaTarefa.ajustada)
-            if ajustadas != tarefas {
-                salvar(ajustadas, para: arquivo.id)
-            }
-            return ajustadas
+        let tarefas = TarefasDaConversa.carregar(
+            arquivo.id,
+            base: arquivo.resumo?.proximosPassos ?? [],
+            tituloDaConversa: arquivo.resumo?.titulo ?? arquivo.titulo,
+            dataDaConversa: arquivo.criadoEm
+        )
+        // Reaplicada a cada carga, e não só na criação: sem isto, uma
+        // tarefa cujo prazo foi ficando perto só subia de prioridade se
+        // alguém reabrisse a tela da conversa — a aba geral de Tarefas,
+        // que lê direto daqui, nunca via a promoção.
+        let ajustadas = tarefas.map(RegraDePrazoDaTarefa.ajustada)
+        if ajustadas != tarefas {
+            salvar(ajustadas, para: arquivo.id)
         }
-
-        let titulo = arquivo.resumo?.titulo ?? arquivo.titulo
-        let tarefas = (arquivo.resumo?.proximosPassos ?? []).enumerated().map { indice, passo in
-            TarefaDaConversa(
-                titulo: passo.descricao,
-                origem: titulo,
-                prioridade: indice < 2 ? .alta : .media,
-                status: .naoIniciado,
-                responsavel: TarefaDaConversa.responsavelSaneado(passo.responsavel),
-                prazo: Calendar.current.date(byAdding: .day, value: 7 + indice, to: arquivo.criadoEm),
-                // Extraída da transcrição, não escrita pela pessoa — fica como
-                // sugestão até ela aceitar, editar ou descartar na aba
-                // Tarefas da própria conversa. Enquanto isso, não aparece
-                // aqui no quadro geral (ver `TarefasView.tarefasPorConversa`).
-                sugestaoPendente: true
-            )
-        }
-
-        if !tarefas.isEmpty {
-            salvar(tarefas, para: arquivo.id)
-        }
-
-        return tarefas
+        return ajustadas
     }
 
     static func salvar(_ tarefas: [TarefaDaConversa], para arquivoID: ArquivoID) {
@@ -65,12 +48,17 @@ enum TarefasGeraisStore {
             )
         }
 
+        TarefasDaConversa.copiarPassosOferecidos(
+            de: arquivo.id,
+            para: copia.id,
+            passosAtuais: arquivo.resumo?.proximosPassos ?? []
+        )
         guard !tarefasCopiadas.isEmpty else { return }
         salvar(tarefasCopiadas, para: copia.id)
     }
 
     static func remover(_ arquivoID: ArquivoID, em defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: chave(arquivoID))
+        TarefasDaConversa.remover(arquivoID, em: defaults)
     }
 
     private static func chave(_ arquivoID: ArquivoID) -> String {

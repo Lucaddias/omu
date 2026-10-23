@@ -171,3 +171,68 @@ func agrupamentoVazio() {
     #expect(Segmentacao.agrupar([]).isEmpty)
     #expect(Segmentacao.mesclarCanais(microfone: [], sistema: []).isEmpty)
 }
+
+@Test("Resposta curta do microfone fica na conversa (T-04)")
+func respostaCurtaDoMicrofoneNaoSome() {
+    let sistema = [Trecho(start: 0, end: 4, texto: "Você consegue entregar na sexta?")]
+
+    // "Sim." depois da pergunta, sem sobreposição: é fala, não ruído.
+    let depois = Segmentacao.mesclarCanais(
+        microfone: [Trecho(start: 4.2, end: 4.5, texto: "Sim.", noSpeechProb: 0.4)],
+        sistema: sistema
+    )
+    #expect(depois.contains { $0.speaker == Speaker.eu && $0.texto == "Sim." })
+
+    // Sobreposto ao sistema, mas o Whisper não desconfia dele: fica.
+    let confiante = Segmentacao.mesclarCanais(
+        microfone: [Trecho(start: 3.6, end: 3.9, texto: "Ok.", noSpeechProb: 0.05)],
+        sistema: sistema
+    )
+    #expect(confiante.contains { $0.speaker == Speaker.eu && $0.texto == "Ok." })
+
+    // Sem a probabilidade (motor antigo), não há evidência para cortar.
+    let semEvidencia = Segmentacao.mesclarCanais(
+        microfone: [Trecho(start: 3.6, end: 3.9, texto: "Não.")],
+        sistema: sistema
+    )
+    #expect(semEvidencia.contains { $0.speaker == Speaker.eu && $0.texto == "Não." })
+
+    // As três evidências juntas — curto, sobreposto e suspeito — ainda cortam
+    // o ruído residual do alto-falante.
+    let ruido = Segmentacao.mesclarCanais(
+        microfone: [Trecho(start: 3.6, end: 3.9, texto: "hm", noSpeechProb: 0.45)],
+        sistema: sistema
+    )
+    #expect(!ruido.contains { $0.speaker == Speaker.eu })
+}
+
+@Test("Agrupar preserva a confiança do trecho (T-05)")
+func agruparPreservaConfianca() throws {
+    // Com palavras: a confiança sai delas, ponderada pela duração.
+    let comPalavras = [
+        Trecho(
+            start: 0, end: 2, texto: "bom dia",
+            palavras: [
+                Palavra(start: 0, end: 1, texto: "bom", confianca: 0.9),
+                Palavra(start: 1, end: 2, texto: "dia", confianca: 0.5),
+            ],
+            confianca: 0.7, noSpeechProb: 0.1
+        ),
+        Trecho(
+            start: 2.1, end: 3.1, texto: "pessoal",
+            palavras: [Palavra(start: 2.1, end: 3.1, texto: "pessoal", confianca: 0.7)],
+            confianca: 0.7, noSpeechProb: 0.3
+        ),
+    ]
+    let agrupado = try #require(Segmentacao.agrupar(comPalavras).first)
+    #expect(abs(try #require(agrupado.confianca) - 0.7) < 0.001)
+    #expect(abs(try #require(agrupado.noSpeechProb) - 0.2) < 0.001)
+
+    // Sem palavras (legado): média dos segmentos pela duração.
+    let semPalavras = [
+        Trecho(start: 0, end: 3, texto: "um", confianca: 0.8),
+        Trecho(start: 3.1, end: 4.1, texto: "dois", confianca: 0.4),
+    ]
+    let legado = try #require(Segmentacao.agrupar(semPalavras).first)
+    #expect(abs(try #require(legado.confianca) - 0.7) < 0.001)
+}

@@ -93,8 +93,13 @@ public final class ReprodutorDeArquivo {
         intervalo: TimeInterval = ReprodutorDeArquivo.intervaloDeObservacao
     ) {
         self.trechos = trechos
-        self.primario = try? AVAudioPlayer(contentsOf: audio)
-        self.secundario = urlSecundario.flatMap { try? AVAudioPlayer(contentsOf: $0) }
+        let principal = try? AVAudioPlayer(contentsOf: audio)
+        let outro = urlSecundario.flatMap { try? AVAudioPlayer(contentsOf: $0) }
+        // Só o canal do sistema abriu (microfone truncado ou removido): ele
+        // vira o principal. Antes a tela mostrava um player com duração e o
+        // botão de tocar não fazia nada, porque o transporte segue o primário.
+        self.primario = principal ?? outro
+        self.secundario = principal == nil ? nil : outro
         self.intervaloDeObservacao = intervalo
 
         primario?.enableRate = true

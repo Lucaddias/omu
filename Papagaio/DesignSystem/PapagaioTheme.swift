@@ -262,6 +262,7 @@ enum DataDigitada {
             (prefixo.replacingOccurrences(of: "/", with: "-") + "-yyyy", false),
             (compactado, false),
             ("\(prefixo)/yy", false),
+            (prefixo.replacingOccurrences(of: "/", with: "-") + "-yy", false),
             (prefixo, true),
         ]
     }
@@ -279,9 +280,13 @@ enum DataDigitada {
         return f
     }()
 
-    static func lendo(_ texto: String) -> Date? {
+    /// - Parameter anterior: a data que o campo tinha. A digitação só informa
+    ///   o dia; hora e minuto vêm daqui, para que confirmar o campo não
+    ///   transforme 14:32 em 00:00.
+    static func lendo(_ texto: String, preservandoHoraDe anterior: Date? = nil) -> Date? {
         let limpo = texto.trimmingCharacters(in: .whitespaces)
         guard !limpo.isEmpty else { return nil }
+        let calendario = Calendar.autoupdatingCurrent
 
         for formato in formatos {
             formatador.locale = LocalizacaoDoApp.localeAtual
@@ -289,20 +294,43 @@ enum DataDigitada {
             formatador.dateFormat = formato.padrao
             guard let lida = formatador.date(from: limpo) else { continue }
 
+            // O `DateFormatter` é tolerante demais para um campo de data:
+            // aceita "26" como o ano 26 d.C. num padrão `yyyy` e "corrige"
+            // 31/02 para 03/03. Os números lidos têm de ser os digitados, e
+            // um ano de quatro dígitos tem de ter quatro dígitos — senão a
+            // tentativa segue para o próximo formato (`yy` soma o século).
+            guard numeros(em: formatador.string(from: lida)) == numeros(em: limpo) else { continue }
+            if !formato.semAno, formato.padrao.contains("yyyy"),
+               calendario.component(.year, from: lida) < 1000 {
+                continue
+            }
+
+            var partes = calendario.dateComponents([.day, .month, .year], from: lida)
             // Uma data sem ano cai no ano de referência do formatador; joga
             // para o ano corrente, preservando a ordem que a região usa.
             if formato.semAno {
-                let calendario = Calendar.autoupdatingCurrent
-                let anoAtual = calendario.component(.year, from: Date())
-                var partes = calendario.dateComponents([.day, .month], from: lida)
-                partes.year = anoAtual
-                return calendario.date(from: partes)
+                partes.year = calendario.component(.year, from: Date())
             }
-
-            return lida
+            if let anterior {
+                let hora = calendario.dateComponents([.hour, .minute, .second], from: anterior)
+                partes.hour = hora.hour
+                partes.minute = hora.minute
+                partes.second = hora.second
+            }
+            guard let data = calendario.date(from: partes) else { continue }
+            // 29/02 sem ano num ano não bissexto viraria 01/03.
+            let conferida = calendario.dateComponents([.day, .month], from: data)
+            guard conferida.day == partes.day, conferida.month == partes.month else { continue }
+            return data
         }
 
         return nil
+    }
+
+    /// Os grupos de dígitos do texto, como números: "01/02/2026" e "1/2/2026"
+    /// são a mesma digitação.
+    private static func numeros(em texto: String) -> [Int] {
+        texto.split { !$0.isNumber }.compactMap { Int($0) }
     }
 
     static func texto(de data: Date) -> String {
@@ -472,7 +500,7 @@ struct CampoDeDataPapagaio: View {
     }
 
     private func aplicarTextoDigitado() {
-        guard let lida = dataLendo(textoDigitado) else {
+        guard let lida = DataDigitada.lendo(textoDigitado, preservandoHoraDe: data) else {
             textoInvalido = true
             return
         }
@@ -480,10 +508,6 @@ struct CampoDeDataPapagaio: View {
         textoInvalido = false
         data = lida
         mostrandoCalendario = false
-    }
-
-    private func dataLendo(_ texto: String) -> Date? {
-        DataDigitada.lendo(texto)
     }
 }
 

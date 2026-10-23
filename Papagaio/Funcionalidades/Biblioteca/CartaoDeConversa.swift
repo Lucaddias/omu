@@ -1211,6 +1211,7 @@ struct CartaoDeConversa: View {
                 bloqueioDeLixeira: emOperacaoDeLixeira,
                 cancelavel: estado.ocupado,
                 podeDiarizar: podeDiarizar,
+                podeReprocessar: !arquivo.semAudio,
                 aoDiarizar: executarMenu(aoDiarizar),
                 aoReprocessar: executarMenu(aoReprocessar),
                 aoRenomear: executarMenu(abrirEditorDeInformacoes),
@@ -1429,27 +1430,42 @@ struct CartaoDeConversa: View {
     /// cópia, e o menu da pasta já oferecia as duas.
     private func baixar() {
         #if os(macOS)
-        guard let pacote = try? DossieDaConversa.pacoteComAudio(
-            arquivo: arquivo,
-            audioPrincipal: urlDeAudio
-        ) else { return }
-
+        // O destino vem primeiro: montar o pacote (cópia do áudio + zip, até
+        // gigabytes) antes de a pessoa escolher a pasta era trabalho jogado
+        // fora num "Cancelar" — e rodava na thread principal.
         let painel = NSOpenPanel()
         painel.title = String(format: "Escolha onde salvar %@".localized, titulo)
         painel.prompt = "Salvar aqui".localized
         painel.canChooseFiles = false
         painel.canChooseDirectories = true
         painel.canCreateDirectories = true
+        guard painel.runModal() == .OK, let destino = painel.url else { return }
 
-        guard painel.runModal() == .OK,
-              let destino = painel.url,
-              destino.startAccessingSecurityScopedResource()
-        else { return }
-        defer { destino.stopAccessingSecurityScopedResource() }
-
-        let alvo = destino.appendingPathComponent(pacote.lastPathComponent)
-        try? FileManager.default.removeItem(at: alvo)
-        try? FileManager.default.copyItem(at: pacote, to: alvo)
+        let arquivoParaExportar = arquivo
+        let audioParaExportar = urlDeAudio
+        Task { @MainActor in
+            do {
+                try await Task.detached {
+                    let pacote = try DossieDaConversa.pacoteComAudio(
+                        arquivo: arquivoParaExportar,
+                        audioPrincipal: audioParaExportar
+                    )
+                    defer { DossieDaConversa.descartarArquivoTemporario(pacote) }
+                    let acesso = destino.startAccessingSecurityScopedResource()
+                    defer { if acesso { destino.stopAccessingSecurityScopedResource() } }
+                    try CopiaSegura.copiar(
+                        pacote,
+                        substituindo: destino.appendingPathComponent(pacote.lastPathComponent)
+                    )
+                }.value
+            } catch {
+                let alerta = NSAlert()
+                alerta.messageText = "Não foi possível salvar".localized
+                alerta.informativeText = error.localizedDescription
+                alerta.alertStyle = .warning
+                alerta.runModal()
+            }
+        }
         #endif
     }
 
@@ -1457,25 +1473,34 @@ struct CartaoDeConversa: View {
         #if os(macOS)
         // Uma ação só: documento e áudio juntos, e no mesmo painel a opção de
         // salvar em pasta. O áudio cru sozinho não dizia nada a quem recebe.
-        let itens: [Any]
-        do {
-            itens = [try DossieDaConversa.pacoteComAudio(arquivo: arquivo, audioPrincipal: urlDeAudio)]
-        } catch {
-            let destino = FileManager.default.temporaryDirectory
-                .appendingPathComponent(DossieDaConversa.nomeDeArquivo(para: arquivo))
-            if (try? DossieDaConversa.gerar(arquivo: arquivo)
-                .write(to: destino, atomically: true, encoding: .utf8)) != nil {
-                itens = [destino]
-            } else {
-                itens = [DossieDaConversa.gerar(arquivo: arquivo)]
+        let arquivoParaExportar = arquivo
+        let audioParaExportar = urlDeAudio
+        Task { @MainActor in
+            let itens: [Any]
+            do {
+                // Fora da thread principal, como a tela de detalhe já fazia.
+                itens = [try await Task.detached {
+                    try DossieDaConversa.pacoteComAudio(
+                        arquivo: arquivoParaExportar,
+                        audioPrincipal: audioParaExportar
+                    )
+                }.value]
+            } catch {
+                if let destino = try? DossieDaConversa.markdownTemporario(arquivo: arquivoParaExportar) {
+                    itens = [destino]
+                } else {
+                    itens = [DossieDaConversa.gerar(arquivo: arquivoParaExportar)]
+                }
             }
-        }
 
-        let picker = NSSharingServicePicker(items: itens)
-        let opcoes = OpcoesDeCompartilhamento(arquivos: itens.compactMap { $0 as? URL })
-        delegadoDeCompartilhamento = opcoes
-        picker.delegate = opcoes
-        if let view = NSApp.keyWindow?.contentView {
+            let picker = NSSharingServicePicker(items: itens)
+            let opcoes = OpcoesDeCompartilhamento(arquivos: itens.compactMap { $0 as? URL })
+            delegadoDeCompartilhamento = opcoes
+            picker.delegate = opcoes
+            guard let view = NSApp.keyWindow?.contentView else {
+                itens.compactMap { $0 as? URL }.forEach(DossieDaConversa.descartarArquivoTemporario)
+                return
+            }
             picker.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
         }
         #endif

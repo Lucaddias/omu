@@ -64,6 +64,33 @@ public struct Armazenamento: Sendable {
         raiz.appendingPathComponent(relativo, isDirectory: true)
     }
 
+    /// Como `resolver`, mas recusa o que não pode ser uma pasta dentro da
+    /// raiz: string vazia (que resolveria para a própria raiz — é a marca de
+    /// conversa sem áudio), caminho absoluto e componentes `.`/`..`.
+    ///
+    /// Quem vai **escrever, copiar ou apagar** a partir de um caminho
+    /// persistido usa esta variante: um `pastaRelativa` vazio ou corrompido
+    /// não pode virar operação de disco sobre a biblioteca inteira.
+    public func resolverSeguro(relativo: String) throws -> URL {
+        let partes = relativo.split(separator: "/", omittingEmptySubsequences: false)
+        guard !relativo.isEmpty,
+              !relativo.hasPrefix("/"),
+              !partes.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." })
+        else {
+            throw ErroArmazenamento.caminhoRelativoInvalido(relativo)
+        }
+
+        let base = raiz.standardizedFileURL.pathComponents
+        let resolvido = resolver(relativo: relativo).standardizedFileURL
+        let componentes = resolvido.pathComponents
+        guard componentes.count > base.count,
+              Array(componentes.prefix(base.count)) == base
+        else {
+            throw ErroArmazenamento.caminhoRelativoInvalido(relativo)
+        }
+        return resolvido
+    }
+
     /// Cria a pasta da gravação e devolve a URL absoluta de um arquivo de
     /// áudio canônico dentro dela (`microfone.wav`, `sistema.caf`, …).
     @discardableResult
@@ -214,11 +241,14 @@ public struct Armazenamento: Sendable {
 
 public enum ErroArmazenamento: LocalizedError {
     case caminhoDeGravacaoInvalido(String)
+    case caminhoRelativoInvalido(String)
 
     public var errorDescription: String? {
         switch self {
         case let .caminhoDeGravacaoInvalido(caminho):
             "O caminho da gravação não é seguro para excluir: \(caminho)"
+        case let .caminhoRelativoInvalido(caminho):
+            "O caminho guardado para esta conversa não aponta para uma pasta da biblioteca: \"\(caminho)\""
         }
     }
 }

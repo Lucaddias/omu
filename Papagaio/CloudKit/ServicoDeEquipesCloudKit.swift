@@ -96,13 +96,67 @@ actor ServicoDeEquipesCloudKit {
             predicate: NSPredicate(format: "%K == %@", Campo.codigoDeEntrada, codigoNormalizado)
         )
         let resultado = try await container.publicCloudDatabase.records(matching: consulta)
-        guard let registro = try resultado.matchResults.first?.1.get(),
-              let textoDaURL = registro[Campo.urlDoCompartilhamento] as? String,
-              let url = URL(string: textoDaURL) else {
+
+        // Qualquer conta pode criar um registro de código no banco público.
+        // Um registro só vale se foi criado pelo dono do compartilhamento
+        // para o qual aponta — isso impede que alguém aponte um código para a
+        // zona de terceiros. E o código precisa levar a um único
+        // compartilhamento: havendo dois, não há como saber qual é o
+        // legítimo, e entrar no errado sincronizaria conversas para lá.
+        var candidatos: [String: CKShare.Metadata] = [:]
+        for (_, item) in resultado.matchResults {
+            guard let registro = try? item.get(),
+                  let textoDaURL = registro[Campo.urlDoCompartilhamento] as? String,
+                  let url = URL(string: textoDaURL),
+                  let metadados = try? await container.shareMetadata(for: url)
+            else { continue }
+            // O dono de um compartilhamento de zona é o dono da zona; a
+            // identidade do proprietário fica como segunda fonte.
+            let donoDaZona = metadados.share.recordID.zoneID.ownerName
+            let dono = donoDaZona == CKCurrentUserDefaultName
+                ? metadados.ownerIdentity.userRecordID?.recordName
+                : donoDaZona
+            guard Self.registroDeCodigoEhDoDono(
+                criador: registro.creatorUserRecordID?.recordName,
+                donoDoCompartilhamento: dono
+            ) else { continue }
+            candidatos[textoDaURL] = metadados
+        }
+        guard let metadados = candidatos.values.first else {
             throw ErroDeEquipeCloudKit.codigoInvalido
         }
-        let metadados = try await container.shareMetadata(for: url)
-        return try await aceitar(metadados)
+        guard candidatos.count == 1 else {
+            throw ErroDeEquipeCloudKit.codigoAmbiguo
+        }
+
+        var equipe = try await aceitar(metadados)
+        // O registro da equipe dentro da zona pode trazer um código antigo
+        // (zonas cujo código foi trocado antes de `rotacionarCodigo` passar
+        // a atualizá-lo). O que acabou de dar acesso é o digitado.
+        equipe.codigoDeEntrada = codigoNormalizado
+        return equipe
+    }
+
+    /// Sai de uma zona compartilhada recém-aceita que não deve ser usada
+    /// (código não confere, ou a equipe conflita com outra já conhecida).
+    /// Para um participante, apagar a zona no banco compartilhado é o que
+    /// encerra a própria participação — o conteúdo do dono não é tocado.
+    func abandonarZonaCompartilhada(de equipe: EquipeDisponivel) async {
+        guard equipe.bancoCloudKit == BancoCloudKitDaEquipe.compartilhado.rawValue,
+              let zona = try? referenciaDaZona(de: equipe),
+              zona.ownerName != CKCurrentUserDefaultName
+        else { return }
+        _ = try? await container.sharedCloudDatabase.deleteRecordZone(withID: zona)
+    }
+
+    /// Um registro de código só é aceito quando quem o criou é o dono do
+    /// compartilhamento para o qual ele aponta.
+    nonisolated static func registroDeCodigoEhDoDono(
+        criador: String?,
+        donoDoCompartilhamento: String?
+    ) -> Bool {
+        guard let criador, let donoDoCompartilhamento, !criador.isEmpty else { return false }
+        return criador == donoDoCompartilhamento
     }
 
     /// Completa equipes aceitas por versões que ainda guardavam só o nome da
@@ -265,6 +319,13 @@ actor ServicoDeEquipesCloudKit {
         let novoCodigo = EquipeDisponivel.novoCodigoDeEntrada()
         try await invalidarCodigoAnterior(equipe.codigoDeEntrada)
         try await publicarCodigo(novoCodigo, para: url)
+        // O registro da equipe, dentro da zona, acompanha o código vigente:
+        // é o que quem entra recebe como "código desta equipe".
+        let idDaEquipe = CKRecord.ID(recordName: "equipe", zoneID: zona)
+        if let registro = try? await container.privateCloudDatabase.record(for: idDaEquipe) {
+            registro[Campo.codigoDeEntrada] = Self.normalizar(novoCodigo) as NSString
+            _ = try? await container.privateCloudDatabase.save(registro)
+        }
 
         var atualizada = equipe
         atualizada.codigoDeEntrada = novoCodigo
@@ -282,37 +343,107 @@ actor ServicoDeEquipesCloudKit {
         guard equipe.bancoCloudKit == BancoCloudKitDaEquipe.privado.rawValue else {
             throw ErroDeEquipeCloudKit.apenasAdministrador
         }
-        let marcador = CKRecord(
-            recordType: TipoDeRegistro.equipeExcluida,
-            recordID: Self.idDoMarcadorDeExclusao(para: equipe.id)
-        )
-        marcador[Campo.equipeID] = equipe.id as NSString
-        marcador[Campo.excluidaEm] = Date() as NSDate
-        marcador[Campo.estadoDaExclusao] = EstadoDoMarcadorDeExclusao.preparando.rawValue as NSString
-        _ = try await container.publicCloudDatabase.save(marcador)
+        // Reaproveita o marcador de uma tentativa anterior. Criar um
+        // `CKRecord` novo com o mesmo ID a cada tentativa fazia o servidor
+        // recusar (`serverRecordChanged`) já no primeiro passo: bastava a
+        // rede cair uma vez para a exclusão nunca mais passar.
+        let idDoMarcador = Self.idDoMarcadorDeExclusao(para: equipe.id)
+        var marcador: CKRecord?
+        do {
+            marcador = try await container.publicCloudDatabase.record(for: idDoMarcador)
+        } catch let erro as CKError where erro.code == .unknownItem {
+            marcador = CKRecord(recordType: TipoDeRegistro.equipeExcluida, recordID: idDoMarcador)
+        }
+        if let existente = marcador,
+           (existente[Campo.estadoDaExclusao] as? String) != EstadoDoMarcadorDeExclusao.concluida.rawValue {
+            existente[Campo.equipeID] = equipe.id as NSString
+            existente[Campo.excluidaEm] = Date() as NSDate
+            existente[Campo.estadoDaExclusao] = EstadoDoMarcadorDeExclusao.preparando.rawValue as NSString
+            marcador = try await salvarMarcadorDeExclusao(existente)
+        }
         try await invalidarCodigoAnterior(equipe.codigoDeEntrada)
         do {
             try await container.privateCloudDatabase.deleteRecordZone(withID: try referenciaDaZona(de: equipe))
-        } catch let erro as CKError where erro.code == .unknownItem {
+        } catch let erro as CKError where erro.code == .unknownItem || erro.code == .zoneNotFound {
             // Repetir a confirmação depois de uma queda entre as duas bases
             // é seguro: a zona já saiu, falta só tornar o marcador visível.
         }
-        marcador[Campo.estadoDaExclusao] = EstadoDoMarcadorDeExclusao.concluida.rawValue as NSString
-        _ = try await container.publicCloudDatabase.save(marcador)
+        if let marcador {
+            marcador[Campo.estadoDaExclusao] = EstadoDoMarcadorDeExclusao.concluida.rawValue as NSString
+            _ = try await salvarMarcadorDeExclusao(marcador)
+        }
+    }
+
+    /// Grava o marcador público. Devolve `nil` quando o registro com esse ID
+    /// pertence a outra conta: o ID é previsível e qualquer pessoa pode
+    /// ocupá-lo antes; isso não pode impedir o dono de apagar a própria zona
+    /// (os outros Macs não confiam num marcador que não seja do dono — ver
+    /// `equipeFoiExcluida`).
+    private func salvarMarcadorDeExclusao(_ marcador: CKRecord) async throws -> CKRecord? {
+        do {
+            let resultado = try await container.publicCloudDatabase.modifyRecords(
+                saving: [marcador],
+                deleting: [],
+                savePolicy: .changedKeys,
+                atomically: false
+            )
+            return try resultado.saveResults[marcador.recordID]?.get() ?? marcador
+        } catch let erro as CKError where erro.code == .permissionFailure {
+            return nil
+        }
     }
 
     /// Chamado por cada instalação antes de voltar a usar uma equipe salva.
     /// O resultado positivo é definitivo: a cópia local daquela equipe deve
     /// sair inclusive da lixeira e do disco.
+    ///
+    /// O marcador mora no banco público, onde qualquer conta autenticada
+    /// cria registros, e o ID dele é previsível. Sozinho ele não prova nada:
+    /// só vale se foi criado pelo dono da zona **e** se a zona realmente
+    /// deixou de existir — coisa que só o dono consegue provocar.
     func equipeFoiExcluida(_ equipe: EquipeDisponivel) async throws -> Bool {
+        let marcador: CKRecord
         do {
-            let marcador = try await container.publicCloudDatabase.record(
+            marcador = try await container.publicCloudDatabase.record(
                 for: Self.idDoMarcadorDeExclusao(para: equipe.id)
             )
-            return (marcador[Campo.estadoDaExclusao] as? String)
-                == EstadoDoMarcadorDeExclusao.concluida.rawValue
         } catch let erro as CKError where erro.code == .unknownItem {
             return false
+        }
+        guard Self.marcadorAutorizaLimpeza(
+            estado: marcador[Campo.estadoDaExclusao] as? String,
+            criador: marcador.creatorUserRecordID?.recordName,
+            donoDaZona: equipe.donoDaZonaCloudKit
+        ) else { return false }
+        return try await zonaDeixouDeExistir(equipe)
+    }
+
+    /// A parte decidível sem rede da regra acima.
+    nonisolated static func marcadorAutorizaLimpeza(
+        estado: String?,
+        criador: String?,
+        donoDaZona: String?
+    ) -> Bool {
+        guard estado == EstadoDoMarcadorDeExclusao.concluida.rawValue,
+              let criador, !criador.isEmpty,
+              // Equipes antigas, sem o dono guardado, não têm contra o que
+              // conferir: na dúvida, nada é apagado.
+              let donoDaZona, !donoDaZona.isEmpty
+        else { return false }
+        return criador == donoDaZona
+    }
+
+    private func zonaDeixouDeExistir(_ equipe: EquipeDisponivel) async throws -> Bool {
+        let zona = try referenciaDaZona(de: equipe)
+        let banco = equipe.bancoCloudKit == BancoCloudKitDaEquipe.privado.rawValue
+            ? container.privateCloudDatabase
+            : container.sharedCloudDatabase
+        do {
+            _ = try await banco.recordZone(for: zona)
+            return false
+        } catch let erro as CKError
+            where [.zoneNotFound, .unknownItem, .userDeletedZone].contains(erro.code) {
+            return true
         }
     }
 
@@ -568,6 +699,8 @@ enum ErroDeEquipeCloudKit: LocalizedError {
     case proprietarioNaoPodeSerRemovido
     case nomeInvalido
     case apenasProprioNome
+    case codigoAmbiguo
+    case conviteConflitaComEquipeLocal
 
     var errorDescription: String? {
         switch self {
@@ -581,6 +714,10 @@ enum ErroDeEquipeCloudKit: LocalizedError {
             "Não encontrei a zona compartilhada desta equipe no iCloud. Entre novamente com o código da equipe.".localized
         case .codigoInvalido:
             "Não encontramos uma equipe com esse código.".localized
+        case .codigoAmbiguo:
+            "Este código aponta para mais de uma equipe. Peça a quem administra a equipe para gerar um código novo.".localized
+        case .conviteConflitaComEquipeLocal:
+            "Este convite usa a identidade de uma equipe que já existe neste Mac em outro lugar do iCloud. Ele foi recusado.".localized
         case .conviteIndisponivel:
             "Não foi possível preparar o convite desta equipe.".localized
         case .apenasAdministrador:

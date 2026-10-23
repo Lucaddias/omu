@@ -103,7 +103,11 @@ enum FotosDePessoas {
         let chaveAntiga = chave(de: nomeAntigo)
         let chaveNova = chave(de: nomeNovo)
         guard chaveAntiga != chaveNova,
-              let dados = UserDefaults.standard.data(forKey: prefixo + chaveAntiga)
+              let dados = UserDefaults.standard.data(forKey: prefixo + chaveAntiga),
+              // A foto é guardada por nome e vale em todas as conversas: o
+              // destino já ter uma significa que é outra pessoa, e o rosto
+              // dela não pode ser trocado por uma edição de ficha.
+              UserDefaults.standard.data(forKey: prefixo + chaveNova) == nil
         else { return }
 
         UserDefaults.standard.set(dados, forKey: prefixo + chaveNova)
@@ -118,19 +122,44 @@ enum FotosDePessoas {
         aviso.versao += 1
     }
 
-    /// Migra as fotos de quem teve o nome editado, comparando duas listas de
-    /// nomes (uma por linha) posição a posição — é assim que o formulário
-    /// trata cada linha como a mesma pessoa antes e depois da edição.
+    /// Migra as fotos de quem teve o nome editado na ficha.
     @MainActor
     static func migrarAoEditarNomes(de antigos: String, para novos: String) {
+        for (antigo, novo) in renomeacoes(de: antigos, para: novos) {
+            renomear(de: antigo, para: novo)
+        }
+    }
+
+    /// As linhas que foram **renomeadas** entre duas versões da lista de
+    /// nomes (uma pessoa por linha).
+    ///
+    /// Comparar posição a posição só faz sentido quando ninguém entrou nem
+    /// saiu: ao remover a pessoa do meio, [Ana, Bruno, Carla] → [Ana, Carla]
+    /// casava "Bruno" com "Carla" e a foto do Bruno ia parar na Carla. Por
+    /// isso só vale quando a quantidade de linhas é a mesma, e a linha
+    /// alterada tem de ser um nome que saiu trocado por um nome que entrou —
+    /// reordenar a lista não é renomear ninguém.
+    static func renomeacoes(de antigos: String, para novos: String) -> [(de: String, para: String)] {
         func linhas(_ texto: String) -> [String] {
             texto
                 .split(whereSeparator: \.isNewline)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
         }
-        for (antigo, novo) in zip(linhas(antigos), linhas(novos)) where antigo != novo {
-            renomear(de: antigo, para: novo)
+        let antes = linhas(antigos)
+        let depois = linhas(novos)
+        guard antes.count == depois.count else { return [] }
+
+        let chavesDeAntes = Set(antes.map(chave(de:)))
+        let chavesDeDepois = Set(depois.map(chave(de:)))
+        return zip(antes, depois).compactMap { antigo, novo in
+            let chaveAntiga = chave(de: antigo)
+            let chaveNova = chave(de: novo)
+            guard chaveAntiga != chaveNova,
+                  !chavesDeDepois.contains(chaveAntiga),
+                  !chavesDeAntes.contains(chaveNova)
+            else { return nil }
+            return (de: antigo, para: novo)
         }
     }
 

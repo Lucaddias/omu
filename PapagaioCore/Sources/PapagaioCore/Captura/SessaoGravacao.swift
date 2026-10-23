@@ -77,6 +77,19 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
     public private(set) var tempoDecorrido: TimeInterval = 0
     private var pausada = false
     private var avisos: [String] = []
+    /// `true` enquanto `parar()`/`descartar()` encerram o gravador de
+    /// propósito — é o que distingue, no delegate, o fim pedido pelo app do
+    /// fim imposto pelo sistema.
+    private var encerrandoPorPedido = false
+    /// O sistema encerrou o gravador sozinho (entrada removida, disco cheio,
+    /// erro de codificação). A partir daí `currentTime` volta a 0 e não serve
+    /// mais como duração.
+    public private(set) var interrompida = false
+
+    /// O tap do sistema fica preso à saída de áudio do início da gravação.
+    nonisolated static let avisoDeTrocaDeSaida =
+        "A saída de áudio do Mac mudou durante a gravação (fones conectados ou desconectados). "
+        + "A partir desse ponto o áudio do interlocutor pode não ter sido gravado."
 
     /// Gravação mais curta que isto é clique acidental, não gravação.
     /// É descartada do disco em vez de virar arquivo pequeno na lista.
@@ -182,6 +195,7 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
 
     public func pausar() async {
         guard !pausada else { return }
+        registrarTempoDoGravador()
         recorder?.pause()
         #if os(macOS)
         // O tap não pausa o stream — pausa a escrita. Sem isso o canal do
@@ -215,10 +229,20 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
     }
 
     public func parar() async -> Resultado {
-        let duracao = recorder?.currentTime ?? tempoDecorrido
+        // `currentTime` volta a 0 quando o gravador já parou sozinho; por isso
+        // ele só pode aumentar o maior tempo já observado, nunca substituí-lo.
+        registrarTempoDoGravador()
         let urlDoSistema = sistemaURL
+        let urlDoMicrofone = pasta?.appendingPathComponent(Armazenamento.Nome.microfone)
         let estatisticasDoSistema = encerrarCaptura()
         pausada = false
+        // Com o gravador fechado, o cabeçalho do WAV está completo: o arquivo
+        // é a medida real do que foi gravado — inclusive quando o sistema
+        // interrompeu a gravação no meio.
+        let duracao = Self.duracaoFinal(
+            observada: tempoDecorrido,
+            doArquivo: urlDoMicrofone.flatMap(Self.duracaoDoMicrofone(em:))
+        )
         tempoDecorrido = duracao
 
         var sistemaOk = false
@@ -233,11 +257,17 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
             sistemaOk = false
             capturouSistema = false
             if let urlDoSistema { try? FileManager.default.removeItem(at: urlDoSistema) }
-            avisos.append("O tap recebeu áudio do sistema, mas todos os buffers vieram em silêncio. A rota de saída atual não está entregando sinal ao tap.")
+            // Silêncio no canal do sistema é o caso normal de uma reunião
+            // presencial (nada tocou no Mac) — não é diagnóstico de defeito.
+            // A mensagem de permissão/rota fica só para callbacks zero, acima.
+            avisos.append("Nenhum áudio do sistema durante a gravação — a conversa tem só o microfone.")
         } else if descartarSistemaSeVazio(urlDoSistema) {
             sistemaOk = false
             capturouSistema = false
             avisos.append("Áudio do sistema não capturou nada — a conversa tem só o microfone.")
+        }
+        if sistemaOk, estatisticasDoSistema?.saidaMudou == true {
+            avisos.append(Self.avisoDeTrocaDeSaida)
         }
         #endif
 
@@ -338,9 +368,48 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
         }
     }
 
+    /// Duração que a gravação declara ao terminar: o maior valor entre o que
+    /// o gravador chegou a reportar e o que de fato está no arquivo.
+    ///
+    /// Uma gravação interrompida pelo sistema reporta 0 no gravador; decidir
+    /// o descarte por esse 0 apagava minutos de áudio já gravados.
+    nonisolated static func duracaoFinal(
+        observada: TimeInterval,
+        doArquivo: TimeInterval?
+    ) -> TimeInterval {
+        let candidatos = [observada, doArquivo ?? 0].filter { $0.isFinite && $0 > 0 }
+        return candidatos.max() ?? 0
+    }
+
+    /// Duração real do `microfone.wav`, lida do próprio arquivo.
+    ///
+    /// Se o cabeçalho não puder ser lido (gravador encerrado à força antes de
+    /// fechá-lo), estima pelo tamanho: PCM 16 bits mono a 16 kHz são 32.000
+    /// bytes por segundo depois dos 44 bytes de cabeçalho.
+    public nonisolated static func duracaoDoMicrofone(em url: URL) -> TimeInterval? {
+        if let arquivo = try? AVAudioFile(forReading: url),
+           arquivo.fileFormat.sampleRate > 0,
+           arquivo.length > 0 {
+            return Double(arquivo.length) / arquivo.fileFormat.sampleRate
+        }
+        guard let tamanho = try? FileManager.default
+            .attributesOfItem(atPath: url.path)[.size] as? Int
+        else { return nil }
+        let cabecalhoWAV = 44
+        let bytesPorSegundo = FormatoAudio.taxaCanonica * 2
+        let conteudo = tamanho - cabecalhoWAV
+        return conteudo > 0 ? Double(conteudo) / bytesPorSegundo : nil
+    }
+
+    private func registrarTempoDoGravador() {
+        guard let recorder else { return }
+        tempoDecorrido = max(tempoDecorrido, recorder.currentTime)
+    }
+
     private func encerrarCaptura() -> SystemAudioTap.Statistics? {
         timer?.invalidate()
         timer = nil
+        encerrandoPorPedido = true
         recorder?.stop()
         recorder = nil
         #if os(macOS)
@@ -356,8 +425,8 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
     // MARK: - Medição
 
     private func atualizarMedicao() {
-        guard let recorder, !pausada else { return }
-        tempoDecorrido = recorder.currentTime
+        guard let recorder, !pausada, !interrompida else { return }
+        tempoDecorrido = max(tempoDecorrido, recorder.currentTime)
         recorder.updateMeters()
         let decibeis = recorder.averagePower(forChannel: 0)
         let nivel = max(0, min(1, (decibeis + 50) / 50))
@@ -370,10 +439,31 @@ public final class SessaoGravacao: NSObject, AVAudioRecorderDelegate {
     public nonisolated func audioRecorderDidFinishRecording(
         _ recorder: AVAudioRecorder, successfully flag: Bool
     ) {
-        guard !flag else { return }
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.avisos.append("A gravação foi interrompida pelo sistema antes do esperado.")
+            // O mesmo delegate dispara quando o próprio app chama `stop()`.
+            guard let self, !self.encerrandoPorPedido else { return }
+            self.marcarInterrupcao(
+                "A gravação foi interrompida pelo sistema antes do esperado. O áudio gravado até ali foi preservado."
+            )
         }
+    }
+
+    public nonisolated func audioRecorderEncodeErrorDidOccur(
+        _ recorder: AVAudioRecorder, error: Error?
+    ) {
+        let motivo = error?.localizedDescription ?? "erro desconhecido"
+        Task { @MainActor [weak self] in
+            guard let self, !self.encerrandoPorPedido else { return }
+            self.marcarInterrupcao(
+                "A gravação parou por um erro ao escrever o áudio (\(motivo)). O áudio gravado até ali foi preservado."
+            )
+        }
+    }
+
+    private func marcarInterrupcao(_ aviso: String) {
+        guard !interrompida else { return }
+        interrompida = true
+        nivelMicrofone.definirNormalizado(0)
+        avisos.append(aviso)
     }
 }

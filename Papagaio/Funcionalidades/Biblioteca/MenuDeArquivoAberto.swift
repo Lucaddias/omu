@@ -9,6 +9,9 @@ struct MenuDeArquivoAberto: View {
     /// isso, em vez de deixar "Mover para Lixeira" fazer o dobro do que diz.
     var cancelavel: Bool = false
     let podeDiarizar: Bool
+    /// Conversas sem áudio (Granola, recebidas da equipe) não têm o que
+    /// transcrever de novo.
+    var podeReprocessar: Bool = true
     let aoDiarizar: @MainActor @Sendable () -> Void
     let aoReprocessar: @MainActor @Sendable () -> Void
     let aoRenomear: @MainActor @Sendable () -> Void
@@ -42,7 +45,7 @@ struct MenuDeArquivoAberto: View {
             ItemDoMenuDeArquivo(
                 simbolo: "arrow.clockwise",
                 titulo: "Reprocessar".localized,
-                desabilitado: bloqueioDeEdicao,
+                desabilitado: bloqueioDeEdicao || !podeReprocessar,
                 acao: aoReprocessar
             )
 

@@ -83,7 +83,15 @@ final class SessaoOAuthGoogle: Sendable {
         self.cofre = cofre
     }
 
-    func tokenDeAcesso(forcandoRenovacao forcar: Bool) async throws -> String {
+    /// - Parameter interativo: só o botão "Conectar" pode abrir o navegador.
+    ///   Temporizador, reconexão da abertura e chamadas de fundo pedem o
+    ///   token sem interação: sem credencial renovável, a resposta é
+    ///   `.semRefreshToken`, e quem chama mostra "conecte de novo" em vez de
+    ///   abrir uma página de autorização que ninguém pediu.
+    func tokenDeAcesso(
+        forcandoRenovacao forcar: Bool,
+        interativo: Bool = false
+    ) async throws -> String {
         guard CredenciaisGoogle.estaConfigurado else {
             throw ErroOAuthGoogle.credenciaisNaoConfiguradas
         }
@@ -101,10 +109,11 @@ final class SessaoOAuthGoogle: Sendable {
             return try await trocarRefreshToken(refresh).accessToken
         }
 
-        if let guardado, guardado.expiraEm > Date() {
+        if !forcar, let guardado, guardado.expiraEm > Date() {
             return guardado.valor
         }
 
+        guard interativo else { throw ErroOAuthGoogle.semRefreshToken }
         return try await fluxoDeAutorizacao()
     }
 
@@ -207,7 +216,11 @@ final class SessaoOAuthGoogle: Sendable {
             URLQueryItem(name: "state", value: estado),
             URLQueryItem(name: "scope", value: escopos),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "none"),
+            // `prompt=none` proíbe as telas de login e de consentimento: a
+            // primeira conexão de qualquer conta voltava com
+            // `interaction_required`. `consent` mostra a tela e garante o
+            // `refresh_token` na resposta.
+            URLQueryItem(name: "prompt", value: "consent"),
         ]
         componentes.queryItems = itens
         guard let url = componentes.url else {
@@ -226,39 +239,54 @@ final class SessaoOAuthGoogle: Sendable {
             throw ErroOAuthGoogle.respostaInvalida
         }
 
-        let corpo: [String: Any] = [
+        let pedido = Self.pedidoDeToken(para: tokenEndpoint, campos: [
             "grant_type": "authorization_code",
             "code": codigo,
             "redirect_uri": redirectURI,
             "code_verifier": verificador,
-            "client_id": CredenciaisGoogle.clienteID,
-        ]
-
-        var pedido = URLRequest(url: tokenEndpoint)
-        pedido.timeoutInterval = 15
-        pedido.httpMethod = "POST"
-        pedido.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        pedido.httpBody = try JSONSerialization.data(withJSONObject: corpo)
+        ])
 
         registro.info("Trocando código de autorização por token (Google)")
         return try await responderComToken(pedido)
     }
 
     private func trocarRefreshToken(_ refresh: String) async throws -> CredenciaisDeToken {
-        let corpo: [String: Any] = [
+        let pedido = Self.pedidoDeToken(para: tokenEndpoint, campos: [
             "grant_type": "refresh_token",
             "refresh_token": refresh,
-            "client_id": CredenciaisGoogle.clienteID,
-        ]
-
-        var pedido = URLRequest(url: tokenEndpoint)
-        pedido.timeoutInterval = 15
-        pedido.httpMethod = "POST"
-        pedido.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        pedido.httpBody = try JSONSerialization.data(withJSONObject: corpo)
+        ])
 
         registro.info("Renovando token com refresh token (Google)")
         return try await responderComToken(pedido)
+    }
+
+    /// Pedido ao endpoint de token no formato da RFC 6749
+    /// (`x-www-form-urlencoded`), com a identificação do cliente. O app é um
+    /// cliente público: nenhum segredo é enviado (ver `Config/SETUP-GOOGLE.md`).
+    static func pedidoDeToken(
+        para endpoint: URL,
+        campos: [String: String],
+        clienteID: String = CredenciaisGoogle.clienteID
+    ) -> URLRequest {
+        var todos = campos
+        todos["client_id"] = clienteID
+
+        // `URLQueryItem` deixa passar `+`, `/` e `=`, que num corpo de
+        // formulário têm outro significado; só os não reservados ficam crus.
+        var permitidos = CharacterSet.alphanumerics
+        permitidos.insert(charactersIn: "-._~")
+        let corpo = todos.sorted { $0.key < $1.key }.map { chave, valor in
+            let k = chave.addingPercentEncoding(withAllowedCharacters: permitidos) ?? chave
+            let v = valor.addingPercentEncoding(withAllowedCharacters: permitidos) ?? valor
+            return "\(k)=\(v)"
+        }.joined(separator: "&")
+
+        var pedido = URLRequest(url: endpoint)
+        pedido.timeoutInterval = 15
+        pedido.httpMethod = "POST"
+        pedido.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        pedido.httpBody = Data(corpo.utf8)
+        return pedido
     }
 
     private func revogar(_ token: String) async throws {
