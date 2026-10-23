@@ -152,7 +152,10 @@ struct BotaoDeContextoDaConta: View {
                     .frame(width: 28, height: 28)
 
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
-                    Text(titulo.localized)
+                    // Sem `.localized`: quem chama já traduz os rótulos fixos,
+                    // e o nome de uma equipe é texto da pessoa — "Tarefas"
+                    // não pode virar "Tasks" só neste menu.
+                    Text(titulo)
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(PapagaioTema.texto)
                         .lineLimit(1)

@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$ITERACOES" =~ ^[1-9][0-9]*$ ]] || { echo "Iterações precisa ser inteiro positivo." >&2; exit 2; }
-mkdir -p "$RUNS_DIR" "$BUILD_DIR"
+mkdir -p "$RUNS_DIR" "$BUILD_DIR" "$STATE_DIR"
 RUN_ID="$(date '+%Y%m%dT%H%M%S')-$$"
 [[ -n "$SAIDA" ]] || SAIDA="$RUNS_DIR/bench-$RUN_ID.json"
 [[ -n "$SCRATCH_PATH" ]] || SCRATCH_PATH="$BUILD_DIR/spm-cli-$RUN_ID"

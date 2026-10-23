@@ -69,13 +69,14 @@ enum PreferenciasVisuaisDoArquivo {
         AparenciaDasPastas.registrarCriacao(de: nome)
     }
 
-    /// Apaga a pasta e devolve as conversas dela para "Todas".
+    /// Tira a pasta da lista e o rótulo de quem o carregava, guardando o
+    /// retrato na lixeira de pastas.
     ///
-    /// Pasta aqui é só um rótulo: apagá-la **não** apaga conversa nenhuma, e é
-    /// por isso que a ação não precisa de aviso alarmante. O que ela precisa é
-    /// limpar o rótulo de quem o carregava — sem isso, sobrariam conversas
-    /// apontando para uma pasta que não existe mais, invisíveis em "Pastas" e
-    /// marcadas com um nome fantasma no cartão.
+    /// Esta função cuida só do rótulo. Quem apaga uma pasta pela interface
+    /// passa por `PastasDaBiblioteca.apagar`, que **antes** move as conversas
+    /// dela para a lixeira — é isso que a confirmação da tela anuncia. Limpar
+    /// o rótulo evita conversas apontando para uma pasta que não existe mais,
+    /// invisíveis em "Pastas" e marcadas com um nome fantasma no cartão.
     @MainActor
     static func apagarPasta(_ pasta: String) {
         let padroes = UserDefaults.standard

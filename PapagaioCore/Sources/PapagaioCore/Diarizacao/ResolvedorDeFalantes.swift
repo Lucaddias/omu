@@ -252,13 +252,8 @@ public enum ResolvedorDeFalantes {
 
         let trechos = arquivo.trechos.map { trecho -> Trecho in
             guard let rotulos = rotuloPorAncora[trecho.id], !rotulos.isEmpty else { return trecho }
-            return Trecho(
-                id: trecho.id,
-                start: trecho.start,
-                end: trecho.end,
-                texto: trecho.texto,
-                speaker: trecho.speaker,
-                palavras: trecho.palavras.enumerated().map { indice, palavra -> Palavra in
+            return trecho.comPalavras(
+                trecho.palavras.enumerated().map { indice, palavra -> Palavra in
                     guard let rotulo = rotulos[indice] else { return palavra }
                     return Palavra(
                         id: palavra.id,

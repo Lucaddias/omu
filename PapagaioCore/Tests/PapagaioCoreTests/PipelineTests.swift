@@ -224,7 +224,7 @@ func pipelineSalvaAntesDeResumir() async throws {
     let salvos = await repositorio.salvos
     #expect(salvos.count == 2)
     #expect(salvos[1].resumo != nil)
-    #expect(fases.withLock { $0 } == [.transcrevendo, .diarizando, .salvando, .resumindo, .salvando])
+    #expect(fases.withLock { $0 } == [.transcrevendo, .diarizando, .resumindo, .salvando])
 }
 
 @Test("Diarização roda por canal e casa falantes com as palavras")
@@ -754,4 +754,300 @@ func pipelineTraduzPortuguesParaIngles() async throws {
     let final = try await pipeline.processar(arquivo)
     #expect(chamouTraducao.withLock { $0 })
     #expect(final.trechos[0].texto == "We will review the schedule on Friday.")
+}
+
+// MARK: - Salvamento por etapa e edições concorrentes
+
+private func repositorioEmMemoria() throws -> SwiftDataRepository {
+    SwiftDataRepository(
+        modelContainer: try SwiftDataRepository.containerLocal(
+            nome: UUID().uuidString, emMemoria: true
+        )
+    )
+}
+
+// B-02: o pipeline partia de uma fotografia do arquivo e a regravava inteira,
+// desfazendo o que a pessoa editou enquanto ele trabalhava.
+@Test("Título, data e notas editados durante o processamento não são sobrescritos")
+func pipelinePreservaEdicoesFeitasDuranteOProcessamento() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: true, sistema: false, mixagem: false
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let repositorio = try repositorioEmMemoria()
+    try await repositorio.salvar(arquivo)
+
+    let novaData = Date(timeIntervalSinceReferenceDate: 777)
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: repositorio,
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            // A pessoa renomeia, corrige a data e anota enquanto transcreve.
+            var editado = try #require(await repositorio.buscarCompleto(id: arquivo.id))
+            editado.titulo = "Entrevista com a Ana"
+            editado.tituloManual = true
+            editado.criadoEm = novaData
+            editado.duracao = 321
+            editado.notas = [NotaDaConversa(texto: "pedir o contrato", start: 4)]
+            try await repositorio.salvar(editado)
+            return [Trecho(start: 0, end: 2, texto: "oi", speaker: Speaker.eu)]
+        },
+        resumir: { _ in resumoDeMentira }
+    )
+
+    try await pipeline.processar(arquivo)
+
+    let salvo = try #require(await repositorio.buscarCompleto(id: arquivo.id))
+    #expect(salvo.titulo == "Entrevista com a Ana")
+    #expect(salvo.criadoEm == novaData)
+    #expect(salvo.duracao == 321)
+    #expect(salvo.notas.map(\.texto) == ["pedir o contrato"])
+    // O que o pipeline produziu também está lá.
+    #expect(salvo.trechos.map(\.texto) == ["oi"])
+    #expect(salvo.engineTranscricao == "w")
+    #expect(salvo.engineResumo == "q")
+    // V-16: o título escolhido pela pessoa vence o que o modelo inventou.
+    #expect(salvo.resumo?.titulo == "Entrevista com a Ana")
+    #expect(salvo.resumo?.visaoGeral == resumoDeMentira.visaoGeral)
+}
+
+@Test("Título provisório continua sendo substituído pelo título do resumo")
+func pipelineUsaTituloDoResumoQuandoOTituloEhAutomatico() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: true, sistema: false, mixagem: false
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let repositorio = try repositorioEmMemoria()
+    try await repositorio.salvar(arquivo)
+
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: repositorio,
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in [Trecho(start: 0, end: 2, texto: "oi")] },
+        resumir: { _ in resumoDeMentira }
+    )
+    try await pipeline.processar(arquivo)
+
+    let salvo = try #require(await repositorio.buscarCompleto(id: arquivo.id))
+    #expect(salvo.resumo?.titulo == resumoDeMentira.titulo)
+}
+
+// P-08
+@Test("Reprocessar com falha no resumo não deixa o resumo antigo com a transcrição nova")
+func pipelineReprocessadoNaoMantemResumoVelho() async throws {
+    let (armazenamento, base) = try montarGravacao(
+        microfone: true, sistema: false, mixagem: false
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    var arquivo = base
+    arquivo.trechos = [Trecho(start: 0, end: 1, texto: "versão antiga")]
+    arquivo.resumo = Resumo(titulo: "Antigo", visaoGeral: "resumo da versão antiga")
+    arquivo.engineResumo = "q"
+    let repositorio = try repositorioEmMemoria()
+    try await repositorio.salvar(arquivo)
+
+    struct FalhaDoResumo: Error {}
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: repositorio,
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in [Trecho(start: 0, end: 2, texto: "versão nova")] },
+        resumir: { _ in throw FalhaDoResumo() }
+    )
+
+    await #expect(throws: FalhaDoResumo.self) {
+        try await pipeline.processar(arquivo)
+    }
+
+    let salvo = try #require(await repositorio.buscarCompleto(id: arquivo.id))
+    #expect(salvo.trechos.map(\.texto) == ["versão nova"])
+    #expect(salvo.resumo == nil)
+    #expect(salvo.engineResumo == nil)
+}
+
+// P-01
+@Test("Falha na tradução mantém a transcrição original e o resumo ainda é gerado")
+func pipelineIsolaFalhaDeTraducao() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: false, sistema: false, mixagem: true
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    struct FalhaDaTraducao: Error {}
+    let repositorio = RepositorioEspiao()
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: repositorio,
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            [Trecho(start: 0, end: 3, texto: "We need to approve the budget tomorrow morning.")]
+        },
+        resumir: { _ in resumoDeMentira },
+        traducaoAutomatica: .init(habilitada: true, idiomaPadrao: .portugues),
+        traduzir: { _, _ in throw FalhaDaTraducao() }
+    )
+
+    let final = try await pipeline.processar(arquivo)
+
+    #expect(final.trechos.map(\.texto) == ["We need to approve the budget tomorrow morning."])
+    #expect(final.resumo != nil)
+    let salvos = await repositorio.salvos
+    #expect(salvos.first?.trechos.count == 1)
+    #expect(salvos.last?.resumo != nil)
+}
+
+// P-02 e P-04
+@Test("Canal do sistema ilegível não derruba a transcrição nem deixa PCM temporário")
+func pipelineIsolaFalhaDoCancelamentoDeEco() async throws {
+    let (armazenamento, base) = try montarGravacao(
+        microfone: true, sistema: true, mixagem: false
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    // Sem fones: o cancelamento de eco é tentado. Os dois arquivos têm 64
+    // bytes de zeros — o decodificador falha, como com um `.caf` truncado.
+    var arquivo = base
+    arquivo.usavaFones = false
+
+    let insumos = Mutex<[String]>([])
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { url, speaker in
+            insumos.withLock { $0.append(url.lastPathComponent) }
+            // Textos distintos por canal: iguais, a mesclagem trataria o do
+            // microfone como eco do sistema e o descartaria.
+            return speaker == Speaker.eu
+                ? [Trecho(start: 0, end: 2, texto: "bom dia, vamos começar", speaker: speaker)]
+                : [Trecho(start: 3, end: 5, texto: "pode falar, estou ouvindo", speaker: speaker)]
+        },
+        resumir: { _ in resumoDeMentira }
+    )
+
+    let final = try await pipeline.processar(arquivo)
+
+    #expect(insumos.withLock { $0 }.first == Armazenamento.Nome.microfone)
+    #expect(final.trechos.contains { $0.speaker == Speaker.eu })
+    let pasta = armazenamento.resolver(relativo: arquivo.pastaRelativa)
+    let nomes = try FileManager.default.contentsOfDirectory(atPath: pasta.path).sorted()
+    #expect(nomes == [Armazenamento.Nome.microfone, Armazenamento.Nome.sistema])
+}
+
+// V-05
+@Test("Gerar novo resumo usa a transcrição existente e não passa pelo Whisper")
+func pipelineResumeTranscricaoExistente() async throws {
+    let (armazenamento, base) = try montarGravacao(
+        microfone: true, sistema: false, mixagem: false
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    var arquivo = base
+    arquivo.trechos = [
+        Trecho(start: 0, end: 2, texto: "trecho corrigido à mão", speaker: Speaker.eu)
+    ]
+    arquivo.resumo = Resumo(titulo: "Antigo", visaoGeral: "antigo")
+    let repositorio = try repositorioEmMemoria()
+    try await repositorio.salvar(arquivo)
+    let id = arquivo.id
+
+    let transcricoes = Mutex(0)
+    let recebidos = Mutex<[String]>([])
+    let fases = Mutex<[PipelineDeArquivo.Fase]>([])
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: repositorio,
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in
+            transcricoes.withLock { $0 += 1 }
+            return []
+        },
+        resumir: { trechos in
+            recebidos.withLock { $0 = trechos.map(\.texto) }
+            // Uma correção feita enquanto o resumo roda também sobrevive.
+            var editado = try #require(await repositorio.buscarCompleto(id: id))
+            editado.trechos = [
+                Trecho(start: 0, end: 2, texto: "corrigido de novo", speaker: Speaker.eu)
+            ]
+            try await repositorio.salvar(editado)
+            return resumoDeMentira
+        }
+    )
+
+    let final = try await pipeline.resumirExistente(arquivo) { fase in
+        fases.withLock { $0.append(fase) }
+    }
+
+    #expect(transcricoes.withLock { $0 } == 0)
+    #expect(recebidos.withLock { $0 } == ["trecho corrigido à mão"])
+    #expect(final.resumo?.visaoGeral == resumoDeMentira.visaoGeral)
+    #expect(fases.withLock { $0 } == [.resumindo, .salvando])
+
+    let salvo = try #require(await repositorio.buscarCompleto(id: arquivo.id))
+    #expect(salvo.trechos.map(\.texto) == ["corrigido de novo"])
+    #expect(salvo.resumo?.visaoGeral == resumoDeMentira.visaoGeral)
+    #expect(salvo.engineResumo == "q")
+}
+
+@Test("Sem transcrição, gerar novo resumo não chama o modelo")
+func pipelineNaoResumeExistenteVazio() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: true, sistema: false, mixagem: false
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let chamadas = Mutex(0)
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { _, _ in [] },
+        resumir: { _ in
+            chamadas.withLock { $0 += 1 }
+            return resumoDeMentira
+        }
+    )
+
+    let final = try await pipeline.resumirExistente(arquivo)
+    #expect(chamadas.withLock { $0 } == 0)
+    #expect(final.resumo == nil)
+}
+
+@Test("Repetição em cascata do Whisper não chega à transcrição (DC-01)")
+func pipelineAplicaOFiltroDeRepeticao() async throws {
+    let (armazenamento, arquivo) = try montarGravacao(
+        microfone: true, sistema: true, mixagem: false
+    )
+    defer { try? FileManager.default.removeItem(at: armazenamento.raiz) }
+
+    let pipeline = PipelineDeArquivo(
+        armazenamento: armazenamento,
+        repositorio: RepositorioEspiao(),
+        idTranscricao: "w", idResumo: "q",
+        transcrever: { url, _ in
+            guard url.lastPathComponent == Armazenamento.Nome.microfone else {
+                return [Trecho(start: 20, end: 23, texto: "Combinado então.")]
+            }
+            // Quatro cópias seguidas do mesmo segmento: o artefato clássico
+            // do Whisper em silêncio ou ruído constante.
+            return (0..<4).map { indice in
+                Trecho(
+                    start: Double(indice) * 3, end: Double(indice) * 3 + 2.5,
+                    texto: "Obrigado por assistir."
+                )
+            }
+        },
+        resumir: { _ in resumoDeMentira }
+    )
+
+    let final = try await pipeline.processar(arquivo)
+
+    let doMicrofone = final.trechos.filter { $0.speaker == Speaker.eu }.map(\.texto).joined(separator: " ")
+    #expect(doMicrofone == "Obrigado por assistir.")
+    #expect(final.trechos.contains { $0.speaker == Speaker.interlocutor && $0.texto == "Combinado então." })
 }

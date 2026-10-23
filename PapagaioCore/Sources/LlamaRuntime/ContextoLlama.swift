@@ -5,7 +5,11 @@ import Dispatch
 // `internal`: o módulo C não vaza para quem importa este target. Ver D-3.2.
 internal import llama
 
-public enum ErroLlama: Error, CustomStringConvertible {
+public enum ErroLlama: Error, CustomStringConvertible, LocalizedError {
+    /// `localizedDescription` é o que chega à tela e às notificações; sem
+    /// isto ela devolvia "The operation couldn't be completed (… error N)".
+    public var errorDescription: String? { description }
+
     case modeloNaoCarregou(String)
     case contextoNaoCriado
     case gramaticaInvalida

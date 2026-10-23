@@ -1,4 +1,5 @@
 import Foundation
+import PapagaioCore
 
 struct TarefaDaConversa: Identifiable, Codable, Equatable {
     let id: UUID
@@ -90,7 +91,17 @@ struct TarefaDaConversa: Identifiable, Codable, Equatable {
     static func responsavelSaneado(_ texto: String?) -> String? {
         guard let texto else { return nil }
         let limpo = texto.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !limpo.isEmpty, !["null", "nil", "n/a", "none"].contains(limpo.lowercased()) else { return nil }
+        // Além dos "nulos" escritos por extenso, o modelo devolve os rótulos
+        // de canal que recebeu na transcrição — "(interlocutor)",
+        // "desconhecido" — como se fossem o nome de alguém.
+        let chave = limpo.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "()[] "))
+        let naoSaoPessoas: Set<String> = [
+            "null", "nil", "n/a", "none", "",
+            Speaker.interlocutor, "desconhecido", "unknown", "other", "them",
+        ]
+        guard !naoSaoPessoas.contains(chave) else { return nil }
+        // O canal do microfone é a própria pessoa.
+        if chave == Speaker.eu || chave == "me" { return "Eu".localized }
         return limpo
     }
 }

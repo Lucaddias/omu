@@ -289,6 +289,43 @@ func duplicacaoMantemTarefasIndependentes() async throws {
     #expect(tarefaDaCopia.atrasoFoiReconhecido)
 }
 
+// B-01: `pastaRelativa` vazia resolvia para a raiz do armazenamento, e a
+// duplicação copiava a biblioteca inteira (e os modelos) para dentro da cópia.
+@MainActor
+@Test("Duplicar conversa sem áudio copia só o registro, nunca a raiz do armazenamento")
+func duplicacaoSemAudioNaoCopiaARaiz() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+
+    // Conteúdo que não pode ser arrastado para dentro de uma cópia.
+    let modelos = raiz.appendingPathComponent(Armazenamento.pastaModelos, isDirectory: true)
+    try FileManager.default.createDirectory(at: modelos, withIntermediateDirectories: true)
+    try Data(repeating: 7, count: 1_024).write(to: modelos.appendingPathComponent("pesos.gguf"))
+
+    let reuniao = ReuniaoExterna(
+        id: "reuniao-1",
+        titulo: "Reunião do Granola",
+        data: Date(timeIntervalSinceReferenceDate: 1_000),
+        notas: "Pauta",
+        resumo: "Resumo pronto",
+        transcricao: nil
+    )
+    let original = try #require(await biblioteca.registrarExterna(reuniao, identificador: "granola"))
+    #expect(original.semAudio)
+
+    let copia = try #require(await biblioteca.duplicar(original))
+    defer { TarefasGeraisStore.remover(copia.id) }
+
+    #expect(copia.semAudio)
+    #expect(copia.id != original.id)
+    #expect(copia.notas.map(\.texto) == ["Pauta"])
+    #expect(biblioteca.arquivos.contains { $0.id == copia.id })
+
+    let gravacoes = raiz.appendingPathComponent(Armazenamento.pastaGravacoes, isDirectory: true)
+    let conteudo = (try? FileManager.default.contentsOfDirectory(atPath: gravacoes.path)) ?? []
+    #expect(conteudo.isEmpty, "a duplicação criou \(conteudo) em Gravacoes/")
+}
+
 @MainActor
 @Test("Processamento automático desligado não enfileira ao registrar")
 func automaticoDesligadoNaoEnfileira() async throws {
@@ -834,4 +871,368 @@ func markdownTemporarioTemCicloDeVidaSeguro() throws {
     let raiz = markdown.deletingLastPathComponent()
     DossieDaConversa.descartarArquivoTemporario(markdown)
     #expect(!fm.fileExists(atPath: raiz.path))
+}
+
+// MARK: - Edições não se perdem
+
+/// Registra uma conversa com dois trechos já transcritos e devolve a versão
+/// completa — a que a tela de detalhe recebe.
+@MainActor
+private func conversaTranscrita(em biblioteca: Biblioteca) async throws -> Arquivo {
+    biblioteca.processamentoAutomatico = false
+    let registrada = try #require(await biblioteca.registrar(
+        titulo: "Entrevista",
+        pastaRelativa: Armazenamento.caminhoRelativo(id: UUID()),
+        duracao: 60
+    ))
+    await biblioteca.atualizarTrechos(
+        [
+            Trecho(start: 0, end: 2, texto: "primeiro trecho", speaker: "Eu"),
+            Trecho(start: 2, end: 4, texto: "segundo trecho", speaker: "Interlocutor"),
+        ],
+        de: registrada
+    )
+    return try #require(try await biblioteca.buscarArquivoCompleto(id: registrada.id.rawValue))
+}
+
+@MainActor
+@Test("Cada edição publica uma revisão nova, e duas correções em sequência sobrevivem as duas")
+func correcoesEmSequenciaNaoSeApagam() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let aberta = try await conversaTranscrita(em: biblioteca)
+    let id = aberta.id.rawValue
+
+    // Primeira correção, calculada sobre a versão que a tela tem em mãos.
+    let revisaoAntes = biblioteca.revisao(de: id)
+    var trechos = aberta.trechos
+    trechos[0] = Trecho(id: trechos[0].id, start: 0, end: 2, texto: "primeiro corrigido", speaker: "Eu")
+    await biblioteca.atualizarTrechos(trechos, de: aberta)
+
+    // É a revisão que faz o detalhe recarregar: sem ela, a segunda correção
+    // partiria da lista antiga e desfaria a primeira.
+    #expect(biblioteca.revisao(de: id) > revisaoAntes)
+    let recarregada = try #require(try await biblioteca.buscarArquivoCompleto(id: id))
+    #expect(recarregada.trechos.map(\.texto) == ["primeiro corrigido", "segundo trecho"])
+
+    var segundos = recarregada.trechos
+    segundos[1] = Trecho(id: segundos[1].id, start: 2, end: 4, texto: "segundo corrigido", speaker: "Interlocutor")
+    await biblioteca.atualizarTrechos(segundos, de: recarregada)
+
+    let final = try #require(try await biblioteca.buscarArquivoCompleto(id: id))
+    #expect(final.trechos.map(\.texto) == ["primeiro corrigido", "segundo corrigido"])
+}
+
+@MainActor
+@Test("Renomear marca o título como escolhido pela pessoa")
+func renomearMarcaTituloManual() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let aberta = try await conversaTranscrita(em: biblioteca)
+    #expect(aberta.tituloManual != true)
+
+    await biblioteca.renomear(aberta, para: "Entrevista com a Ana")
+
+    let salvo = try #require(try await biblioteca.buscarArquivoCompleto(id: aberta.id.rawValue))
+    #expect(salvo.titulo == "Entrevista com a Ana")
+    #expect(salvo.tituloManual == true)
+}
+
+@MainActor
+@Test("Salvar a ficha sem trocar o título não o congela como manual")
+func fichaSemTrocarTituloNaoMarcaManual() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let aberta = try await conversaTranscrita(em: biblioteca)
+
+    await biblioteca.atualizarMetadados(
+        aberta,
+        titulo: aberta.titulo,
+        criadoEm: Date(timeIntervalSinceReferenceDate: 5_000),
+        duracao: 90
+    )
+
+    let salvo = try #require(try await biblioteca.buscarArquivoCompleto(id: aberta.id.rawValue))
+    #expect(salvo.duracao == 90)
+    #expect(salvo.tituloManual != true)
+}
+
+@MainActor
+@Test("Fechar a conversa sem editar as notas não regrava nem publica revisão")
+func notasIguaisNaoRegravam() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let aberta = try await conversaTranscrita(em: biblioteca)
+    let id = aberta.id.rawValue
+    let nota = NotaDaConversa(texto: "Decisão", start: 3)
+    await biblioteca.atualizarNotas([nota], de: aberta)
+    let revisao = biblioteca.revisao(de: id)
+
+    await biblioteca.atualizarNotas([nota], de: aberta)
+
+    #expect(biblioteca.revisao(de: id) == revisao)
+}
+
+@MainActor
+@Test("Gerar novo resumo sem transcrição avisa em vez de transcrever de novo")
+func novoResumoSemTranscricaoNaoTranscreve() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    biblioteca.processamentoAutomatico = false
+    let arquivo = try #require(await biblioteca.registrar(
+        titulo: "Sem texto",
+        pastaRelativa: Armazenamento.caminhoRelativo(id: UUID()),
+        duracao: 60
+    ))
+
+    biblioteca.enfileirarNovoResumo(arquivo)
+    _ = await aguardar { !biblioteca.processando }
+
+    #expect(biblioteca.erros[arquivo.id.rawValue] == "Não há transcrição para resumir.".localized)
+}
+
+@MainActor
+@Test("Reprocessar pede confirmação quando já há transcrição, e respeita o não")
+func reprocessarPedeConfirmacao() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let aberta = try await conversaTranscrita(em: biblioteca)
+    var perguntas = 0
+    biblioteca.confirmarReprocessamento = { _ in
+        perguntas += 1
+        return false
+    }
+
+    biblioteca.reprocessar(aberta)
+
+    #expect(perguntas == 1)
+    #expect(!biblioteca.processando)
+    #expect(!biblioteca.estaNaFila(aberta))
+}
+
+@MainActor
+@Test("Reprocessar conversa sem áudio é recusado sem perguntar nada")
+func reprocessarSemAudioEhRecusado() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let reuniao = ReuniaoExterna(
+        id: "reuniao-2",
+        titulo: "Só texto",
+        data: Date(timeIntervalSinceReferenceDate: 2_000),
+        notas: nil,
+        resumo: "Resumo pronto",
+        transcricao: nil
+    )
+    let externa = try #require(await biblioteca.registrarExterna(reuniao, identificador: "granola"))
+    var perguntas = 0
+    biblioteca.confirmarReprocessamento = { _ in
+        perguntas += 1
+        return true
+    }
+
+    biblioteca.reprocessar(externa)
+
+    #expect(perguntas == 0)
+    #expect(!biblioteca.processando)
+    #expect(!biblioteca.estaNaFila(externa))
+}
+
+// MARK: - Gravações órfãs
+
+/// WAV PCM 16 bits mono a 16 kHz com o cabeçalho ainda zerado — o que sobra
+/// no disco quando o app é encerrado no meio da gravação.
+private func wavInterrompido(segundos: Double) -> Data {
+    func le(_ valor: UInt32) -> Data { Data([0, 8, 16, 24].map { UInt8((valor >> $0) & 0xFF) }) }
+    func le16(_ valor: UInt16) -> Data { Data([UInt8(valor & 0xFF), UInt8(valor >> 8)]) }
+    var dados = Data("RIFF".utf8) + le(0) + Data("WAVE".utf8)
+    dados += Data("fmt ".utf8) + le(16) + le16(1) + le16(1) + le(16_000) + le(32_000) + le16(2) + le16(16)
+    dados += Data("data".utf8) + le(0) + Data(repeating: 1, count: Int(segundos * 32_000))
+    return dados
+}
+
+@MainActor
+@Test("Gravação sem registro volta para a biblioteca; conhecida, em uso e vazia não")
+func gravacaoOrfaEhRecuperada() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    biblioteca.processamentoAutomatico = false
+    await biblioteca.usarEspaco(Biblioteca.espacoPessoal())
+    let armazenamento = Armazenamento(raiz: raiz)
+
+    func criarPasta(_ id: UUID, segundos: Double?) throws -> String {
+        let pasta = try armazenamento.criarPastaDaGravacao(id: id)
+        if let segundos {
+            try wavInterrompido(segundos: segundos)
+                .write(to: pasta.appendingPathComponent(Armazenamento.Nome.microfone))
+        }
+        return Armazenamento.caminhoRelativo(id: id)
+    }
+    let orfa = try criarPasta(UUID(), segundos: 3)
+    let conhecida = try criarPasta(UUID(), segundos: 3)
+    let emUso = try criarPasta(UUID(), segundos: 3)
+    let cliqueAcidental = try criarPasta(UUID(), segundos: 0.2)
+    let vazia = try criarPasta(UUID(), segundos: nil)
+    await biblioteca.registrar(titulo: "Já registrada", pastaRelativa: conhecida, duracao: 3)
+
+    let recuperadas = await biblioteca.recuperarGravacoesOrfas(ignorando: [emUso])
+
+    #expect(recuperadas.map(\.pastaRelativa) == [orfa])
+    let recuperada = try #require(recuperadas.first)
+    #expect(abs(recuperada.duracao - 3) < 0.01)
+    #expect(biblioteca.arquivos.contains { $0.id == recuperada.id })
+    #expect(biblioteca.arquivos.count == 2)
+    // O cabeçalho foi consertado: o áudio agora abre com a duração real.
+    let microfone = armazenamento.resolver(relativo: orfa)
+        .appendingPathComponent(Armazenamento.Nome.microfone)
+    #expect(SessaoGravacao.duracaoDoMicrofone(em: microfone).map { abs($0 - 3) < 0.01 } == true)
+    // O que a captura descartaria sozinha sai do disco; o resto fica.
+    let fm = FileManager.default
+    #expect(!fm.fileExists(atPath: armazenamento.resolver(relativo: cliqueAcidental).path))
+    #expect(!fm.fileExists(atPath: armazenamento.resolver(relativo: vazia).path))
+    #expect(fm.fileExists(atPath: armazenamento.resolver(relativo: emUso).path))
+
+    // Rodar de novo não cria um segundo registro para a mesma pasta.
+    #expect(await biblioteca.recuperarGravacoesOrfas(ignorando: [emUso]).isEmpty)
+}
+
+// MARK: - Prazo da lixeira (V-06)
+
+@MainActor
+@Test("A lixeira cumpre o prazo de 30 dias que anuncia (V-06)")
+func lixeiraExpurgaDepoisDoPrazo() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+
+    biblioteca.processamentoAutomatico = false
+    let id = UUID()
+    let pasta = raiz.appendingPathComponent(Armazenamento.caminhoRelativo(id: id), isDirectory: true)
+    try FileManager.default.createDirectory(at: pasta, withIntermediateDirectories: true)
+    try Data(repeating: 1, count: 64).write(to: pasta.appendingPathComponent(Armazenamento.Nome.microfone))
+    await biblioteca.registrar(titulo: "Antiga", pastaRelativa: Armazenamento.caminhoRelativo(id: id), duracao: 30)
+    await biblioteca.registrar(titulo: "Fica", pastaRelativa: Armazenamento.caminhoRelativo(id: UUID()), duracao: 30)
+    let antiga = try #require(biblioteca.arquivos.first { $0.titulo == "Antiga" })
+
+    await biblioteca.moverParaLixeira(antiga)
+    #expect(biblioteca.arquivosNaLixeira.count == 1)
+
+    // 29 dias depois ainda está lá, com o áudio.
+    let quase = Date().addingTimeInterval(29 * 24 * 3_600)
+    #expect(await biblioteca.expurgarLixeiraVencida(agora: quase) == 0)
+    #expect(biblioteca.arquivosNaLixeira.count == 1)
+    #expect(FileManager.default.fileExists(atPath: pasta.path))
+
+    // Passado o prazo, sai o registro e sai o áudio do disco.
+    let depois = Date().addingTimeInterval(31 * 24 * 3_600)
+    #expect(await biblioteca.expurgarLixeiraVencida(agora: depois) == 1)
+    #expect(biblioteca.arquivosNaLixeira.isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: pasta.path))
+    // Quem não foi para a lixeira não é tocado.
+    #expect(biblioteca.arquivos.map(\.titulo) == ["Fica"])
+    #expect(biblioteca.erroDaLixeira == nil)
+}
+
+@Test("O prazo da lixeira é o mesmo para quem mostra e para quem apaga")
+func prazoDaLixeiraEhUmSo() throws {
+    let apagadoEm = Date(timeIntervalSince1970: 1_800_000_000)
+    let dia: TimeInterval = 24 * 3_600
+
+    #expect(!PrazoDaLixeira.venceu(apagadoEm, agora: apagadoEm))
+    #expect(!PrazoDaLixeira.venceu(apagadoEm, agora: apagadoEm.addingTimeInterval(29 * dia)))
+    #expect(PrazoDaLixeira.venceu(apagadoEm, agora: apagadoEm.addingTimeInterval(31 * dia)))
+    let limite = try #require(PrazoDaLixeira.limite(de: apagadoEm))
+    #expect(PrazoDaLixeira.venceu(apagadoEm, agora: limite))
+}
+
+// MARK: - Fila persistente (B-08)
+
+@Test("A fila em disco guarda os pedidos por espaço e conta as tentativas")
+func filaPersistidaGuardaPedidos() throws {
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let fila = FilaDeProcessamentoPersistida(url: raiz.appendingPathComponent("Processamento/fila.json"))
+    let (pessoal, equipe) = (EspacoID(), EspacoID())
+    let (primeiro, segundo, daEquipe) = (ArquivoID(), ArquivoID(), ArquivoID())
+
+    fila.registrar(primeiro, espaco: pessoal, somenteResumo: false)
+    fila.registrar(segundo, espaco: pessoal, somenteResumo: true)
+    fila.registrar(daEquipe, espaco: equipe, somenteResumo: false)
+    fila.registrar(primeiro, espaco: pessoal, somenteResumo: false)
+
+    // Outra instância lê o mesmo arquivo: é o que acontece ao reabrir o app.
+    let reaberta = FilaDeProcessamentoPersistida(url: fila.url)
+    #expect(reaberta.pendentes(do: pessoal).map(\.id) == [primeiro.rawValue, segundo.rawValue])
+    #expect(reaberta.pendentes(do: pessoal).map(\.somenteResumo) == [false, true])
+    #expect(reaberta.pendentes(do: equipe).map(\.id) == [daEquipe.rawValue])
+
+    reaberta.marcarInicio(primeiro)
+    reaberta.marcarInicio(primeiro)
+    #expect(fila.pendentes(do: pessoal).first?.tentativas == 2)
+    // Recusado antes de começar (faltam modelos): a tentativa não conta.
+    fila.adiar(primeiro)
+    #expect(fila.pendentes(do: pessoal).first?.tentativas == 0)
+
+    fila.remover(primeiro)
+    fila.removerTodas(do: equipe)
+    #expect(fila.todas().map(\.id) == [segundo.rawValue])
+    fila.remover(segundo)
+    #expect(!FileManager.default.fileExists(atPath: fila.url.path))
+}
+
+@MainActor
+@Test("Pedido recusado por falta de modelos continua pendente e não é repetido às cegas")
+func pedidoSemModelosContinuaPendente() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let fila = FilaDeProcessamentoPersistida(
+        url: raiz.appendingPathComponent("Processamento/fila-pendente.json")
+    )
+
+    let arquivo = try #require(await biblioteca.registrar(
+        titulo: "Reunião", pastaRelativa: Armazenamento.caminhoRelativo(id: UUID()), duracao: 60
+    ))
+    #expect(fila.pendentes(do: arquivo.espaco).map(\.id) == [arquivo.id.rawValue])
+    #expect(await aguardar { !biblioteca.processando })
+
+    // Sem os pesos o Preflight recusa: o pedido fica em disco, sem tentativa
+    // contada, esperando os modelos.
+    #expect(fila.pendentes(do: arquivo.espaco).first?.tentativas == 0)
+
+    // Recarregar a lista sem modelos não reenfileira — o cartão não pisca.
+    await biblioteca.carregar()
+    #expect(!biblioteca.processando)
+    #expect(fila.pendentes(do: arquivo.espaco).count == 1)
+
+    // Mover para a lixeira é desistir do pedido.
+    #expect(await biblioteca.moverParaLixeira(arquivo))
+    #expect(fila.todas().isEmpty)
+}
+
+@MainActor
+@Test("Anexos de conversa sem áudio ficam em Gravacoes/<id> e saem com a conversa (PS-01)")
+func anexosDeConversaSemAudioSaemComAConversa() async throws {
+    let (biblioteca, raiz) = try bibliotecaDeTeste()
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    biblioteca.processamentoAutomatico = false
+    let fm = FileManager.default
+
+    let arquivo = try #require(await biblioteca.registrar(titulo: "Do Granola", pastaRelativa: "", duracao: 0))
+    let pasta = biblioteca.audio(de: arquivo).deletingLastPathComponent()
+    // Dentro de `Gravacoes/<id>`: é o que a lixeira de mídia aceita.
+    #expect(pasta.standardizedFileURL.path == raiz
+        .appendingPathComponent(Armazenamento.caminhoRelativo(id: arquivo.id.rawValue))
+        .standardizedFileURL.path)
+
+    try fm.createDirectory(at: pasta, withIntermediateDirectories: true)
+    try Data("anexo".utf8).write(to: pasta.appendingPathComponent("contrato.pdf"))
+    // Endereço de versões anteriores: também não pode ficar para trás.
+    let legado = raiz.appendingPathComponent("MidiaIndisponivel/\(arquivo.id.rawValue.uuidString)")
+    try fm.createDirectory(at: legado, withIntermediateDirectories: true)
+    try Data("antigo".utf8).write(to: legado.appendingPathComponent("foto.png"))
+
+    #expect(await biblioteca.moverParaLixeira(arquivo))
+    let naLixeira = try #require(biblioteca.arquivosNaLixeira.first { $0.id == arquivo.id })
+    await biblioteca.apagarDefinitivamente(naLixeira)
+
+    #expect(!fm.fileExists(atPath: pasta.path))
+    #expect(!fm.fileExists(atPath: legado.path))
 }

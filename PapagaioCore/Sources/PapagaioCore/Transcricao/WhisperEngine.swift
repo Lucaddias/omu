@@ -33,6 +33,42 @@ private actor AcumuladorDeTrechos {
     }
 
     func todos() -> [Trecho] { trechos }
+
+    /// O idioma das próximas janelas deste arquivo (`nil` = detectar).
+    private(set) var idioma: String?
+
+    func definirIdioma(_ novo: String?) { idioma = novo }
+
+    func observar(detectado: String?, duracaoDaJanela: TimeInterval, palavras: Int) {
+        idioma = IdiomaDaTranscricao.fixar(
+            atual: idioma, detectado: detectado,
+            duracaoDaJanela: duracaoDaJanela, palavras: palavras
+        )
+    }
+}
+
+/// O áudio é fatiado em janelas e, com detecção automática, o Whisper
+/// redetectava o idioma em **cada uma**: uma janela curta ou ruidosa saía em
+/// espanhol ou galego no meio de uma reunião em português. O idioma é
+/// detectado uma vez — na primeira janela com fala suficiente — e vale para
+/// o resto do arquivo.
+enum IdiomaDaTranscricao {
+    static let duracaoMinimaParaFixar: TimeInterval = 5
+    static let palavrasMinimasParaFixar = 5
+
+    static func fixar(
+        atual: String?,
+        detectado: String?,
+        duracaoDaJanela: TimeInterval,
+        palavras: Int
+    ) -> String? {
+        if let atual, !atual.isEmpty { return atual }
+        guard let detectado, !detectado.isEmpty,
+              duracaoDaJanela >= duracaoMinimaParaFixar,
+              palavras >= palavrasMinimasParaFixar
+        else { return nil }
+        return detectado
+    }
 }
 
 /// A engine de transcrição do Papagaio. Não existe segunda (D-0.5).
@@ -81,14 +117,20 @@ public struct WhisperEngine: TranscriptionEngine {
     ) async throws -> [Trecho] {
         let sessao = DetectorDeAtividadeDeVoz.SessaoEmFluxo()
         let acumulador = AcumuladorDeTrechos()
+        await acumulador.definirIdioma(idioma)
 
         func transcrever(_ janelas: [DetectorDeAtividadeDeVoz.JanelaEmFluxo]) async throws {
             for janela in janelas where !janela.amostras.isEmpty {
                 try Task.checkCancellation()
-                let segmentosBrutos = try await contexto.transcrever(
+                let (segmentosBrutos, idiomaUsado) = try await contexto.transcreverInformandoIdioma(
                     amostras: janela.amostras,
-                    idioma: idioma,
+                    idioma: await acumulador.idioma,
                     initialPrompt: initialPrompt
+                )
+                await acumulador.observar(
+                    detectado: idiomaUsado,
+                    duracaoDaJanela: Double(janela.amostras.count) / FormatoAudio.taxaCanonica,
+                    palavras: segmentosBrutos.reduce(0) { $0 + $1.palavras.count }
                 )
                 // Remove palavras que são puramente emoji (alucinação do
                 // Whisper em silêncio/ruído) e descarta segmentos que ficaram

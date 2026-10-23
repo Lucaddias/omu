@@ -8,7 +8,7 @@ struct CartaoDeMidiaNaLixeira: View {
     let aoRevelarNoFinder: () -> Void
 
     private var prazoDeExclusao: String {
-        guard let limite = Calendar.current.date(byAdding: .day, value: 30, to: item.apagadoEm) else {
+        guard let limite = PrazoDaLixeira.limite(de: item.apagadoEm) else {
             return "Exclui em 30 dias".localized
         }
         let dias = Calendar.current.dateComponents([.day], from: Date(), to: limite).day ?? 0

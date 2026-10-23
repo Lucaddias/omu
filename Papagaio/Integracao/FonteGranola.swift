@@ -57,7 +57,15 @@ struct FonteGranola: FonteDeReunioesExternas {
 
         var transcricao: [SegmentoDeTranscricaoExterna]? = nil
         if incluirTranscricao {
-            transcricao = try await transcricaoDaReuniao(id: id)
+            // A transcrição é um extra dos planos pagos: quando o servidor a
+            // recusa, a reunião ainda entra com notas e resumo.
+            do {
+                transcricao = try await transcricaoDaReuniao(id: id)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                transcricao = nil
+            }
         }
 
         return ReuniaoExterna(
@@ -83,6 +91,11 @@ struct FonteGranola: FonteDeReunioesExternas {
               !texto.isEmpty
         else { return nil }
         return FonteGranolaXML.segmentos(de: texto)
+    }
+
+    /// Exposto para os testes: a divisão da transcrição corrida em falas.
+    static func segmentosDeTranscricao(_ texto: String) -> [SegmentoDeTranscricaoExterna] {
+        FonteGranolaXML.segmentos(de: texto)
     }
 }
 
@@ -129,7 +142,7 @@ private enum FonteGranolaXML {
         return marcacoes.compactMap { marcacao in
             let atributos = atributosDo(bloco: marcacao, no: documento)
             guard let id = atributos["id"], !id.isEmpty else { return nil }
-            let titulo = atributos["title"] ?? "Reunião".localized
+            let titulo = atributos["title"]?.desescaparEntidades() ?? "Reunião".localized
 
             var participantes: [ParticipanteDaReuniao] = []
             var resumo: String?
@@ -161,28 +174,60 @@ private enum FonteGranolaXML {
         }
     }
 
-    /// A transcrição chega como um texto corrido com rótulos ocasionais
-    /// (`Me:`, `Them:`). Sem marcações de virada é um único segmento.
+    /// A transcrição chega como um texto corrido com rótulos de virada
+    /// (`Me:`, `Them:`). Cada rótulo abre uma fala; o que vem antes do
+    /// primeiro é uma fala sem falante.
+    ///
+    /// A fonte não dá tempos. Eles são **estimados** pelo tamanho da fala
+    /// (ritmo de conversa, ~150 palavras por minuto) por dois motivos: os
+    /// trechos precisam de um `start` crescente para manter a ordem ao
+    /// recarregar do banco, e uma conversa de duração zero some das contas
+    /// de tempo. Antes, tudo virava um trecho só, de 0 a 0 s, atribuído a
+    /// quem falou primeiro — as falas do interlocutor entravam como "eu".
     static func segmentos(de texto: String) -> [SegmentoDeTranscricaoExterna] {
         let corrido = texto.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !corrido.isEmpty else { return [] }
-        var falante: String?
-        var fala = corrido
-        if let resultado = rotuloInicial.firstMatch(in: corrido, range: NSRange(corrido.startIndex..., in: corrido)),
-           let marcado = Range(resultado.range(at: 0), in: corrido) {
-            let rotulo = String(corrido[marcado])
-                .trimmingCharacters(in: CharacterSet(charactersIn: ":").union(.whitespaces))
-            falante = FalanteExterno.rotulo(de: rotulo.lowercased())
-            fala = String(corrido[marcado.upperBound...])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let viradas = rotuloDeVirada.matches(in: corrido, range: NSRange(corrido.startIndex..., in: corrido))
+        var falas: [(falante: String?, texto: String)] = []
+        func acrescentar(_ falante: String?, _ trecho: Substring) {
+            let limpo = trecho.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !limpo.isEmpty else { return }
+            // Dois rótulos iguais seguidos são a mesma fala continuando.
+            if let ultima = falas.last, ultima.falante == falante, falante != nil {
+                falas[falas.count - 1].texto += " " + limpo
+            } else {
+                falas.append((falante, limpo))
+            }
         }
-        return [SegmentoDeTranscricaoExterna(
-            falante: falante,
-            texto: fala,
-            inicio: 0,
-            fim: 0
-        )]
+
+        var cursor = corrido.startIndex
+        var falanteAtual: String?
+        for virada in viradas {
+            guard let marcado = Range(virada.range(at: 0), in: corrido),
+                  let rotulo = Range(virada.range(at: 1), in: corrido)
+            else { continue }
+            acrescentar(falanteAtual, corrido[cursor..<marcado.lowerBound])
+            falanteAtual = FalanteExterno.rotulo(de: corrido[rotulo].lowercased())
+            cursor = marcado.upperBound
+        }
+        acrescentar(falanteAtual, corrido[cursor...])
+
+        var relogio: TimeInterval = 0
+        return falas.map { fala in
+            let palavras = fala.texto.split(whereSeparator: \.isWhitespace).count
+            let duracao = max(1, Double(palavras) / palavrasPorSegundo)
+            defer { relogio += duracao }
+            return SegmentoDeTranscricaoExterna(
+                falante: fala.falante,
+                texto: fala.texto,
+                inicio: relogio,
+                fim: relogio + duracao
+            )
+        }
     }
+
+    private static let palavrasPorSegundo = 2.5
 
     // MARK: - Formato de marcação
 
@@ -195,8 +240,10 @@ private enum FonteGranolaXML {
     private static let sentinelaDeFilhos = try! NSRegularExpression(
         pattern: #"(?s)<(known_participants|summary|notes|transcript)>(.*?)</\1>"#
     )
-    private static let rotuloInicial = try! NSRegularExpression(
-        pattern: #"^\s*(Me|Them|me|them)\s*:"#
+    /// `Me:`/`Them:` no começo do texto, de uma linha ou depois de um espaço.
+    private static let rotuloDeVirada = try! NSRegularExpression(
+        pattern: #"(?:^|(?<=\s))(Me|Them|me|them)\s*:"#,
+        options: [.anchorsMatchLines]
     )
 
     private static func atributosDo(bloco marcacao: NSTextCheckingResult, no documento: String) -> [String: String] {

@@ -57,12 +57,14 @@ final class GoogleCalendarViewModel {
         !cofre.contasExistentes(entre: ["refresh_token"]).isEmpty
     }
 
-    func conectar(biblioteca: Biblioteca) async {
+    /// - Parameter interativo: `true` só quando a pessoa clicou em Conectar.
+    ///   A reconexão da abertura usa `false` e nunca abre o navegador.
+    func conectar(biblioteca: Biblioteca, interativo: Bool = true) async {
         guard tarefaDeConexao == nil, !estado.conectado, !(estado == .conectando) else { return }
         let id = UUID()
         let tarefa = Task { @MainActor [weak self, weak biblioteca] in
             guard let self, let biblioteca else { return }
-            await self.executarConexao(biblioteca: biblioteca)
+            await self.executarConexao(biblioteca: biblioteca, interativo: interativo)
         }
         idDaTarefaDeConexao = id
         tarefaDeConexao = tarefa
@@ -73,7 +75,7 @@ final class GoogleCalendarViewModel {
         }
     }
 
-    private func executarConexao(biblioteca: Biblioteca) async {
+    private func executarConexao(biblioteca: Biblioteca, interativo: Bool) async {
         estado = .conectando
         registro.info("Iniciando conexão com o Google Calendar")
 
@@ -81,6 +83,9 @@ final class GoogleCalendarViewModel {
         self.sessao = sessao
 
         do {
+            // O único ponto que pode abrir o navegador. Daqui em diante a
+            // fonte (temporizador, recarga, detalhes) só renova em silêncio.
+            _ = try await sessao.tokenDeAcesso(forcandoRenovacao: false, interativo: interativo)
             let fonte = FonteGoogleCalendarAPI { forcar in
                 try await sessao.tokenDeAcesso(forcandoRenovacao: forcar)
             }
@@ -175,10 +180,24 @@ final class GoogleCalendarViewModel {
             aplicar(eventos: eventos, biblioteca: bibliotecaRef)
             falhaDeImportacao = nil
             registro.info("\(self.reunioesPendentes.count) reuniões pendentes carregadas do Google Calendar")
+        } catch ErroOAuthGoogle.semRefreshToken {
+            // O Google invalidou a sessão (revogação, troca de senha, validade
+            // do cliente em teste). Continuar "conectado" com o temporizador
+            // ligado só repetiria a falha a cada 15 minutos.
+            registro.info("Sessão do Google Calendar expirou — aguardando nova conexão")
+            timerDeSincronizacao?.cancel()
+            timerDeSincronizacao = nil
+            self.sessao = nil
+            self.fonte = nil
+            estado = .falhou(Self.mensagemDeSessaoExpirada)
         } catch {
             falhaDeImportacao = ErroDaConexao.descricao(do: error)
             registro.error("Falha ao carregar reuniões: \(ErroDaConexao.descricao(do: error), privacy: .public)")
         }
+    }
+
+    static var mensagemDeSessaoExpirada: String {
+        "A sessão do Google Calendar expirou. Conecte de novo.".localized
     }
 
     /// Importa um arquivo de áudio local para uma reunião pendente e cria o
@@ -190,7 +209,8 @@ final class GoogleCalendarViewModel {
         audioURL: URL,
         biblioteca: Biblioteca,
         duracao: TimeInterval? = nil,
-        notas: [NotaDaConversa] = []
+        notas: [NotaDaConversa] = [],
+        usavaFones: Bool? = nil
     ) async -> Arquivo? {
         let id = UUID()
         let tarefa = Task { @MainActor [weak self, weak biblioteca] () -> Arquivo? in
@@ -200,7 +220,8 @@ final class GoogleCalendarViewModel {
                 audioURL: audioURL,
                 biblioteca: biblioteca,
                 duracao: duracao,
-                notas: notas
+                notas: notas,
+                usavaFones: usavaFones
             )
         }
         tarefasDeImportacao[id] = tarefa
@@ -214,14 +235,16 @@ final class GoogleCalendarViewModel {
         audioURL: URL,
         biblioteca: Biblioteca,
         duracao: TimeInterval? = nil,
-        notas: [NotaDaConversa] = []
+        notas: [NotaDaConversa] = [],
+        usavaFones: Bool? = nil
     ) async -> Arquivo? {
         guard !Task.isCancelled else { return nil }
         let arquivo = await biblioteca.criarArquivoDeReuniaoPendente(
             pendente,
             audioURL: audioURL,
             duracao: duracao,
-            notas: notas
+            notas: notas,
+            usavaFones: usavaFones
         )
         if arquivo != nil {
             estadoDasReunioes.definir(.convertida, para: pendente)

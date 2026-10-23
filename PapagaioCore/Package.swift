@@ -18,7 +18,7 @@ let package = Package(
     dependencies: [
         // Diarização acústica offline (pyannote community-1 em CoreML).
         // Versão fixada: a API do OfflineDiarizerManager muda entre releases.
-        // Ver DECISIONS.md — primeira dependência remota do projeto.
+        // Primeira dependência remota do projeto.
         .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.5"),
     ],
     targets: [
@@ -64,7 +64,6 @@ let package = Package(
         // Wrapper Sendable sobre o FluidAudio (diarização offline). O target é
         // isolado por causa do CoreML: MLModel não é Sendable, e a fronteira do
         // módulo impede que os tipos do FluidAudio vazem para o domínio.
-        // Ver DECISIONS.md — diarização.
         .target(
             name: "DiarizationRuntime",
             dependencies: ["FluidAudio"],

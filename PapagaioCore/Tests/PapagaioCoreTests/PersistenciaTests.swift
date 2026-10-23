@@ -581,3 +581,101 @@ func buscaVazia() async throws {
     #expect(try await repo.buscar(termo: "   ", espaco: espaco).isEmpty)
     #expect(try await repo.buscar(termo: "termo-que-nao-existe", espaco: espaco).isEmpty)
 }
+
+@Test("Versão recebida da sincronização aplica o estado de lixeira; salvar comum não ressuscita")
+func salvarRecebidoAplicaEstadoDeLixeira() async throws {
+    let repositorio = try repositorioDeTeste()
+    let espaco = EspacoID()
+    let arquivo = Arquivo(titulo: "Da equipe", pastaRelativa: "", espaco: espaco)
+    try await repositorio.salvar(arquivo)
+    try await repositorio.moverParaLixeira(arquivo.id)
+
+    // Um resultado tardio (pipeline) não tira nada da lixeira.
+    try await repositorio.salvar(arquivo)
+    #expect(try await repositorio.buscarCompleto(id: arquivo.id)?.apagadoEm != nil)
+
+    // Um colega restaurou a conversa: a versão recebida vem sem `apagadoEm`.
+    try await repositorio.salvarRecebido(arquivo)
+    #expect(try await repositorio.buscarCompleto(id: arquivo.id)?.apagadoEm == nil)
+    #expect(try await repositorio.listar(espaco: espaco).map(\.id) == [arquivo.id])
+
+    // E o caminho inverso: um colega mandou para a lixeira.
+    var apagada = arquivo
+    apagada.apagadoEm = Date(timeIntervalSince1970: 500)
+    try await repositorio.salvarRecebido(apagada)
+    #expect(try await repositorio.buscarCompleto(id: arquivo.id)?.apagadoEm == apagada.apagadoEm)
+    #expect(try await repositorio.listar(espaco: espaco).isEmpty)
+}
+
+@Test("A confiança do trecho volta do banco, derivada das palavras (T-05)")
+func confiancaDoTrechoSobreviveAoRoundTrip() async throws {
+    let repositorio = try repositorioDeTeste()
+    let espaco = EspacoID()
+    let arquivo = Arquivo(
+        titulo: "Confiança",
+        pastaRelativa: "Gravacoes/confianca",
+        espaco: espaco,
+        trechos: [
+            Trecho(
+                start: 0, end: 2, texto: "bom dia",
+                palavras: [
+                    Palavra(start: 0, end: 1, texto: "bom", confianca: 0.9),
+                    Palavra(start: 1, end: 2, texto: "dia", confianca: 0.5),
+                ],
+                confianca: 0.7
+            ),
+        ]
+    )
+    try await repositorio.salvar(arquivo)
+
+    let lido = try #require(try await repositorio.listar(espaco: espaco).first)
+    let completo = try #require(try await repositorio.buscarCompleto(id: lido.id))
+    #expect(abs(try #require(completo.trechos.first?.confianca) - 0.7) < 0.001)
+}
+
+@Test("Apagar remove a mídia do armazenamento de quem chama (D-02)")
+func apagarUsaOArmazenamentoInformado() async throws {
+    let repo = try repositorioDeTeste()
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let armazenamento = Armazenamento(raiz: raiz)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    let id = UUID()
+    let pasta = try armazenamento.criarPastaDaGravacao(id: id)
+    try Data(repeating: 1, count: 16).write(to: pasta.appendingPathComponent(Armazenamento.Nome.microfone))
+
+    let espaco = EspacoID()
+    let arquivo = Arquivo(
+        titulo: "Em outra raiz",
+        pastaRelativa: Armazenamento.caminhoRelativo(id: id),
+        espaco: espaco
+    )
+    try await repo.salvar(arquivo)
+    try await repo.moverParaLixeira(arquivo.id)
+
+    try await repo.apagar(arquivo.id, em: armazenamento)
+
+    #expect(!FileManager.default.fileExists(atPath: pasta.path))
+    #expect(try await repo.listarNaLixeira(espaco: espaco).isEmpty)
+}
+
+@Test("Registro com caminho fora do padrão não fica preso na lixeira (D-03)")
+func apagarRegistroComCaminhoForaDoPadrao() async throws {
+    let repo = try repositorioDeTeste()
+    let raiz = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let armazenamento = Armazenamento(raiz: raiz)
+    defer { try? FileManager.default.removeItem(at: raiz) }
+    // Uma pasta que **não** pode ser apagada por este caminho.
+    let fora = raiz.appendingPathComponent("Outra/pasta/funda", isDirectory: true)
+    try FileManager.default.createDirectory(at: fora, withIntermediateDirectories: true)
+
+    let espaco = EspacoID()
+    let arquivo = Arquivo(titulo: "Legado", pastaRelativa: "Outra/pasta/funda", espaco: espaco)
+    try await repo.salvar(arquivo)
+    try await repo.moverParaLixeira(arquivo.id)
+
+    try await repo.apagar(arquivo.id, em: armazenamento)
+
+    #expect(try await repo.listarNaLixeira(espaco: espaco).isEmpty)
+    // O registro sai; o que está fora de `Gravacoes/` continua intocado.
+    #expect(FileManager.default.fileExists(atPath: fora.path))
+}

@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Foundation
 import Speech
@@ -28,13 +29,29 @@ final class GravadorViewModel {
     /// `dataDeGravacao` é `nil` numa gravação normal (o instante é agora
     /// mesmo, não há nada a distinguir) e vem preenchido só na importação,
     /// com a data real lida do arquivo original — ver `importar(_:)`.
+    ///
+    /// `usavaFones` é o que a sessão observou ao começar a gravar; `nil` na
+    /// importação, onde não há como saber. É o que decide se o microfone
+    /// passa pelo cancelamento de eco antes de ser transcrito.
     var aoProduzirAudio: (@MainActor (_ titulo: String, _ pastaRelativa: String,
                                       _ duracao: TimeInterval,
                                       _ notas: [NotaDaConversa],
-                                      _ dataDeGravacao: Date?) async -> Void)?
+                                      _ dataDeGravacao: Date?,
+                                      _ usavaFones: Bool?) async -> Void)?
 
     /// Limpa o contexto de destino da gravação em qualquer superfície da UI.
     var aoCancelarGravacao: (@MainActor () -> Void)?
+
+    /// Pergunta antes de descartar. Injetável para os testes não abrirem um
+    /// `NSAlert`; em produção é o alerta modal do app, que funciona de
+    /// qualquer superfície — janela, painel flutuante ou menu da barra.
+    var confirmarCancelamento: @MainActor () -> Bool = GravadorViewModel.alertaDeCancelamento
+
+    /// Importações em andamento. Estado próprio, separado de `estado`: a
+    /// importação escrevia `.processando`/`.ocioso` por cima de uma gravação
+    /// em curso, que seguia capturando sem nenhum indicador.
+    private(set) var importacoesEmCurso = 0
+    var importando: Bool { importacoesEmCurso > 0 }
 
     /// Amostras de nível para a waveform ao vivo, ~20 Hz, janela de ~6 s.
     private(set) var waveform: [Float] = []
@@ -69,22 +86,45 @@ final class GravadorViewModel {
     private let duracaoDosAvisos: Duration = .seconds(30)
     private var identificadorDaGravacao: UUID?
     private let armazenamento: Armazenamento?
+    /// Pastas de gravações já encerradas cuja conversa ainda está sendo
+    /// registrada pela biblioteca.
+    private var pastasEmEntrega: Set<String> = []
 
-#if OMU_PERF
-    init(armazenamento: Armazenamento? = nil) {
+    /// Pastas em `Gravacoes/` que existem no disco mas ainda não têm conversa
+    /// no banco **por estarem em uso agora** — a gravação em curso e as
+    /// entregas a caminho. A recuperação de gravações órfãs as ignora.
+    ///
+    /// `nil` enquanto há uma importação copiando: a pasta dela só é conhecida
+    /// quando a cópia termina, então não dá para listar o que está em uso.
+    var pastasEmUso: Set<String>? {
+        guard !importando else { return nil }
+        var pastas = pastasEmEntrega
+        if let sessao {
+            pastas.insert(Armazenamento.caminhoRelativo(id: sessao.id))
+        }
+        return pastas
+    }
+
+    /// Finaliza a gravação em curso (se houver) e espera a conversa ser
+    /// registrada. É o que o encerramento do app chama antes de sair: sem
+    /// isso, ⌘Q no meio de uma reunião deixava o áudio sem registro.
+    func finalizarAntesDeEncerrar() async {
+        guard gravando else { return }
+        await parar()
+    }
+
+    /// - Parameters:
+    ///   - armazenamento: injetado na build de perf e nos testes; em produção
+    ///     é o container do app.
+    ///   - estadoInicial: só os testes passam algo diferente de `.ocioso`,
+    ///     para exercitar as regras de "gravando"/"pausado" sem microfone.
+    init(armazenamento: Armazenamento? = nil, estadoInicial: Estado = .ocioso) {
         self.armazenamento = armazenamento ?? (try? Armazenamento.padrao())
+        estado = estadoInicial
         if self.armazenamento == nil {
             estado = .falhou("não foi possível abrir a pasta de suporte do app".localized)
         }
     }
-#else
-    init() {
-        armazenamento = try? Armazenamento.padrao()
-        if armazenamento == nil {
-            estado = .falhou("não foi possível abrir a pasta de suporte do app".localized)
-        }
-    }
-#endif
 
     var gravando: Bool { estado == .gravando || estado == .pausado }
     var pausado: Bool { estado == .pausado }
@@ -113,6 +153,27 @@ final class GravadorViewModel {
         await sessao.continuar()
         estado = .gravando
         iniciarMonitoramentoDeNivel(sessao: sessao, identificador: identificadorDaGravacao ?? UUID())
+    }
+
+    /// Cancelar apaga áudio e notas da gravação em curso, sem lixeira. Toda
+    /// superfície que não tem a própria confirmação passa por aqui — um
+    /// clique errado ao tentar finalizar não pode custar a reunião inteira.
+    func cancelarComConfirmacao() async {
+        guard gravando else { return }
+        guard confirmarCancelamento() else { return }
+        await cancelar()
+    }
+
+    private static func alertaDeCancelamento() -> Bool {
+        let alerta = NSAlert()
+        alerta.alertStyle = .warning
+        alerta.messageText = "Cancelar a gravação?".localized
+        alerta.informativeText = "O áudio capturado até agora é descartado.".localized
+        let descartar = alerta.addButton(withTitle: "Cancelar gravação".localized)
+        descartar.hasDestructiveAction = true
+        alerta.addButton(withTitle: "Continuar gravando".localized)
+        NSApp.activate(ignoringOtherApps: true)
+        return alerta.runModal() == .alertFirstButtonReturn
     }
 
     func cancelar() async {
@@ -182,7 +243,7 @@ final class GravadorViewModel {
             // Sem isto a sessão que falhou continuava sendo a `self.sessao` de
             // uma tentativa anterior, e nada a soltava.
             self.sessao = nil
-            estado = .falhou("\(error)")
+            estado = .falhou(error.localizedDescription)
             return
         }
 
@@ -217,30 +278,45 @@ final class GravadorViewModel {
         estado = .ocioso
         tempoDeGravacao = resultado.duracao
 
+        // As notas saem daqui antes de qualquer `await`: com o estado já
+        // ocioso, a pessoa pode começar outra gravação enquanto a biblioteca
+        // registra esta, e uma limpeza tardia apagaria as notas da NOVA.
+        let notasDestaGravacao = notasDaGravacao
+        limparDepoisDeGravar()
+
         // Gravação descartada por ser curta demais volta com duração 0 e já foi
         // apagada do disco — não entra na biblioteca.
         if resultado.duracao > 0 {
-            let notas = notasDaGravacao.map { nota in
+            let notas = notasDestaGravacao.map { nota in
                 var notaAjustada = nota
                 notaAjustada.start = min(max(0, nota.start), resultado.duracao)
                 return notaAjustada
             }
+            pastasEmEntrega.insert(resultado.pastaRelativa)
             await aoProduzirAudio?(
                 Self.tituloParaAgora(),
                 resultado.pastaRelativa,
                 resultado.duracao,
                 Self.notasParaArquivo(notas),
-                nil
+                nil,
+                resultado.usavaFones
             )
-        } else if !notasDaGravacao.isEmpty {
+            pastasEmEntrega.remove(resultado.pastaRelativa)
+        } else if !notasDestaGravacao.isEmpty {
+            // Uma gravação curta é descartada junto com o áudio, portanto não
+            // há um arquivo ao qual as notas possam pertencer.
             avisos.append(
                 "As notas também foram descartadas porque a gravação era curta demais para criar um arquivo.".localized
             )
         }
+    }
 
-        // Uma gravação curta é descartada junto com o áudio, portanto não há
-        // um arquivo ao qual as notas possam pertencer.
-        limparDepoisDeGravar()
+    /// O sistema encerrou o gravador sozinho (entrada removida, disco cheio).
+    /// Finaliza como se a pessoa tivesse parado: o que foi gravado vira
+    /// conversa, em vez de a tela seguir "gravando" algo que já acabou.
+    private func finalizarPorInterrupcao(_ identificador: UUID) async {
+        guard identificadorDaGravacao == identificador, gravando else { return }
+        await parar()
     }
 
     private func iniciarMonitoramentoDeNivel(sessao: SessaoGravacao, identificador: UUID) {
@@ -252,6 +328,7 @@ final class GravadorViewModel {
                 let valor = nivel.normalizado
                 let valorSistema = nivelSistema.normalizado
                 let tempo = sessao.tempoDecorrido
+                let interrompida = sessao.interrompida
                 await MainActor.run {
                     guard self?.identificadorDaGravacao == identificador,
                           self?.estado == .gravando
@@ -259,6 +336,14 @@ final class GravadorViewModel {
                     self?.acrescentarAoWaveform(valor)
                     self?.acrescentarAoWaveformSistema(valorSistema)
                     self?.tempoDeGravacao = tempo
+                }
+                if interrompida {
+                    // Tarefa nova: `parar()` cancela esta, e o registro na
+                    // biblioteca não pode herdar o cancelamento.
+                    Task { @MainActor [weak self] in
+                        await self?.finalizarPorInterrupcao(identificador)
+                    }
+                    return
                 }
                 try? await Task.sleep(for: .milliseconds(50))
             }
@@ -315,9 +400,12 @@ final class GravadorViewModel {
 
     /// Registra o texto atual com o carimbo de tempo do áudio. Rascunhos vazios
     /// não viram cartões silenciosos no detalhe.
+    ///
+    /// Vale também com a gravação pausada — é justamente quando sobra tempo
+    /// para anotar. O instante é `tempoDeGravacao`, congelado na pausa.
     func adicionarNota() {
         let texto = rascunhoDaNota.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard estado == .gravando, !texto.isEmpty else { return }
+        guard gravando, !texto.isEmpty else { return }
 
         notasDaGravacao.append(
             NotaDaConversa(
@@ -358,7 +446,7 @@ final class GravadorViewModel {
     /// Um marcador é uma nota sem texto livre que conserva o instante exato da
     /// conversa. Pode ser usado depois para localizar um ponto relevante.
     func inserirMarcador() {
-        guard estado == .gravando else { return }
+        guard gravando else { return }
 
         notasDaGravacao.append(
             NotaDaConversa(
@@ -381,7 +469,15 @@ final class GravadorViewModel {
     ///   security-scoped já aberto** por quem chama.
     func importar(_ url: URL) async {
         guard let armazenamento else { return }
-        estado = .processando
+        // Com uma gravação em curso, importar mexia no estado dela: o selo
+        // "Gravando" sumia e a próxima gravação descartava a que seguia viva.
+        guard !gravando else {
+            avisos.append("Finalize a gravação em andamento antes de importar um áudio.".localized)
+            return
+        }
+        importacoesEmCurso += 1
+        defer { importacoesEmCurso -= 1 }
+        if case .falhou = estado { estado = .ocioso }
 #if OMU_PERF
         let inicioImportacao = DispatchTime.now().uptimeNanoseconds
         PerfProbe.shared.registrarImportacaoInicio(url)
@@ -389,10 +485,10 @@ final class GravadorViewModel {
         do {
             let importado = try await ImportadorAudio(armazenamento: armazenamento).importar(de: url)
             avisos = ["Arquivo importado: um canal só, sem separação de falante.".localized]
-            estado = .ocioso
             await aoProduzirAudio?(
                 importado.tituloSugerido, importado.pastaRelativa, importado.duracao, [],
-                importado.dataOriginal
+                importado.dataOriginal,
+                nil
             )
 #if OMU_PERF
             let duracao = Double(DispatchTime.now().uptimeNanoseconds &- inicioImportacao) / 1_000_000_000
@@ -403,7 +499,14 @@ final class GravadorViewModel {
             )
 #endif
         } catch {
-            estado = .falhou(Self.mensagemAmigavelDeImportacao(error))
+            let mensagem = Self.mensagemAmigavelDeImportacao(error)
+            // Uma gravação pode ter começado enquanto a cópia rodava; a falha
+            // da importação não pode derrubar o estado dela.
+            if gravando {
+                avisos.append(mensagem)
+            } else {
+                estado = .falhou(mensagem)
+            }
 #if OMU_PERF
             let duracao = Double(DispatchTime.now().uptimeNanoseconds &- inicioImportacao) / 1_000_000_000
             PerfProbe.shared.registrarImportacaoFim(
@@ -426,7 +529,7 @@ final class GravadorViewModel {
         if nsError.domain == NSCocoaErrorDomain && [257, 260, 513].contains(nsError.code) {
             return "Não consegui acessar esse áudio. Se ele estiver no iPhone, desbloqueie o aparelho e tente importar de novo.".localized
         }
-        return "\(error)"
+        return error.localizedDescription
     }
 }
 
@@ -453,8 +556,12 @@ final class CapturaDeDitado: @unchecked Sendable {
         self.arquivoDeAudio = arquivoDeAudio
     }
 
+    /// - Parameter reconhecedor: `nil` quando o Mac não reconhece fala no
+    ///   próprio dispositivo. Nesse caso só o arquivo é gravado e o Whisper
+    ///   transcreve no fim — sem parciais, mas também sem enviar áudio a
+    ///   servidor nenhum, que é o que a descrição de uso promete.
     func iniciar(
-        reconhecedor: SFSpeechRecognizer,
+        reconhecedor: SFSpeechRecognizer?,
         aoReconhecer: @escaping @Sendable (String) -> Void
     ) throws {
         let entrada = motor.inputNode
@@ -469,18 +576,24 @@ final class CapturaDeDitado: @unchecked Sendable {
         let arquivo = try AVAudioFile(forWriting: arquivoDeAudio, settings: formato.settings)
         saida = arquivo
 
-        pedido.shouldReportPartialResults = true
-        // No dispositivo quando dá: o ditado não sai da máquina.
-        pedido.requiresOnDeviceRecognition = reconhecedor.supportsOnDeviceRecognition
-
-        tarefa = reconhecedor.recognitionTask(with: pedido) { resultado, _ in
-            guard let texto = resultado?.bestTranscription.formattedString else { return }
-            aoReconhecer(texto)
+        // Só no dispositivo: sem essa exigência o `SFSpeechRecognizer` manda
+        // o áudio para os servidores da Apple quando o Mac não tem o modelo
+        // local do idioma.
+        let pedidoDoTap: SFSpeechAudioBufferRecognitionRequest?
+        if let reconhecedor, reconhecedor.supportsOnDeviceRecognition {
+            pedido.shouldReportPartialResults = true
+            pedido.requiresOnDeviceRecognition = true
+            tarefa = reconhecedor.recognitionTask(with: pedido) { resultado, _ in
+                guard let texto = resultado?.bestTranscription.formattedString else { return }
+                aoReconhecer(texto)
+            }
+            pedidoDoTap = pedido
+        } else {
+            pedidoDoTap = nil
         }
 
-        let pedidoDoTap = pedido
         entrada.installTap(onBus: 0, bufferSize: 2_048, format: formato) { buffer, _ in
-            pedidoDoTap.append(buffer)
+            pedidoDoTap?.append(buffer)
             try? arquivo.write(from: buffer)
         }
 
@@ -551,12 +664,10 @@ final class DitadoDeNota {
             return
         }
 
-        guard let reconhecedor = SFSpeechRecognizer(locale: Locale(identifier: "pt_BR")) ?? SFSpeechRecognizer(),
-              reconhecedor.isAvailable
-        else {
-            estado = .falhou(CapturaDeDitado.ErroDeDitado.reconhecimentoIndisponivel.localizedDescription)
-            return
-        }
+        // Os parciais seguem o idioma do app. Sem reconhecimento local nesse
+        // idioma o ditado continua — o Whisper transcreve no fim —, só não
+        // mostra texto enquanto a pessoa fala.
+        let reconhecedor = Self.reconhecedorLocal()
 
         let destino = FileManager.default.temporaryDirectory
             .appendingPathComponent("ditado-\(UUID().uuidString).caf")
@@ -595,6 +706,18 @@ final class DitadoDeNota {
             estado = .ocioso
             return parcial.isEmpty ? nil : parcial
         }
+    }
+
+    /// Reconhecedor do idioma do app, e só se funcionar no próprio Mac.
+    private static func reconhecedorLocal() -> SFSpeechRecognizer? {
+        let candidatos = [
+            SFSpeechRecognizer(locale: LocalizacaoDoApp.localeAtual),
+            SFSpeechRecognizer(),
+            SFSpeechRecognizer(locale: Locale(identifier: "pt_BR")),
+        ]
+        return candidatos
+            .compactMap { $0 }
+            .first { $0.isAvailable && $0.supportsOnDeviceRecognition }
     }
 
     func cancelar() {

@@ -68,12 +68,79 @@ func cargaCriaBaseDosProximosPassos() {
     vm.carregar(base: passos, tituloDaConversa: "Kickoff", dataDaConversa: Date())
 
     #expect(vm.tarefas.count == 3)
-    // Os dois primeiros nascem alta; o resto, média.
-    #expect(vm.tarefas[0].prioridade == .alta)
-    #expect(vm.tarefas[1].prioridade == .alta)
-    #expect(vm.tarefas[2].prioridade == .media)
+    // O resumo não informa prazo nem prioridade: nada é inventado.
+    #expect(vm.tarefas.allSatisfy { $0.prioridade == .media })
+    #expect(vm.tarefas.allSatisfy { $0.prazo == nil })
     #expect(vm.tarefas.allSatisfy { $0.status == .naoIniciado })
     #expect(vm.tarefas.allSatisfy { $0.origem == "Kickoff" })
+}
+
+@MainActor
+@Test("Abrir a conversa antes do resumo não impede as sugestões depois")
+func sugestoesChegamDepoisDoResumo() {
+    let arquivoID = ArquivoID()
+    defer { TarefasDaConversa.remover(arquivoID) }
+    let antes = TarefasDaConversaViewModel(arquivoID: arquivoID)
+    antes.carregar(base: [], tituloDaConversa: "Kickoff", dataDaConversa: Date())
+    #expect(antes.tarefas.isEmpty)
+    // Uma tarefa escrita à mão enquanto a conversa transcreve.
+    antes.tituloDaTarefa = "Criada à mão"
+    antes.adicionar(origem: "Kickoff")
+
+    let depois = TarefasDaConversaViewModel(arquivoID: arquivoID)
+    depois.carregar(
+        base: [ProximoPasso(descricao: "Enviar minuta", responsavel: nil)],
+        tituloDaConversa: "Kickoff",
+        dataDaConversa: Date()
+    )
+
+    #expect(depois.tarefas.map(\.titulo) == ["Criada à mão", "Enviar minuta"])
+    #expect(depois.sugestoes.map(\.titulo) == ["Enviar minuta"])
+}
+
+@MainActor
+@Test("Resumo novo acrescenta só os passos inéditos e não ressuscita os descartados")
+func resumoNovoAcrescentaSoPassosIneditos() throws {
+    let arquivoID = ArquivoID()
+    defer { TarefasDaConversa.remover(arquivoID) }
+    let primeiro = [
+        ProximoPasso(descricao: "Fechar o contrato", responsavel: nil),
+        ProximoPasso(descricao: "Enviar minuta", responsavel: nil),
+    ]
+    let vm = TarefasDaConversaViewModel(arquivoID: arquivoID)
+    vm.carregar(base: primeiro, tituloDaConversa: "Kickoff", dataDaConversa: Date())
+    let descartada = try #require(vm.tarefas.first { $0.titulo == "Enviar minuta" })
+    vm.rejeitarSugestao(descartada)
+
+    let outra = TarefasDaConversaViewModel(arquivoID: arquivoID)
+    outra.carregar(
+        base: primeiro + [ProximoPasso(descricao: "Agendar assinatura", responsavel: nil)],
+        tituloDaConversa: "Kickoff",
+        dataDaConversa: Date()
+    )
+
+    #expect(outra.tarefas.map(\.titulo) == ["Fechar o contrato", "Agendar assinatura"])
+}
+
+@MainActor
+@Test("Editar o título de uma tarefa sem prazo não inventa um prazo")
+func edicaoNaoInventaPrazo() throws {
+    let arquivoID = ArquivoID()
+    defer { TarefasDaConversa.remover(arquivoID) }
+    let vm = TarefasDaConversaViewModel(arquivoID: arquivoID)
+    vm.carregar(
+        base: [ProximoPasso(descricao: "Enviar minuta", responsavel: nil)],
+        tituloDaConversa: "Kickoff",
+        dataDaConversa: Date()
+    )
+    let sugestao = try #require(vm.tarefas.first)
+
+    vm.iniciarEdicao(sugestao)
+    vm.tituloDaTarefa = "Enviar a minuta revisada"
+    vm.salvarEdicao()
+
+    #expect(vm.tarefas.first?.titulo == "Enviar a minuta revisada")
+    #expect(vm.tarefas.first?.prazo == nil)
 }
 
 @MainActor
@@ -131,4 +198,16 @@ func responsaveisDaFichaNaoDuplicam() {
     #expect(pessoas.count == 2)
     #expect(pessoas[0].nome == "ana silva")
     #expect(pessoas[1].email == "contato@empresa.com")
+}
+
+@Test("Rótulo de canal não vira responsável da tarefa (S-08)")
+func rotuloDeCanalNaoEhResponsavel() {
+    for rotulo in ["interlocutor", "(interlocutor)", "Desconhecido", "(desconhecido)", "null", "N/A", "  "] {
+        #expect(TarefaDaConversa.responsavelSaneado(rotulo) == nil, "\(rotulo) não é uma pessoa")
+    }
+    // O canal do microfone é a própria pessoa.
+    #expect(TarefaDaConversa.responsavelSaneado("eu") == "Eu".localized)
+    #expect(TarefaDaConversa.responsavelSaneado("(eu)") == "Eu".localized)
+    // Nome de verdade passa como veio.
+    #expect(TarefaDaConversa.responsavelSaneado(" Ana Souza ") == "Ana Souza")
 }

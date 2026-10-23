@@ -12,7 +12,11 @@ public struct ProgressoDownload: Sendable, Equatable {
     }
 }
 
-public enum ErroDownload: Error, CustomStringConvertible {
+public enum ErroDownload: Error, CustomStringConvertible, LocalizedError {
+    /// `localizedDescription` é o que chega à tela e às notificações; sem
+    /// isto ela devolvia "The operation couldn't be completed (… error N)".
+    public var errorDescription: String? { description }
+
     case checksumInvalido(esperado: String, obtido: String)
     case respostaInvalida(Int)
     case tamanhoInvalido(esperado: Int64, obtido: Int64)
@@ -23,7 +27,8 @@ public enum ErroDownload: Error, CustomStringConvertible {
         switch self {
         case let .checksumInvalido(esperado, obtido):
             "O arquivo baixado não confere (esperado \(esperado.prefix(12))…, "
-                + "obtido \(obtido.prefix(12))…). Ele foi descartado."
+                + "obtido \(obtido.prefix(12))…). Ele foi descartado — tente baixar de novo; "
+                + "se o erro se repetir, atualize o Ōmu."
         case let .respostaInvalida(codigo):
             "O servidor respondeu \(codigo)."
         case let .tamanhoInvalido(esperado, obtido):
@@ -81,9 +86,22 @@ public actor DownloadDeModelos {
     ) async throws -> URL {
         let destino = pastaDeModelos.appendingPathComponent(peso.nomeArquivo)
         if FileManager.default.fileExists(atPath: destino.path) {
-            try validar(destino, peso: peso)
-            aoProgredir(ProgressoDownload(peso: peso, bytesRecebidos: peso.bytes, bytesTotais: peso.bytes))
-            return destino
+            do {
+                try validar(destino, peso: peso)
+                aoProgredir(ProgressoDownload(peso: peso, bytesRecebidos: peso.bytes, bytesTotais: peso.bytes))
+                return destino
+            } catch let erro as ErroDownload {
+                // Cópia truncada ou revisão antiga com o mesmo nome: deixá-la
+                // ali fazia "Baixar" falhar para sempre, até alguém apagar o
+                // arquivo à mão dentro do container. Sai o arquivo ruim e o
+                // download segue do começo.
+                switch erro {
+                case .checksumInvalido, .tamanhoInvalido:
+                    try FileManager.default.removeItem(at: destino)
+                default:
+                    throw erro
+                }
+            }
         }
 
         try FileManager.default.createDirectory(
@@ -115,7 +133,51 @@ public actor DownloadDeModelos {
             requisicao.setValue("bytes=\(jaBaixado)-", forHTTPHeaderField: "Range")
         }
 
-        let (bytes, resposta) = try await sessao.bytes(for: requisicao)
+        // O corpo chega em blocos, pelo delegate. `sessao.bytes(for:)` entrega
+        // um byte por iteração: nos 9 GB dos pesos eram ~9 bilhões de voltas
+        // de laço, com CPU alta e um teto de velocidade bem abaixo do que
+        // uma conexão rápida permite.
+        let receptor = ReceptorDeBlocos()
+        let sessaoDeBlocos = URLSession(
+            configuration: sessao.configuration, delegate: receptor, delegateQueue: nil
+        )
+        defer { sessaoDeBlocos.invalidateAndCancel() }
+        let tarefa = sessaoDeBlocos.dataTask(with: requisicao)
+        receptor.tarefa = tarefa
+
+        return try await withTaskCancellationHandler {
+            do {
+                return try await receber(
+                    de: receptor, tarefa: tarefa, peso: peso,
+                    jaBaixado: jaBaixado, parcial: parcial, destino: destino,
+                    aoProgredir: aoProgredir
+                )
+            } catch {
+                tarefa.cancel()
+                // O cancelamento da tarefa chega como `URLError(.cancelled)`;
+                // para quem chama, cancelar é cancelar.
+                if Task.isCancelled { throw CancellationError() }
+                throw error
+            }
+        } onCancel: {
+            tarefa.cancel()
+        }
+    }
+
+    private func receber(
+        de receptor: ReceptorDeBlocos,
+        tarefa: URLSessionDataTask,
+        peso: PesoDeModelo,
+        jaBaixado: Int64,
+        parcial: URL,
+        destino: URL,
+        aoProgredir: @escaping @Sendable (ProgressoDownload) -> Void
+    ) async throws -> URL {
+        var eventos = receptor.eventos.makeAsyncIterator()
+        tarefa.resume()
+        guard case let .resposta(resposta)? = try await eventos.next() else {
+            throw ErroDownload.respostaInvalida(-1)
+        }
         guard let http = resposta as? HTTPURLResponse else {
             throw ErroDownload.respostaInvalida(-1)
         }
@@ -144,24 +206,21 @@ public actor DownloadDeModelos {
         defer { try? escritor.close() }
 
         var recebidos = inicio
-        var buffer = Data()
-        buffer.reserveCapacity(4 * 1_048_576)
-
-        for try await byte in bytes {
-            buffer.append(byte)
-            if buffer.count >= 4 * 1_048_576 {
-                try escritor.write(contentsOf: buffer)
-                recebidos += Int64(buffer.count)
-                buffer.removeAll(keepingCapacity: true)
+        var desdeOUltimoAviso = 0
+        while let evento = try await eventos.next() {
+            guard case let .dados(bloco) = evento else { continue }
+            try escritor.write(contentsOf: bloco)
+            receptor.consumiu(bloco.count)
+            recebidos += Int64(bloco.count)
+            desdeOUltimoAviso += bloco.count
+            // O progresso continua saindo a cada ~4 MB, como antes.
+            if desdeOUltimoAviso >= 4 * 1_048_576 {
+                desdeOUltimoAviso = 0
                 aoProgredir(ProgressoDownload(
                     peso: peso, bytesRecebidos: recebidos, bytesTotais: peso.bytes
                 ))
                 try Task.checkCancellation()
             }
-        }
-        if !buffer.isEmpty {
-            try escritor.write(contentsOf: buffer)
-            recebidos += Int64(buffer.count)
         }
         try escritor.close()
 
@@ -218,5 +277,78 @@ public actor DownloadDeModelos {
               let tamanho = atributos[.size] as? Int64
         else { return 0 }
         return tamanho
+    }
+}
+
+/// Entrega a resposta e o corpo de um download em blocos, na ordem em que a
+/// rede os traz.
+///
+/// O fluxo não tem limite próprio, então quem controla a memória é este
+/// receptor: se o disco ficar para trás, a tarefa é suspensa até o
+/// consumidor avisar (`consumiu`) que escreveu o que já tinha recebido.
+private final class ReceptorDeBlocos: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    enum Evento: Sendable {
+        case resposta(URLResponse)
+        case dados(Data)
+    }
+
+    let eventos: AsyncThrowingStream<Evento, Error>
+    private let continuacao: AsyncThrowingStream<Evento, Error>.Continuation
+
+    private let trava = NSLock()
+    private var emEspera = 0
+    private var suspensa = false
+    private weak var tarefaGuardada: URLSessionDataTask?
+
+    var tarefa: URLSessionDataTask? {
+        get { trava.withLock { tarefaGuardada } }
+        set { trava.withLock { tarefaGuardada = newValue } }
+    }
+
+    private static let tetoEmEspera = 64 * 1_048_576
+    private static let pisoParaRetomar = 16 * 1_048_576
+
+    override init() {
+        (eventos, continuacao) = AsyncThrowingStream.makeStream(of: Evento.self)
+        super.init()
+    }
+
+    func consumiu(_ bytes: Int) {
+        let retomar: URLSessionDataTask? = trava.withLock {
+            emEspera -= bytes
+            guard suspensa, emEspera <= Self.pisoParaRetomar else { return nil }
+            suspensa = false
+            return tarefaGuardada
+        }
+        retomar?.resume()
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        continuacao.yield(.resposta(response))
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let suspender: Bool = trava.withLock {
+            emEspera += data.count
+            guard !suspensa, emEspera >= Self.tetoEmEspera else { return false }
+            suspensa = true
+            return true
+        }
+        if suspender { dataTask.suspend() }
+        continuacao.yield(.dados(data))
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        if let error {
+            continuacao.finish(throwing: error)
+        } else {
+            continuacao.finish()
+        }
     }
 }

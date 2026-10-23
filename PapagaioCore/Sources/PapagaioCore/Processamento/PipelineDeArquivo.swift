@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Leva uma gravação de áudio bruto até `Arquivo` salvo: transcreve, agrupa em
 /// trechos, resume e persiste.
@@ -12,6 +13,8 @@ import Foundation
 /// `speaker`, que não está no contrato do Passo 1, e a alternância de carga
 /// entre os dois modelos é responsabilidade de `MotoresLocais`.
 public struct PipelineDeArquivo: Sendable {
+    private static let logger = Logger(subsystem: "PapagaioCore", category: "Pipeline")
+
     public enum Fase: Sendable, Equatable {
         case transcrevendo
         case diarizando
@@ -99,9 +102,14 @@ public struct PipelineDeArquivo: Sendable {
 
     /// Processa e salva. Devolve o `Arquivo` atualizado.
     ///
-    /// Salva **duas vezes**: uma com a transcrição pronta e outra com o resumo.
-    /// O resumo é a parte lenta (dezenas de segundos), e perder a transcrição
-    /// porque o Qwen falhou seria jogar fora a parte cara que já deu certo.
+    /// Salva **a cada etapa concluída**: logo depois da transcrição (a parte
+    /// cara), depois das etapas decorativas que a alteraram e, por fim, com o
+    /// resumo. Fechar o app, um *jetsam* ou uma falha do Qwen no meio não
+    /// jogam fora o que já deu certo.
+    ///
+    /// Cada salvamento grava só o que o pipeline produz
+    /// (`salvarResultadoDoProcessamento`): título, data, duração e notas
+    /// editados pela pessoa durante o processamento ficam como estão.
     @discardableResult
     public func processar(
         _ arquivo: Arquivo,
@@ -125,11 +133,17 @@ public struct PipelineDeArquivo: Sendable {
             throw error
         }
         atualizado.engineTranscricao = idTranscricao
+        // Num reprocessamento, o resumo antigo não descreve a transcrição
+        // nova. Sai junto, para que uma falha adiante não deixe a conversa
+        // com um resumo que não corresponde ao texto.
+        atualizado.resumo = nil
+        atualizado.engineResumo = nil
         // A closure acima já terminou todos os canais; a diarização não usa Whisper.
         // Liberar aqui reduz a sobreposição com os modelos acústicos da próxima fase.
         await liberarTranscricao?()
 
         try Task.checkCancellation()
+        try await repositorio.salvarResultadoDoProcessamento(atualizado, partes: .tudo)
 
         // A diarização é decorativa e **nunca** decide o destino da gravação:
         // falha de modelo, de áudio ou de alinhamento não sobe — o `try?` por
@@ -137,6 +151,7 @@ public struct PipelineDeArquivo: Sendable {
         // desta feature. Transcrição e resumo não podem ser jogados fora por
         // causa da diarização.
         aoProgredir(.diarizando)
+        let antesDosFalantes = atualizado.trechos
         atualizado = await aplicarDiarizacao(atualizado)
 
         // Resolução contextual das falas que ficaram sem falante. Carrega o
@@ -147,10 +162,13 @@ public struct PipelineDeArquivo: Sendable {
         if let resolverFalantes {
             try Task.checkCancellation()
             aoProgredir(.resolvendoFalantes)
-            atualizado = (try? await resolverFalantes(atualizado)) ?? atualizado
+            atualizado.trechos = (try? await resolverFalantes(atualizado))?.trechos ?? atualizado.trechos
         }
 
         try Task.checkCancellation()
+        if atualizado.trechos != antesDosFalantes {
+            try await repositorio.salvarResultadoDoProcessamento(atualizado, partes: .transcricao)
+        }
 
         // A transcrição não é forçada ao idioma do sistema: o Whisper a
         // reconhece automaticamente. Só depois de detectar uma divergência é
@@ -163,16 +181,28 @@ public struct PipelineDeArquivo: Sendable {
         var traduziuComSucesso = false
         if deveTraduzir, let traduzir {
             aoProgredir(.traduzindo)
-            atualizado.trechos = try await traduzir(
-                atualizado.trechos,
-                traducaoAutomatica.idiomaPadrao
-            )
-            traduziuComSucesso = true
+            // Opcional como as outras etapas decorativas: a tradução falha com
+            // facilidade (contagem de itens diferente, JSON inválido) e a
+            // transcrição original, já salva, continua valendo.
+            do {
+                atualizado.trechos = try await traduzir(
+                    atualizado.trechos,
+                    traducaoAutomatica.idiomaPadrao
+                )
+                traduziuComSucesso = true
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                Self.logger.error(
+                    "Tradução falhou; a transcrição original foi mantida: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+            if traduziuComSucesso {
+                try Task.checkCancellation()
+                aoProgredir(.salvando)
+                try await repositorio.salvarResultadoDoProcessamento(atualizado, partes: .transcricao)
+            }
         }
-
-        try Task.checkCancellation()
-        aoProgredir(.salvando)
-        try await repositorio.salvar(atualizado)
 
         // Sem fala reconhecida não há o que resumir — e mandar transcrição
         // vazia para o Qwen produz um resumo inventado.
@@ -190,17 +220,59 @@ public struct PipelineDeArquivo: Sendable {
             )
             ? traducaoAutomatica.idiomaPadrao
             : DetectorDeIdiomaDaTranscricao.idiomaDeProcessamento(idiomaDetectado)
-        if let resumirNoIdioma {
-            atualizado.resumo = try await resumirNoIdioma(atualizado.trechos, idiomaDoResumo)
-        } else {
-            atualizado.resumo = try await resumir(atualizado.trechos)
-        }
+        atualizado.resumo = try await gerarResumo(de: atualizado.trechos, idioma: idiomaDoResumo)
         atualizado.engineResumo = idResumo
 
         try Task.checkCancellation()
         aoProgredir(.salvando)
-        try await repositorio.salvar(atualizado)
+        // Só o resumo: a transcrição pode ter sido corrigida à mão enquanto
+        // o Qwen trabalhava.
+        try await repositorio.salvarResultadoDoProcessamento(atualizado, partes: .resumo)
         return atualizado
+    }
+
+    /// Gera um resumo novo para a transcrição **que já existe**, sem passar
+    /// pelo Whisper nem pela diarização.
+    ///
+    /// É o que "Gerar novo resumo" precisa: refazer a transcrição ali
+    /// descartava trechos corrigidos à mão, falas fundidas e falantes
+    /// preservados. Sem trechos não há o que resumir e o arquivo volta igual.
+    @discardableResult
+    public func resumirExistente(
+        _ arquivo: Arquivo,
+        aoProgredir: @Sendable (Fase) -> Void = { _ in }
+    ) async throws -> Arquivo {
+        guard !arquivo.trechos.isEmpty else { return arquivo }
+        try Task.checkCancellation()
+
+        aoProgredir(.resumindo)
+        let idiomaDetectado = DetectorDeIdiomaDaTranscricao.detectar(em: arquivo.trechos)
+        let idioma: IdiomaDeProcessamento? =
+            traducaoAutomatica.habilitada && DetectorDeIdiomaDaTranscricao.correspondeAoIdiomaPadrao(
+                idiomaDetectado: idiomaDetectado,
+                configuracao: traducaoAutomatica
+            )
+            ? traducaoAutomatica.idiomaPadrao
+            : DetectorDeIdiomaDaTranscricao.idiomaDeProcessamento(idiomaDetectado)
+
+        var atualizado = arquivo
+        atualizado.resumo = try await gerarResumo(de: arquivo.trechos, idioma: idioma)
+        atualizado.engineResumo = idResumo
+
+        try Task.checkCancellation()
+        aoProgredir(.salvando)
+        try await repositorio.salvarResultadoDoProcessamento(atualizado, partes: .resumo)
+        return atualizado
+    }
+
+    private func gerarResumo(
+        de trechos: [Trecho],
+        idioma: IdiomaDeProcessamento?
+    ) async throws -> Resumo {
+        if let resumirNoIdioma {
+            return try await resumirNoIdioma(trechos, idioma)
+        }
+        return try await resumir(trechos)
     }
 
     /// Aplica **só** a diarização sobre uma transcrição já salva, sem
@@ -242,13 +314,32 @@ public struct PipelineDeArquivo: Sendable {
             // sistema — o eco do alto-falante vaza para o microfone e prejudica
             // a transcrição. Com fones, o eco não existe e o AEC é desnecessário.
             var urlMicrofone = canais.microfone!
+            var microfoneLimpo: URL?
+            // O PCM limpo é temporário (≈ 230 MB por hora): some assim que o
+            // microfone foi transcrito, em sucesso, erro ou cancelamento.
+            defer {
+                if let microfoneLimpo {
+                    try? FileManager.default.removeItem(at: microfoneLimpo)
+                }
+            }
             if arquivo.usavaFones == false, temSistema {
-                let pasta = armazenamento.resolver(relativo: arquivo.pastaRelativa)
-                urlMicrofone = try await aplicarAEC(
-                    microfoneURL: canais.microfone!,
-                    sistemaURL: canais.sistema!,
-                    pasta: pasta
-                )
+                // O cancelamento de eco é uma melhoria, não um requisito: um
+                // `sistema.caf` truncado ou ilegível não pode derrubar a
+                // transcrição do microfone, que é o canal principal.
+                do {
+                    let limpo = try await aplicarAEC(
+                        microfoneURL: canais.microfone!,
+                        sistemaURL: canais.sistema!
+                    )
+                    microfoneLimpo = limpo
+                    urlMicrofone = limpo
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    Self.logger.error(
+                        "Cancelamento de eco falhou; transcrevendo o microfone original: \(error.localizedDescription, privacy: .public)"
+                    )
+                }
             }
             let doMicrofone = try await transcrever(urlMicrofone, Speaker.eu)
             // O canal do sistema é acessório: se ele estiver corrompido — tap
@@ -259,7 +350,13 @@ public struct PipelineDeArquivo: Sendable {
             if temSistema {
                 doSistema = (try? await transcrever(canais.sistema!, Speaker.interlocutor)) ?? []
             }
-            return Segmentacao.mesclarCanais(microfone: doMicrofone, sistema: doSistema)
+            // Repetição em cascata é artefato do Whisper por canal: limpar
+            // antes de mesclar evita que a cópia de um canal "separe" as do
+            // outro e escape do filtro.
+            return Segmentacao.mesclarCanais(
+                microfone: FiltroDeRepeticao.remover(doMicrofone),
+                sistema: FiltroDeRepeticao.remover(doSistema)
+            )
         }
 
         let mixagem = Self.arquivoDeCanalUnico(em: armazenamento.resolver(relativo: arquivo.pastaRelativa))
@@ -269,7 +366,7 @@ public struct PipelineDeArquivo: Sendable {
         // Canal único (mixagem legada ou importado): não dá para saber quem
         // falou. `nil` é honesto; inventar "eu" atribuiria as falas do
         // interlocutor ao usuário.
-        return Segmentacao.agrupar(try await transcrever(mixagem, nil))
+        return Segmentacao.agrupar(FiltroDeRepeticao.remover(try await transcrever(mixagem, nil)))
     }
 
     /// Diariza os canais separados e casa os falantes acústicos com as palavras.
@@ -413,8 +510,7 @@ public struct PipelineDeArquivo: Sendable {
     /// temporário com o microfone limpo.
     private func aplicarAEC(
         microfoneURL: URL,
-        sistemaURL: URL,
-        pasta: URL
+        sistemaURL: URL
     ) async throws -> URL {
         let micAmostras = try await DecodificadorDeAudio.amostras(de: microfoneURL)
         let sisAmostras = try await DecodificadorDeAudio.amostras(de: sistemaURL)
@@ -422,10 +518,12 @@ public struct PipelineDeArquivo: Sendable {
         let cancelador = CanceladorDeEco(tamanhoBloco: 512, comprimentoFiltro: 4096)
         // Mantém a duração do microfone mesmo quando o tap termina antes.
         // O bloco final é completado só para o filtro; o padding não vai ao áudio.
-        let limpa = cancelador.processar(microfone: micAmostras, sistema: sisAmostras)
-        try Task.checkCancellation()
+        let limpa = try cancelador.processar(microfone: micAmostras, sistema: sisAmostras)
 
-        let urlLimpa = pasta.appendingPathComponent("microfone_aec.pcm")
+        // Fora da pasta da gravação: lá o arquivo ficava para sempre,
+        // aparecia no Finder e entrava nas exportações.
+        let urlLimpa = FileManager.default.temporaryDirectory
+            .appendingPathComponent("microfone_aec-\(UUID().uuidString).pcm")
         let dados = limpa.withUnsafeBytes { Data($0) }
         try dados.write(to: urlLimpa, options: .atomic)
         return urlLimpa

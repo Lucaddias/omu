@@ -190,3 +190,22 @@ struct TestesComModeloQwen {
         }
     }
 }
+
+@Test("Strings da gramática não aceitam caracteres de controle crus (S-01)")
+func gramaticaRecusaControleCruEmString() {
+    // Quebra de linha crua dentro de string é JSON inválido: o `JSONDecoder`
+    // recusava a saída e o resumo caía no reprompt. A classe tem de excluir
+    // 0x00–0x1F, como a `json.gbnf` de referência do llama.cpp.
+    let classe = #"[^"\\\x7F\x00-\x1F]"#
+    #expect(GramaticaDoResumo.gbnf.contains(classe))
+    #expect(GramaticaDaTraducao.gbnf(quantidade: 2).contains(classe))
+}
+
+@Test("Falhas do resumo dizem o que aconteceu, não 'gramática recusada' (S-02, S-05)")
+func errosDoResumoTemMensagemPropria() {
+    #expect(ErroDeResumo.transcricaoVazia.localizedDescription.contains("transcrição"))
+    let incompleto = ErroDeResumo.resumoIncompleto.localizedDescription
+    #expect(incompleto.contains("resumo"))
+    #expect(!incompleto.lowercased().contains("gbnf"))
+    #expect(!incompleto.contains("operation couldn"))
+}

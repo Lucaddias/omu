@@ -202,7 +202,7 @@ struct BarraDeAudioDaConversa: View {
 
             Menu {
                 ForEach([0.75, 1, 1.25, 1.5, 2], id: \.self) { velocidade in
-                    Button(String(format: "%.2gx", velocidade)) {
+                    Button(Self.rotuloDeVelocidade(velocidade)) {
                         reprodutor.definirVelocidade(Float(velocidade))
                     }
                 }
@@ -279,14 +279,13 @@ struct BarraDeAudioDaConversa: View {
     }
 
     private var textoDaVelocidade: String {
-        String(format: "%.1fx", reprodutor.velocidade)
+        Self.rotuloDeVelocidade(Double(reprodutor.velocidade))
     }
 
-    private func alternarVelocidade() {
-        let opcoes: [Float] = [0.75, 1, 1.25, 1.5, 2]
-        let atual = reprodutor.velocidade
-        let proxima = opcoes.first { $0 > atual + 0.01 } ?? opcoes[0]
-        reprodutor.velocidade = proxima
+    /// `%g` mostra o valor como ele é: os formatos anteriores arredondavam
+    /// 1,25 para "1.2x" e 0,75 para "0.8x".
+    static func rotuloDeVelocidade(_ velocidade: Double) -> String {
+        String(format: "%gx", velocidade)
     }
 }
 

@@ -1103,7 +1103,7 @@ CartaoReuniaoPendente(
                 if !emCaptura && (filtroSelecionado != .pastas || pastaSelecionada != nil) {
                     CartaoNovaConversa(
                         gravando: gravador.gravando,
-                        bloqueado: gravador.estado == .processando,
+                        bloqueado: gravador.estado == .processando || gravador.importando,
                         prontoParaEntrada: biblioteca != nil,
                         aoAlternarGravacao: aoAlternarGravacao,
                         aoImportar: { mostrandoImportador = true },
@@ -1283,7 +1283,7 @@ CartaoReuniaoPendente(
             fichaPendente: biblioteca.fichaPendente(arquivo.id),
             seloDeConclusaoRevelado: biblioteca.seloDeConclusaoRevelado(arquivo.id),
             aoAbrirFicha: { aoAbrirFicha(arquivo) },
-            aoReprocessar: { biblioteca.enfileirarProcessamento(arquivo) },
+            aoReprocessar: { biblioteca.reprocessar(arquivo) },
             aoDiarizar: {
                 Task { await biblioteca.diarizarTranscricao(arquivo) }
             },

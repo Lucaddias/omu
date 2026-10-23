@@ -16,6 +16,7 @@ struct ConfiguracoesView: View {
     /// Mesma chave lida pelo `PapagaioApp`, que é quem abre e fecha o painel.
     @AppStorage("painelFlutuanteDuranteGravacao") private var painelFlutuante = true
     @AppStorage("mostrarPorcentagemConfianca") private var mostrarPorcentagemConfianca = true
+    @State private var usaContatosECalendario = PromptDeEntidades.habilitado()
     /// Reuniões marcadas para importar, pelos ids do Granola.
     @State private var selecionadas: Set<String> = []
 
@@ -135,6 +136,24 @@ struct ConfiguracoesView: View {
         }
     }
 
+    /// Ligar pede o acesso ao macOS na hora, com a explicação ao lado; se a
+    /// pessoa negar, a chave volta a ficar desligada.
+    private var nomesDeContatosECalendario: Binding<Bool> {
+        Binding(
+            get: { usaContatosECalendario },
+            set: { ligar in
+                usaContatosECalendario = ligar
+                UserDefaults.standard.set(ligar, forKey: PromptDeEntidades.chaveDaPreferencia)
+                guard ligar else { return }
+                Task { @MainActor in
+                    let autorizado = await PromptDeEntidades.pedirAcesso()
+                    usaContatosECalendario = autorizado
+                    UserDefaults.standard.set(autorizado, forKey: PromptDeEntidades.chaveDaPreferencia)
+                }
+            }
+        )
+    }
+
     private var secaoDeTranscricao: some View {
         VStack(alignment: .leading, spacing: PapagaioTema.Espaco.largo) {
             Label("Preferências".localized, systemImage: "text.quote")
@@ -157,6 +176,9 @@ struct ConfiguracoesView: View {
                 }
             }
             .toggleStyle(.switch)
+            .accessibilityHint(
+                "Quando ativado, novos áudios não entram na fila até você selecionar Transcrever.".localized
+            )
 
             Toggle(isOn: $painelFlutuante) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
@@ -189,9 +211,6 @@ struct ConfiguracoesView: View {
             }
             .toggleStyle(.switch)
             .tint(PapagaioTema.preenchimentoPrimario)
-            .accessibilityHint(
-                "Quando ativado, novos áudios não entram na fila até você selecionar Transcrever.".localized
-            )
 
             Toggle(isOn: $mostrarPorcentagemConfianca) {
                 VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
@@ -201,6 +220,22 @@ struct ConfiguracoesView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text("Quando desligado, as palavras continuam destacadas por cor, mas o percentual não aparece.".localized)
+                        .font(PapagaioTema.Tipo.apoio)
+                        .foregroundStyle(PapagaioTema.textoSecundario)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(PapagaioTema.preenchimentoPrimario)
+
+            Toggle(isOn: nomesDeContatosECalendario) {
+                VStack(alignment: .leading, spacing: PapagaioTema.Espaco.minimo) {
+                    Text("Usar Contatos e Calendário para reconhecer nomes".localized)
+                        .font(PapagaioTema.Tipo.corpo.weight(.semibold))
+                        .foregroundStyle(PapagaioTema.texto)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("O Ōmu lê os participantes do evento no horário da gravação e completa os nomes com seus contatos, para acertar a grafia na transcrição. Esses nomes não saem do Mac.".localized)
                         .font(PapagaioTema.Tipo.apoio)
                         .foregroundStyle(PapagaioTema.textoSecundario)
                         .fixedSize(horizontal: false, vertical: true)
@@ -502,7 +537,8 @@ struct ConfiguracoesView: View {
                 }
 
                 Button {
-                    Task { await googleCalendar.conectar(biblioteca: biblioteca!) }
+                    guard let biblioteca else { return }
+                    Task { await googleCalendar.conectar(biblioteca: biblioteca) }
                 } label: {
                     Label("Conectar conta Google…".localized, systemImage: "person.badge.plus")
                 }
@@ -527,7 +563,8 @@ struct ConfiguracoesView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Button {
-                    Task { await googleCalendar.conectar(biblioteca: biblioteca!) }
+                    guard let biblioteca else { return }
+                    Task { await googleCalendar.conectar(biblioteca: biblioteca) }
                 } label: {
                     Label("Tentar novamente".localized, systemImage: "arrow.clockwise")
                 }

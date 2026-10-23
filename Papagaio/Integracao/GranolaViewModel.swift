@@ -85,7 +85,9 @@ final class GranolaViewModel {
             let conta = try await fonte.conta()
             self.fonte = fonte
             estado = .conectado(conta)
-            registro.info("Conectado: \(conta.email, privacy: .public)")
+            // Sem o e-mail: no log unificado ele ficaria legível no Console
+            // e em qualquer sysdiagnose enviado a terceiros.
+            registro.info("Conta do Granola conectada")
             await carregarReunioes()
         } catch {
             self.sessao = nil

@@ -192,11 +192,32 @@ struct TransporteGoogleCalendarTests {
         #expect(fim.timeIntervalSince(inicio) == 24 * 3_600)
     }
 
-    @Test("Data inválida produz erro observável em vez de usar o horário atual")
-    func dataInvalida() async throws {
+    @Test("Evento com data inválida fica de fora sem esconder os outros (IN-05)")
+    func dataInvalidaNaoDerrubaALista() async throws {
         let transporte = TransporteCalendarFake(respostas: [
             """
-            {"items":[{"id":"quebrada","eventType":"default","start":{"dateTime":"nao-e-data"},"attendees":[{"email":"ana@example.com"}]}]}
+            {"items":[
+              {"id":"quebrada","eventType":"default","start":{"dateTime":"nao-e-data"},"attendees":[{"email":"ana@example.com"}]},
+              {"id":"boa","summary":"Boa","eventType":"default","start":{"dateTime":"2026-08-27T13:00:00Z"},"attendees":[{"email":"bia@example.com"}]}
+            ]}
+            """,
+        ])
+        let fonte = FonteGoogleCalendarAPI(
+            transportar: { pedido in try await transporte.enviar(pedido) },
+            obterToken: { _ in "token-fake" }
+        )
+
+        let eventos = try await fonte.listarEventos()
+
+        // A data ruim nunca vira "agora": o evento some da lista, só ele.
+        #expect(eventos.map(\.id) == ["boa"])
+    }
+
+    @Test("Data inválida no detalhe de um evento continua sendo erro observável")
+    func dataInvalidaNoDetalhe() async throws {
+        let transporte = TransporteCalendarFake(respostas: [
+            """
+            {"id":"quebrada","eventType":"default","start":{"dateTime":"nao-e-data"}}
             """,
         ])
         let fonte = FonteGoogleCalendarAPI(
@@ -205,7 +226,7 @@ struct TransporteGoogleCalendarTests {
         )
 
         do {
-            _ = try await fonte.listarEventos()
+            _ = try await fonte.obterEventoDetalhado(id: "quebrada")
             Issue.record("A API aceitou uma data inválida")
         } catch let erro as FonteGoogleCalendarErro {
             guard case .dataInvalida("quebrada") = erro else {
@@ -213,6 +234,42 @@ struct TransporteGoogleCalendarTests {
                 return
             }
         }
+    }
+
+    @Test("401 renova o token à força e repete o pedido uma vez (IN-03)")
+    func naoAutorizadoRenovaERepete() async throws {
+        let transporte = TransporteCalendarFake(
+            respostas: ["{}", #"{"email":"ana@example.com"}"#],
+            status: [401, 200]
+        )
+        let pedidos = PedidosDeToken()
+        let fonte = FonteGoogleCalendarAPI(
+            transportar: { pedido in try await transporte.enviar(pedido) },
+            obterToken: { forcar in
+                await pedidos.registrar(forcar)
+                return forcar ? "token-novo" : "token-velho"
+            }
+        )
+
+        let conta = try await fonte.conta()
+
+        #expect(conta.email == "ana@example.com")
+        #expect(await pedidos.todos == [false, true])
+        #expect(await transporte.autorizacoesRecebidas() == ["Bearer token-velho", "Bearer token-novo"])
+    }
+
+    @Test("Um segundo 401 não entra em laço")
+    func naoAutorizadoDuasVezesFalha() async throws {
+        let transporte = TransporteCalendarFake(respostas: ["{}", "{}"], status: [401, 401])
+        let fonte = FonteGoogleCalendarAPI(
+            transportar: { pedido in try await transporte.enviar(pedido) },
+            obterToken: { _ in "token" }
+        )
+
+        await #expect(throws: FonteGoogleCalendarErro.self) {
+            _ = try await fonte.conta()
+        }
+        #expect(await transporte.urlsRecebidas().count == 2)
     }
 }
 
@@ -230,13 +287,21 @@ private func eventoCalendar(
     )
 }
 
+private actor PedidosDeToken {
+    private(set) var todos: [Bool] = []
+    func registrar(_ forcar: Bool) { todos.append(forcar) }
+}
+
 private actor TransporteCalendarFake {
     private let respostas: [Data]
+    private let status: [Int]
     private var indice = 0
     private var urls: [URL] = []
+    private var autorizacoes: [String] = []
 
-    init(respostas: [String]) {
+    init(respostas: [String], status: [Int] = []) {
         self.respostas = respostas.map { Data($0.utf8) }
+        self.status = status
     }
 
     func enviar(_ pedido: URLRequest) throws -> (Data, URLResponse) {
@@ -245,13 +310,56 @@ private actor TransporteCalendarFake {
             throw URLError(.badServerResponse)
         }
         urls.append(url)
+        autorizacoes.append(pedido.value(forHTTPHeaderField: "Authorization") ?? "")
         let dados = respostas[indice]
+        let codigo = indice < status.count ? status[indice] : 200
         indice += 1
         let resposta = try #require(
-            HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+            HTTPURLResponse(url: url, statusCode: codigo, httpVersion: nil, headerFields: nil)
         )
         return (dados, resposta)
     }
 
     func urlsRecebidas() -> [URL] { urls }
+    func autorizacoesRecebidas() -> [String] { autorizacoes }
+}
+
+// MARK: - Granola
+
+@Test("Transcrição do Granola é dividida por fala, com falante e ordem (IN-04)")
+func transcricaoDoGranolaViraFalas() throws {
+    let texto = """
+    Me: Bom dia, vamos começar pela agenda. Them: Claro, pode ser.
+    Me: Primeiro ponto é o prazo.
+    Them: Sexta-feira funciona para todos?
+    """
+
+    let segmentos = FonteGranola.segmentosDeTranscricao(texto)
+
+    #expect(segmentos.map(\.falante) == [Speaker.eu, Speaker.interlocutor, Speaker.eu, Speaker.interlocutor])
+    #expect(segmentos.map(\.texto) == [
+        "Bom dia, vamos começar pela agenda.",
+        "Claro, pode ser.",
+        "Primeiro ponto é o prazo.",
+        "Sexta-feira funciona para todos?",
+    ])
+    // Tempos estimados, crescentes e sem sobreposição: é o que mantém a
+    // ordem ao recarregar e dá duração à conversa.
+    let inicios = segmentos.compactMap(\.inicio)
+    #expect(inicios == inicios.sorted())
+    #expect(Set(inicios).count == segmentos.count)
+    for (anterior, seguinte) in zip(segmentos, segmentos.dropFirst()) {
+        #expect(try #require(anterior.fim) <= (try #require(seguinte.inicio)))
+    }
+    #expect(try #require(segmentos.last?.fim) > 0)
+}
+
+@Test("Transcrição do Granola sem rótulos continua sendo uma fala só, sem falante")
+func transcricaoDoGranolaSemRotulos() {
+    let segmentos = FonteGranola.segmentosDeTranscricao("Apenas um texto corrido, sem viradas.")
+
+    #expect(segmentos.count == 1)
+    #expect(segmentos.first?.falante == nil)
+    #expect(segmentos.first?.texto == "Apenas um texto corrido, sem viradas.")
+    #expect(FonteGranola.segmentosDeTranscricao("   ").isEmpty)
 }

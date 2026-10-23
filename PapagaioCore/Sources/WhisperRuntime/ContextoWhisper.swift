@@ -53,7 +53,11 @@ public struct SegmentoWhisper: Sendable, Equatable {
     }
 }
 
-public enum ErroWhisper: Error, CustomStringConvertible {
+public enum ErroWhisper: Error, CustomStringConvertible, LocalizedError {
+    /// `localizedDescription` é o que chega à tela e às notificações; sem
+    /// isto ela devolvia "The operation couldn't be completed (… error N)".
+    public var errorDescription: String? { description }
+
     case modeloNaoCarregou(String)
     case falhaNaTranscricao(Int32)
     case audioVazio
@@ -177,6 +181,22 @@ public actor ContextoWhisper {
 #endif
     }
 
+    /// O idioma que o Whisper usou na última chamada — o detectado, quando
+    /// `idioma` veio `nil`.
+    public private(set) var idiomaDaUltimaTranscricao: String?
+
+    /// Transcreve e devolve junto o idioma usado. Uma chamada só, para que
+    /// outra transcrição no mesmo ator não troque o valor entre a inferência
+    /// e a leitura.
+    public func transcreverInformandoIdioma(
+        amostras: [Float],
+        idioma: String? = nil,
+        initialPrompt: String? = nil
+    ) throws -> (segmentos: [SegmentoWhisper], idioma: String?) {
+        let segmentos = try transcrever(amostras: amostras, idioma: idioma, initialPrompt: initialPrompt)
+        return (segmentos, idiomaDaUltimaTranscricao)
+    }
+
     /// Transcreve amostras PCM Float32 mono 16 kHz.
     ///
     /// - Parameter idioma: código ISO-639-1 opcional. `nil` usa a detecção
@@ -225,6 +245,11 @@ public actor ContextoWhisper {
             }
         }
         guard codigo == 0 else { throw ErroWhisper.falhaNaTranscricao(codigo) }
+
+        let idDoIdioma = whisper_full_lang_id(contexto)
+        idiomaDaUltimaTranscricao = idDoIdioma >= 0
+            ? whisper_lang_str(idDoIdioma).map { String(cString: $0) }
+            : nil
 
         let total = whisper_full_n_segments(contexto)
         var segmentos: [SegmentoWhisper] = []

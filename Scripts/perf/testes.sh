@@ -7,7 +7,7 @@ OMU_PERF_DIR="$HOME/OmuPerf"
 STATE_DIR="$OMU_PERF_DIR/estado"
 RUN_ID="$(date '+%Y%m%dT%H%M%S')-$$"
 RUNS_DIR="$OMU_PERF_DIR/runs"
-mkdir -p "$RUNS_DIR" "$OMU_PERF_DIR/build"
+mkdir -p "$RUNS_DIR" "$OMU_PERF_DIR/build" "$STATE_DIR"
 [[ ! -d "$STATE_DIR/measurement.lock" ]] || { echo "Medição ativa; não iniciar testes." >&2; exit 3; }
 mkdir "$STATE_DIR/infra.lock" 2>/dev/null || { echo "Outra build/teste/geração está ativa." >&2; exit 3; }
 CORE_LOG="$RUNS_DIR/testes-core-$RUN_ID.log"
