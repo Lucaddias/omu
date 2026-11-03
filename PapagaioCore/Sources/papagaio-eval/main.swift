@@ -5,8 +5,8 @@ import PapagaioCore
 import WhisperRuntime
 
 // Passo 1: a CLI existe para provar que `PapagaioCore` é importável sem
-// arrastar SwiftUI. O harness de medição real (WER, acurácia de entidades)
-// chega no Passo 6.
+// arrastar SwiftUI. O harness de medição de qualidade (`run`) mora em
+// `Avaliacao.swift`.
 
 let versao = "0.2.0-bench"
 
@@ -30,7 +30,10 @@ func uso() {
                                 [--somente-caso aec.processarBlocos]
                                 [--modelos <dir>] [--saida <json>] [--comparar <baseline>]
     \(linhaSeed)
-      papagaio-eval run          harness de medição (qualidade/WER) — reserva
+      papagaio-eval run          qualidade do pipeline: WER, DER e resumo
+                                [--dados <dir>] [--modelos <dir>] [--saida <json>]
+                                [--limite N] [--somente transcricao,falantes,resumo]
+                                dados: Scripts/avaliacao/preparar-dados.py
       papagaio-eval resolver     diagnóstico da atribuição de falantes:
                                 <audio> (ou --fixture <json>), --modelos <dir>,
                                 --pasta <dir de diarização>, --sem-modelo
@@ -733,10 +736,42 @@ case "seed-library":
 #endif
 
 case "run":
-    FileHandle.standardError.write(
-        Data("papagaio-eval run: qualidade/WER ainda no Passo 6 — use `bench` para performance.\n".utf8)
+    let raizDeAvaliacao = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("OmuPerf")
+    let carimbo = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+    var opcoesDeAvaliacao = Avaliacao.Opcoes(
+        dados: raizDeAvaliacao.appendingPathComponent("fixtures/avaliacao"),
+        modelos: raizDeAvaliacao.appendingPathComponent("fixtures/modelos"),
+        saida: raizDeAvaliacao.appendingPathComponent("runs/avaliacao-\(carimbo).json")
     )
-    exit(2)
+    var i = 1
+    while i < argumentos.count {
+        switch argumentos[i] {
+        case "--dados" where i + 1 < argumentos.count:
+            opcoesDeAvaliacao.dados = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--modelos" where i + 1 < argumentos.count:
+            opcoesDeAvaliacao.modelos = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--saida" where i + 1 < argumentos.count:
+            opcoesDeAvaliacao.saida = URL(fileURLWithPath: argumentos[i + 1]); i += 2
+        case "--limite" where i + 1 < argumentos.count:
+            opcoesDeAvaliacao.limite = Int(argumentos[i + 1]); i += 2
+        case "--somente" where i + 1 < argumentos.count:
+            let nomes = argumentos[i + 1].split(separator: ",").map(String.init)
+            let suites = nomes.compactMap(Avaliacao.Suite.init(rawValue:))
+            guard suites.count == nomes.count else {
+                FileHandle.standardError.write(Data("suítes válidas: transcricao, falantes, resumo\n".utf8))
+                exit(2)
+            }
+            opcoesDeAvaliacao.suites = Set(suites)
+            i += 2
+        default:
+            FileHandle.standardError.write(Data("argumento desconhecido: \(argumentos[i])\n".utf8))
+            exit(2)
+        }
+    }
+    let relatorio = try await Avaliacao.rodar(opcoesDeAvaliacao)
+    Avaliacao.imprimir(relatorio)
+    try Avaliacao.gravar(relatorio, em: opcoesDeAvaliacao.saida)
+    print("relatório: \(opcoesDeAvaliacao.saida.path)")
 
 default:
     uso()
