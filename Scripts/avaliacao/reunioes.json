@@ -1,0 +1,89 @@
+{
+  "observacao": "Reuniões fictícias para a suíte de resumo do papagaio-eval run. Os fatos listam o que um bom resumo precisa preservar (todos os grupos de termos têm de aparecer; dentro de um grupo, basta uma alternativa). Todos os turnos usam a mesma voz: a suíte mede o resumo, e as vozes Eloquence do macOS (Eddy, Flo, Reed...) saem robóticas a ponto de o Whisper trocar os nomes das pessoas, o que contaminaria a medida.",
+  "voz": "Luciana",
+  "reunioes": [
+    {
+      "id": "sprint-app-delivery",
+      "turnos": [
+        ["Ana", "Bom dia, pessoal. Vamos fechar as prioridades da sprint, que começa hoje e vai até o dia quinze."],
+        ["Bruno", "O mais urgente é o bug do checkout no Android. Desde a última versão, uns dois por cento dos pedidos travam na tela de pagamento."],
+        ["Ana", "Então esse é o primeiro item. Bruno, você consegue corrigir até quarta-feira?"],
+        ["Bruno", "Consigo. Eu já sei onde está o problema, é a validação do cartão salvo. Na quarta eu mando para teste."],
+        ["Carla", "Do meu lado, o filtro de restaurantes por tempo de entrega está quase pronto no design. Eu entrego as telas finais na sexta-feira."],
+        ["Ana", "Perfeito. E o modo escuro? Ele estava previsto para esta sprint."],
+        ["Carla", "Eu sugiro adiar o modo escuro para a próxima sprint. Não dá para fazer direito junto com o filtro."],
+        ["Bruno", "Concordo. Melhor adiar do que entregar pela metade."],
+        ["Ana", "Combinado, o modo escuro fica para a próxima sprint. A versão quatro ponto dois sai no dia quinze com o checkout corrigido e o filtro novo."],
+        ["Carla", "Só uma coisa: eu preciso que alguém revise os textos do filtro antes de sexta."],
+        ["Ana", "Eu reviso os textos na quinta. Mais alguma coisa? Não? Então obrigada, pessoal."]
+      ],
+      "fatos": [
+        { "descricao": "Bruno corrige o bug do checkout no Android até quarta", "termos": [["bruno"], ["checkout"], ["quarta", "quarta-feira"]] },
+        { "descricao": "Carla entrega o design do filtro de restaurantes na sexta", "termos": [["carla"], ["filtro"], ["sexta", "sexta-feira"]] },
+        { "descricao": "O modo escuro foi adiado para a próxima sprint", "termos": [["modo escuro", "tema escuro", "dark mode"], ["adiado", "adiada", "adiar", "adiamento", "proxima sprint"]] },
+        { "descricao": "A versão 4.2 sai no dia 15", "termos": [["4 2", "quatro ponto dois"], ["15", "quinze"]] },
+        { "descricao": "Ana revisa os textos do filtro na quinta", "termos": [["ana"], ["textos", "texto"], ["quinta", "quinta-feira"]] }
+      ]
+    },
+    {
+      "id": "orcamento-marketing",
+      "turnos": [
+        ["Diego", "Elisa, a diretoria aprovou cento e vinte mil reais para o marketing do primeiro trimestre."],
+        ["Elisa", "Ótimo. Minha proposta é colocar quarenta por cento em mídia paga, porque é o canal que trouxe mais pedidos no ano passado."],
+        ["Diego", "Faz sentido. E os influenciadores? No último trimestre eles custaram caro e quase não trouxeram cadastro."],
+        ["Elisa", "Eu cortaria os influenciadores este trimestre. O retorno foi muito baixo. Esse dinheiro vai para a campanha do Dia das Mães."],
+        ["Diego", "A campanha do Dia das Mães começa quando?"],
+        ["Elisa", "No começo de maio. Mas a produção das peças precisa começar em março, senão não dá tempo."],
+        ["Diego", "Então vamos fazer assim: você monta o plano detalhado e apresenta para a diretoria na segunda-feira."],
+        ["Elisa", "Fechado. Eu apresento na segunda com a divisão do orçamento por canal."],
+        ["Diego", "E eu falo com o jurídico sobre o contrato da agência ainda esta semana."]
+      ],
+      "fatos": [
+        { "descricao": "O orçamento do trimestre é de 120 mil reais", "termos": [["120 mil", "120 000", "cento e vinte mil"]] },
+        { "descricao": "40% do orçamento vai para mídia paga", "termos": [["40", "quarenta"], ["midia paga", "anuncios pagos", "midia"]] },
+        { "descricao": "Os influenciadores foram cortados", "termos": [["influenciadores", "influenciador", "influencers"], ["cortar", "cortados", "corte", "cortaria", "eliminar", "eliminados", "suspensos", "retirar"]] },
+        { "descricao": "Campanha do Dia das Mães em maio, produção em março", "termos": [["dia das maes"], ["maio", "marco"]] },
+        { "descricao": "Elisa apresenta o plano à diretoria na segunda", "termos": [["elisa"], ["diretoria"], ["segunda", "segunda-feira"]] }
+      ]
+    },
+    {
+      "id": "postmortem-pagamentos",
+      "turnos": [
+        ["Fernanda", "Vamos repassar o incidente de sábado à noite. Os pagamentos ficaram fora do ar por quarenta minutos, das oito e dez às oito e cinquenta."],
+        ["Gustavo", "A causa foi o certificado do gateway de pagamento, que expirou. Ninguém recebeu alerta, então só descobrimos pelas reclamações."],
+        ["Helena", "Nesse intervalo, mais de três mil pedidos falharam. Muitos restaurantes ligaram para o suporte."],
+        ["Fernanda", "Primeira ação: Gustavo, você cria um alerta que avisa trinta dias antes de qualquer certificado expirar."],
+        ["Gustavo", "Pode deixar. Eu configuro o alerta até amanhã e coloco todos os certificados no inventário."],
+        ["Fernanda", "Segunda ação: eu atualizo o runbook de incidentes de pagamento até quinta-feira, com o passo a passo da renovação."],
+        ["Helena", "E eu preparo um comunicado para os restaurantes afetados, explicando o que aconteceu e oferecendo um crédito na taxa."],
+        ["Fernanda", "Ótimo. Helena, manda o comunicado para mim revisar antes de enviar."],
+        ["Helena", "Mando hoje à tarde."]
+      ],
+      "fatos": [
+        { "descricao": "Os pagamentos ficaram fora do ar por 40 minutos", "termos": [["40", "quarenta"], ["minutos", "min"]] },
+        { "descricao": "A causa foi um certificado expirado", "termos": [["certificado"], ["expirou", "expirado", "expiracao", "vencido", "venceu"]] },
+        { "descricao": "Gustavo cria um alerta 30 dias antes da expiração", "termos": [["gustavo"], ["alerta"], ["30", "trinta"]] },
+        { "descricao": "Fernanda atualiza o runbook até quinta", "termos": [["fernanda"], ["runbook"], ["quinta", "quinta-feira"]] },
+        { "descricao": "Helena prepara um comunicado para os restaurantes", "termos": [["helena"], ["comunicado"], ["restaurantes", "restaurante"]] }
+      ]
+    },
+    {
+      "id": "expansao-restaurantes",
+      "turnos": [
+        ["Igor", "Júlia, a meta para o Rio de Janeiro é cadastrar quinhentos restaurantes novos até o fim de março."],
+        ["Julia", "É uma meta alta. Hoje o cadastro de um restaurante leva em média dez dias, por causa da conferência dos documentos."],
+        ["Igor", "Se a gente reduzir esse prazo para cinco dias, a meta fica possível?"],
+        ["Julia", "Fica. A ideia é fazer a conferência dos documentos de forma automática e só mandar para revisão manual quando der erro."],
+        ["Igor", "Então vamos começar com um piloto na zona norte. Você lidera o piloto?"],
+        ["Julia", "Lidero. Eu começo pela Tijuca na semana que vem, com vinte restaurantes."],
+        ["Igor", "Perfeito. E eu mando um relatório com os números do piloto toda segunda-feira para a gerência."]
+      ],
+      "fatos": [
+        { "descricao": "Meta de 500 restaurantes novos no Rio até março", "termos": [["500", "quinhentos"], ["restaurantes"], ["marco"]] },
+        { "descricao": "Reduzir o cadastro de 10 para 5 dias", "termos": [["10", "dez"], ["5", "cinco"], ["dias"]] },
+        { "descricao": "Júlia lidera um piloto na zona norte, começando pela Tijuca", "termos": [["julia"], ["piloto"], ["zona norte", "tijuca"]] },
+        { "descricao": "Igor manda relatório toda segunda", "termos": [["igor"], ["relatorio"], ["segunda", "segunda-feira", "semanal", "semanalmente"]] }
+      ]
+    }
+  ]
+}

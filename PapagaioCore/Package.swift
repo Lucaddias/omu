@@ -87,9 +87,21 @@ let package = Package(
             ],
             swiftSettings: swiftSettings
         ),
+        // Métricas de qualidade (WER, CER, DER, cobertura de fatos) usadas pelo
+        // `papagaio-eval run`. Swift puro e sem runtime: é o que permite
+        // testá-las sem modelos e sem o app.
+        .target(
+            name: "MetricasDeAvaliacao",
+            swiftSettings: swiftSettings
+        ),
         .executableTarget(
             name: "papagaio-eval",
-            dependencies: ["PapagaioCore", "WhisperRuntime", "LlamaRuntime"],
+            dependencies: ["PapagaioCore", "WhisperRuntime", "LlamaRuntime", "MetricasDeAvaliacao"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "MetricasDeAvaliacaoTests",
+            dependencies: ["MetricasDeAvaliacao"],
             swiftSettings: swiftSettings
         ),
         .testTarget(

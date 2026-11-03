@@ -1,0 +1,2454 @@
+{
+  "data" : "2026-11-03T16:29:44Z",
+  "falantes" : {
+    "diarizacao" : {
+      "confusao" : 2.6300000000000017,
+      "falaDeReferencia" : 1160.2600000002171,
+      "falaPerdida" : 130.08000000000064,
+      "falantesNaHipotese" : 25,
+      "falantesNaReferencia" : 25,
+      "falsoAlarme" : 0
+    },
+    "itens" : [
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 120.8100000000249,
+          "falaPerdida" : 8.119999999999871,
+          "falantesNaHipotese" : 2,
+          "falantesNaReferencia" : 2,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 128.887,
+        "id" : "conversa-01",
+        "porPalavra" : {
+          "atribuidas" : 290,
+          "corretas" : 290,
+          "total" : 295
+        },
+        "segundosDeDiarizacao" : 0.757306916
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 111.87000000002033,
+          "falaPerdida" : 8.829999999999856,
+          "falantesNaHipotese" : 3,
+          "falantesNaReferencia" : 3,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 119.749,
+        "id" : "conversa-02",
+        "porPalavra" : {
+          "atribuidas" : 246,
+          "corretas" : 246,
+          "total" : 249
+        },
+        "segundosDeDiarizacao" : 0.945485167
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 105.45000000001704,
+          "falaPerdida" : 26.660000000001368,
+          "falantesNaHipotese" : 2,
+          "falantesNaReferencia" : 2,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 113.675,
+        "id" : "conversa-03",
+        "porPalavra" : {
+          "atribuidas" : 245,
+          "corretas" : 244,
+          "total" : 255
+        },
+        "segundosDeDiarizacao" : 0.589644
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0.9200000000000006,
+          "falaDeReferencia" : 107.63000000001816,
+          "falaPerdida" : 13.659999999999753,
+          "falantesNaHipotese" : 3,
+          "falantesNaReferencia" : 3,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 114.968,
+        "id" : "conversa-04",
+        "porPalavra" : {
+          "atribuidas" : 239,
+          "corretas" : 235,
+          "total" : 242
+        },
+        "segundosDeDiarizacao" : 0.601857625
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 126.20000000002766,
+          "falaPerdida" : 4.009999999999959,
+          "falantesNaHipotese" : 2,
+          "falantesNaReferencia" : 2,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 133.415,
+        "id" : "conversa-05",
+        "porPalavra" : {
+          "atribuidas" : 334,
+          "corretas" : 334,
+          "total" : 338
+        },
+        "segundosDeDiarizacao" : 0.660821541
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 114.98000000002192,
+          "falaPerdida" : 21.090000000000497,
+          "falantesNaHipotese" : 3,
+          "falantesNaReferencia" : 3,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 123.456,
+        "id" : "conversa-06",
+        "porPalavra" : {
+          "atribuidas" : 236,
+          "corretas" : 235,
+          "total" : 246
+        },
+        "segundosDeDiarizacao" : 0.589615083
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 1.7100000000000013,
+          "falaDeReferencia" : 122.00000000002551,
+          "falaPerdida" : 9.209999999999848,
+          "falantesNaHipotese" : 2,
+          "falantesNaReferencia" : 2,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 129.833,
+        "id" : "conversa-07",
+        "porPalavra" : {
+          "atribuidas" : 322,
+          "corretas" : 314,
+          "total" : 330
+        },
+        "segundosDeDiarizacao" : 0.613862667
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 133.16000000002387,
+          "falaPerdida" : 9.539999999999841,
+          "falantesNaHipotese" : 3,
+          "falantesNaReferencia" : 3,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 140.33,
+        "id" : "conversa-08",
+        "porPalavra" : {
+          "atribuidas" : 344,
+          "corretas" : 343,
+          "total" : 347
+        },
+        "segundosDeDiarizacao" : 0.632217291
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 116.16000000002252,
+          "falaPerdida" : 16.859999999999836,
+          "falantesNaHipotese" : 2,
+          "falantesNaReferencia" : 2,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 123.928,
+        "id" : "conversa-09",
+        "porPalavra" : {
+          "atribuidas" : 258,
+          "corretas" : 258,
+          "total" : 260
+        },
+        "segundosDeDiarizacao" : 0.606749208
+      },
+      {
+        "diarizacao" : {
+          "confusao" : 0,
+          "falaDeReferencia" : 102.00000000001528,
+          "falaPerdida" : 12.099999999999786,
+          "falantesNaHipotese" : 3,
+          "falantesNaReferencia" : 3,
+          "falsoAlarme" : 0
+        },
+        "duracao" : 109.696,
+        "id" : "conversa-10",
+        "porPalavra" : {
+          "atribuidas" : 285,
+          "corretas" : 283,
+          "total" : 289
+        },
+        "segundosDeDiarizacao" : 0.550256417
+      }
+    ],
+    "numeroDeFalantesCorreto" : 10,
+    "porPalavra" : {
+      "atribuidas" : 2799,
+      "corretas" : 2782,
+      "total" : 2851
+    }
+  },
+  "fontes" : {
+    "conversas" : "falas do mesmo split, de falantes diferentes, coladas com pausas de 0,3 a 0,8 s",
+    "reunioes" : "roteiros de Scripts\/avaliacao\/reunioes.json sintetizados com a voz Luciana (pt-BR) do macOS",
+    "transcricao" : "Multilingual LibriSpeech, português, split de teste (facebook\/multilingual_librispeech@2e83e61, CC BY 4.0)"
+  },
+  "maquina" : "Apple M5 (10 cores)",
+  "modelos" : [
+    "ggml-large-v3.bin",
+    "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+    "fluidaudio-community-1"
+  ],
+  "resumo" : {
+    "citacoesSugeridas" : 12,
+    "citacoesValidas" : 11,
+    "fatosCobertos" : 14,
+    "fatosTotal" : 19,
+    "itens" : [
+      {
+        "citacoesSugeridas" : 3,
+        "citacoesValidas" : 2,
+        "duracao" : 81.29,
+        "fatos" : [
+          {
+            "coberto" : true,
+            "descricao" : "Bruno corrige o bug do checkout no Android até quarta"
+          },
+          {
+            "coberto" : false,
+            "descricao" : "Carla entrega o design do filtro de restaurantes na sexta"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "O modo escuro foi adiado para a próxima sprint"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "A versão 4.2 sai no dia 15"
+          },
+          {
+            "coberto" : false,
+            "descricao" : "Ana revisa os textos do filtro na quinta"
+          }
+        ],
+        "id" : "sprint-app-delivery",
+        "resumo" : {
+          "citacoes" : [
+            {
+              "start" : 0,
+              "texto" : "Desde a última versão, os 2% dos pedidos travam na tela de pagamento."
+            }
+          ],
+          "proximosPassos" : [
+            {
+              "descricao" : "Corrigir bug do checkout no Android (validação do cartão ou salvo)",
+              "responsavel" : "Bruno"
+            },
+            {
+              "descricao" : "Entregar telas finais do filtro de restaurantes por tempo de entrega",
+              "responsavel" : "desconhecido"
+            },
+            {
+              "descricao" : "Revisar os textos do filtro",
+              "responsavel" : "desconhecido"
+            }
+          ],
+          "temas" : [
+            {
+              "detalhe" : "Bruno corrigirá o bug de travamento em 2% dos pedidos na tela de pagamento até quarta-feira, focando na validação do cartão ou salvo.",
+              "titulo" : "Correção de bug no checkout Android"
+            },
+            {
+              "detalhe" : "O filtro de restaurantes por tempo de entrega será finalizado com a entrega das telas na sexta-feira, após revisão dos textos na quinta-feira.",
+              "titulo" : "Entrega do filtro de restaurantes"
+            },
+            {
+              "detalhe" : "O modo escuro foi adiado para a próxima Sprint para evitar entregar o filtro de restaurantes pela metade ou com qualidade comprometida.",
+              "titulo" : "Adiamento do modo escuro"
+            },
+            {
+              "detalhe" : "A versão 4.2 será lançada no dia 15 contendo o checkout corrigido e o novo filtro de restaurantes por tempo de entrega.",
+              "titulo" : "Lançamento da versão 4.2"
+            }
+          ],
+          "titulo" : "Fechamento de Prioridades da Sprint",
+          "visaoGeral" : "A reunião focou no fechamento das prioridades da Sprint que inicia hoje e termina no dia 15. O item mais urgente foi a correção de um bug no checkout do Android que causa travamentos em 2% dos pedidos na tela de pagamento. Bruno assumiu a responsabilidade de corrigir o erro relacionado à validação do cartão ou salvo até quarta-feira. Paralelamente, o desenvolvedor informou que o filtro de restaurantes por tempo de entrega está quase pronto e entregará as telas finais na sexta-feira. Foi decidido adiar o modo escuro para a próxima Sprint devido à complexidade de integrá-lo com o novo filtro. A versão 4.2 será lançada no dia 15 com o checkout corrigido e o filtro de restaurantes implementado. Uma revisão dos textos do filtro é necessária antes da entrega final, sendo que essa tarefa será realizada na quinta-feira."
+        },
+        "segundosDeResumo" : 52.674947875,
+        "tokensDeEntrada" : 280,
+        "werDaTranscricao" : {
+          "delecoes" : 3,
+          "insercoes" : 5,
+          "referencia" : 192,
+          "substituicoes" : 7
+        }
+      },
+      {
+        "citacoesSugeridas" : 3,
+        "citacoesValidas" : 3,
+        "duracao" : 61.849,
+        "fatos" : [
+          {
+            "coberto" : true,
+            "descricao" : "O orçamento do trimestre é de 120 mil reais"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "40% do orçamento vai para mídia paga"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "Os influenciadores foram cortados"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "Campanha do Dia das Mães em maio, produção em março"
+          },
+          {
+            "coberto" : false,
+            "descricao" : "Elisa apresenta o plano à diretoria na segunda"
+          }
+        ],
+        "id" : "orcamento-marketing",
+        "resumo" : {
+          "citacoes" : [
+            {
+              "start" : 0,
+              "texto" : "Minha proposta é colocar 40% em mídia paga, porque é o canal que trouxe mais pedidos no ano passado."
+            },
+            {
+              "start" : 43.7,
+              "texto" : "Então vamos fazer assim. Você monta o plano detalhado e apresenta para a diretoria na segunda-feira. Fechado."
+            }
+          ],
+          "proximosPassos" : [
+            {
+              "descricao" : "Montar plano detalhado com divisão do orçamento por canal e apresentar à diretoria na segunda-feira.",
+              "responsavel" : "(desconhecido)"
+            },
+            {
+              "descricao" : "Falar com o jurídico sobre o contrato da AG.",
+              "responsavel" : "(desconhecido)"
+            }
+          ],
+          "temas" : [
+            {
+              "detalhe" : "Diretoria liberou 120 mil reais para o primeiro trimestre de marketing.",
+              "titulo" : "Aprovação do Orçamento Q1"
+            },
+            {
+              "detalhe" : "Proposta de investir 40% em mídia paga e eliminar influenciadores pelo baixo ROI.",
+              "titulo" : "Estratégia de Alocação de Verba"
+            },
+            {
+              "detalhe" : "Campanha inicia em maio com produção de peças obrigatória a partir de março.",
+              "titulo" : "Campanha Dia das Mães"
+            },
+            {
+              "detalhe" : "Apresentação do plano detalhado à diretoria na segunda-feira e contato com jurídico sobre contrato da AG.",
+              "titulo" : "Próximas Ações e Prazos"
+            }
+          ],
+          "titulo" : "Aprovação de Orçamento e Estratégia de Marketing Q1",
+          "visaoGeral" : "A diretoria aprovou um orçamento de 120 mil reais para o marketing do primeiro trimestre. A proposta é alocar 40% do valor em mídia paga, baseando-se no desempenho do ano anterior, enquanto os influenciadores serão cortados devido ao baixo retorno e alto custo no último trimestre. O foco principal será a campanha do Dia das Mães, com início em maio e produção de peças iniciando em março. O plano detalhado com a divisão do orçamento por canal deve ser apresentado à diretoria na segunda-feira."
+        },
+        "segundosDeResumo" : 44.788547542,
+        "tokensDeEntrada" : 213,
+        "werDaTranscricao" : {
+          "delecoes" : 4,
+          "insercoes" : 3,
+          "referencia" : 142,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "citacoesSugeridas" : 3,
+        "citacoesValidas" : 3,
+        "duracao" : 66.545,
+        "fatos" : [
+          {
+            "coberto" : true,
+            "descricao" : "Os pagamentos ficaram fora do ar por 40 minutos"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "A causa foi um certificado expirado"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "Gustavo cria um alerta 30 dias antes da expiração"
+          },
+          {
+            "coberto" : false,
+            "descricao" : "Fernanda atualiza o runbook até quinta"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "Helena prepara um comunicado para os restaurantes"
+          }
+        ],
+        "id" : "postmortem-pagamentos",
+        "resumo" : {
+          "citacoes" : [
+            {
+              "start" : 0,
+              "texto" : "Ninguém recebeu alerta, então só descobrimos pelas reclamações."
+            },
+            {
+              "start" : 42.5,
+              "texto" : "Eu atualizo o rumbo aqui de incidentes de pagamento até quinta-feira, com o passo a passo da renovação."
+            }
+          ],
+          "proximosPassos" : [
+            {
+              "descricao" : "Criar alerta para avisar 30 dias antes da expiração de certificados e colocar todos no inventário",
+              "responsavel" : "Gustavo"
+            },
+            {
+              "descricao" : "Atualizar o documento de incidentes de pagamento com o passo a passo da renovação",
+              "responsavel" : "desconhecido"
+            },
+            {
+              "descricao" : "Preparar comunicado para os restaurantes afetados explicando o ocorrido e oferecendo crédito na taxa",
+              "responsavel" : "desconhecido"
+            },
+            {
+              "descricao" : "Enviar comunicado para revisão antes do envio final",
+              "responsavel" : "Helena"
+            }
+          ],
+          "temas" : [
+            {
+              "detalhe" : "O certificado do Gateway de pagamento expirou sem alerta, causando falha em mais de 3 mil pedidos e reclamações de restaurantes entre 8h10 e 8h50.",
+              "titulo" : "Causa do Incidente e Impacto"
+            },
+            {
+              "detalhe" : "Gustavo deve criar um alerta para notificar 30 dias antes da expiração de certificados e registrar todos no inventário até amanhã.",
+              "titulo" : "Implementação de Alertas Preventivos"
+            },
+            {
+              "detalhe" : "O documento de incidentes será atualizado até quinta-feira com o passo a passo da renovação e Helena enviará um comunicado de crédito para revisão.",
+              "titulo" : "Atualização de Documentação e Comunicação"
+            }
+          ],
+          "titulo" : "Análise do Incidente de Pagamentos e Plano de Ação",
+          "visaoGeral" : "A reunião focou na análise do incidente de sábado à noite em que os pagamentos ficaram fora do ar por 40 minutos devido à expiração do certificado do Gateway de pagamento. Durante esse período, mais de 3 mil pedidos falharam e diversos restaurantes entraram em contato com o suporte. Foi decidido que Gustavo deve criar um alerta para avisar 30 dias antes da expiração de qualquer certificado e atualizar o inventário até amanhã. Também foi acordado que o documento de incidentes de pagamento será atualizado até quinta-feira com o passo a passo da renovação e um comunicado para os clientes afetados, que incluirá uma oferta de crédito na taxa."
+        },
+        "segundosDeResumo" : 49.535372833,
+        "tokensDeEntrada" : 233,
+        "werDaTranscricao" : {
+          "delecoes" : 4,
+          "insercoes" : 2,
+          "referencia" : 143,
+          "substituicoes" : 6
+        }
+      },
+      {
+        "citacoesSugeridas" : 3,
+        "citacoesValidas" : 3,
+        "duracao" : 48.846,
+        "fatos" : [
+          {
+            "coberto" : true,
+            "descricao" : "Meta de 500 restaurantes novos no Rio até março"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "Reduzir o cadastro de 10 para 5 dias"
+          },
+          {
+            "coberto" : true,
+            "descricao" : "Júlia lidera um piloto na zona norte, começando pela Tijuca"
+          },
+          {
+            "coberto" : false,
+            "descricao" : "Igor manda relatório toda segunda"
+          }
+        ],
+        "id" : "expansao-restaurantes",
+        "resumo" : {
+          "citacoes" : [
+            {
+              "start" : 0,
+              "texto" : "A meta para o Rio de Janeiro é cadastrar 500 restaurantes novos até o fim de março. É uma meta alta."
+            }
+          ],
+          "proximosPassos" : [
+            {
+              "descricao" : "Iniciar piloto de automação de cadastro com 20 restaurantes na Tijuca",
+              "responsavel" : "Júlia"
+            },
+            {
+              "descricao" : "Enviar relatório com números do piloto para a gerência",
+              "responsavel" : "Júlia"
+            }
+          ],
+          "temas" : [
+            {
+              "detalhe" : "A meta de 500 cadastros até março é considerada alta devido ao prazo médio de 10 dias, mas torna-se viável se o prazo for reduzido para 5 dias via automação.",
+              "titulo" : "Viabilidade da meta de 500 restaurantes"
+            },
+            {
+              "detalhe" : "A conferência de documentos será automatizada, com envio para revisão manual apenas quando houver erros detectados pelo sistema.",
+              "titulo" : "Estratégia de automação de conferência"
+            },
+            {
+              "detalhe" : "O piloto começará na Tijuca com 20 restaurantes na semana seguinte, liderado por Júlia para testar a nova metodologia.",
+              "titulo" : "Definição do piloto na Zona Norte"
+            },
+            {
+              "detalhe" : "Será enviado um relatório com os números do piloto toda segunda-feira para acompanhamento direto pela gerência.",
+              "titulo" : "Relatório semanal para a gerência"
+            }
+          ],
+          "titulo" : "Piloto de Automação de Cadastro de Restaurantes no Rio de Janeiro",
+          "visaoGeral" : "A reunião focou na meta de cadastrar 500 restaurantes novos no Rio de Janeiro até o fim de março, reconhecendo que o prazo atual de 10 dias por unidade inviabiliza esse objetivo. Para tornar a meta possível, decidiu-se implementar uma conferência de documentos automática, enviando apenas casos com erro para revisão manual. O projeto iniciará como um piloto na Zona Norte, especificamente na Tijuca, com 20 restaurantes na semana seguinte. A liderança do piloto foi atribuída a Júlia, que também se comprometeu a enviar um relatório semanal com os números para a gerência toda segunda-feira."
+        },
+        "segundosDeResumo" : 47.1646595,
+        "tokensDeEntrada" : 178,
+        "werDaTranscricao" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 115,
+          "substituicoes" : 4
+        }
+      }
+    ],
+    "werDaTranscricao" : {
+      "delecoes" : 11,
+      "insercoes" : 11,
+      "referencia" : 592,
+      "substituicoes" : 19
+    }
+  },
+  "transcricao" : {
+    "cer" : {
+      "delecoes" : 170,
+      "insercoes" : 54,
+      "referencia" : 16962,
+      "substituicoes" : 165
+    },
+    "duracaoDoAudio" : 1574.1280000000002,
+    "itens" : [
+      {
+        "cer" : {
+          "delecoes" : 9,
+          "insercoes" : 0,
+          "referencia" : 216,
+          "substituicoes" : 1
+        },
+        "duracao" : 20,
+        "hipotese" : "foi-se cortou o pescoço do animal a cabeça ficou segura na carne da vítima e das artérias rotas jorrava o sangue não havia mais cães a matar o terreiro ficara lastrado de corpos decepados mutilados de membros esparsos os homens maltratados doloridos",
+        "id" : "11247_10229_000000",
+        "referencia" : "foice cortou o pescoço do animal a cabeça ficou segura na carne da vítima e das artérias rotas jorrava o sangue não havia mais cães a matar o terreiro ficara alastrado de corpos decepados mutilados de membros esparsos os homens maltratados doloridos deitavam",
+        "segundos" : 2.6689876249999998,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 1,
+          "referencia" : 43,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 193,
+          "substituicoes" : 0
+        },
+        "duracao" : 16.98,
+        "hipotese" : "vamos procurá-lo propôs milkau é tempo mesmo porque já podíamos ir jantando acendeu lentz já aquela hora o sol esfriando transformava magicamente o panorama graduando a cor que parecia surgir pouco a pouco do seio secreto das coisas",
+        "id" : "12114_10229_000000",
+        "referencia" : "vamos procurá-lo propôs milkau é tempo mesmo porque já podíamos ir jantando acedeu lentz já aquela hora o sol esfriando transformava magicamente o panorama graduando a cor que parecia surgir pouco a pouco do seio secreto das coisas",
+        "segundos" : 2.314911291,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 39,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 139,
+          "substituicoes" : 2
+        },
+        "duracao" : 10.38,
+        "hipotese" : "constituem uma dessas fisionomias que se sente que vão ficar na galeria da história e que servirão a futuros historiadores para explicar um destino e um gênio. Em novo,",
+        "id" : "12287_12742_000000",
+        "referencia" : "constituíam uma destas fisionomias que se sente que vão ficar na galeria da história e que servirão a futuros historiadores para explicar um destino e um gênio em novo",
+        "segundos" : 1.994670083,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 29,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 185,
+          "substituicoes" : 1
+        },
+        "duracao" : 15.49,
+        "hipotese" : "Mas para isso, que soma de energia, de fluido nervoso não precisava de consumir? Valeria a pena? As suas poucas forças o traíram e a inteligência fina, distinta, descortinou-lhe, pérfida, o desenrolar de uma luta com seus colegas.",
+        "id" : "12626_10229_000000",
+        "referencia" : "mas para isso que soma de energia de fluído nervoso não precisava de consumir valeria a pena as suas poucas forças o traíram e a inteligência fina distinta descortinou lhe pérfida o desenrolar de uma luta com os seus colegas",
+        "segundos" : 2.664136917,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 40,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 123,
+          "substituicoes" : 2
+        },
+        "duracao" : 11.51,
+        "hipotese" : "e já os cigarros de ótimo bragança fumegavam enquanto ao arruído da palestra juntava-se a meia nau o ranger dos moitões e cabos do velame desfraudado",
+        "id" : "12670_13396_000000",
+        "referencia" : "e já os cigarros de ótimo bragança fumegavam enquanto ao arruído da palestra juntava-se à meia nau o ranger dos moitões e cabos do velame desfraldado",
+        "segundos" : 2.02614625,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 27,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 149,
+          "substituicoes" : 1
+        },
+        "duracao" : 16.51,
+        "hipotese" : "Só tarde esses símbolos foram compreendidos, tinham sido como o enigma da espinge que devorava os que iam passando. O cristianismo, ao ideal do trabalho pena, ligou a universalidade.",
+        "id" : "13063_13511_000000",
+        "referencia" : "só tarde esses símbolos foram compreendidos tinham sido como o enigma da esfinge que devorava os que iam passando o cristianismo ao ideal do trabalho pena ligou a universalidade",
+        "segundos" : 2.178874417,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 29,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 126,
+          "substituicoes" : 4
+        },
+        "duracao" : 14.33,
+        "hipotese" : "deus ao mundo deu à guerra à doença à morte às dores mas para alegrar a terra basta haver-lhe dado as flores umas criadas com arte outras simples e modestas",
+        "id" : "3050_2941_000000",
+        "referencia" : "deus ao mundo deu a guerra a doença a morte as dores mas para alegrar a terra basta haver-lhe dado as flores umas criadas com arte outras simples e modestas",
+        "segundos" : 1.8996915840000002,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 31,
+          "substituicoes" : 4
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 2,
+          "referencia" : 169,
+          "substituicoes" : 3
+        },
+        "duracao" : 15.53,
+        "hipotese" : "Que crédito que dá tão facilmente o coração àquilo que deseja, quando lhe esquece o fero seu destino? Ó, deixem-me enganar que eu sou contente, que posto que maior meu dano seja, fica minha glória já do que imagino.",
+        "id" : "4405_3604_000000",
+        "referencia" : "que crédito que dá tão facilmente o coração aquilo que deseja quando lhe esquece o fero seu destino oh deixem-me enganar que eu sou contente que posto que maior meu dano seja fica me a glória já do que imagino",
+        "segundos" : 2.446435,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 41,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 143,
+          "substituicoes" : 2
+        },
+        "duracao" : 10.4,
+        "hipotese" : "Viajou ainda mais o nosso herói e tudo viu com olhos de quem sabe ver e tudo contava com alma de quem sabe contar. Às EV de Adelaide passavam horas esquecidas. Do amor, dizia ele.",
+        "id" : "5739_4739_000000",
+        "referencia" : "viajou ainda mais o nosso herói e tudo viu com olhos de quem sabe ver e tudo contava com alma de quem sabe contar azevedo e adelaide passavam horas esquecidas do amor dizia ele",
+        "segundos" : 2.235054167,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 34,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 124,
+          "substituicoes" : 1
+        },
+        "duracao" : 15.37,
+        "hipotese" : "Em outros países, ter uma posição elevada é ser sério. No Brasil, ser sério é ter uma posição elevada. Catão não teve estátua no Capitólio. Eis a sua estátua.",
+        "id" : "7925_6390_000000",
+        "referencia" : "em outros países ter uma posição elevada é ser sério no brasil ser serio é ter uma posição elevada catão não teve estátua no capitólio eis a sua estátua",
+        "segundos" : 2.144952667,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 29,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 7,
+          "insercoes" : 0,
+          "referencia" : 187,
+          "substituicoes" : 0
+        },
+        "duracao" : 20,
+        "hipotese" : "fugiu o céu espanou-se e dilatou-se em maravilhosa limpidez a mancha móvel sobre a planície definiu-se no perfil de um pobre cavalo que passeava na verdura os seus olhos de velhice e fadiga tristes e longos de passada com",
+        "id" : "11247_10229_000001",
+        "referencia" : "névoa fugiu o céu espanou-se e dilatou-se em maravilhosa limpidez a mancha móvel sobre a planície definiu-se no perfil de um pobre cavalo que passeava na verdura os seus olhos de velhice e fadiga tristes e longos de passada com os",
+        "segundos" : 2.392197375,
+        "wer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 44,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 200,
+          "substituicoes" : 0
+        },
+        "duracao" : 16.44,
+        "hipotese" : "Outros entravam e saíam do armazém cantarolando com a voz rouca e a gesticulação de embriagados. O estrondo dos pés que dançavam no sobrado, ecoando no vasto armazém, e o som langoroso de um realejo incessante, desciam do alto, atordoando a gente.",
+        "id" : "12114_10229_000001",
+        "referencia" : "outros entravam e saíam do armazém cantarolando com a voz rouca e a gesticulação de embriagados o estrondo dos pés que dançavam no sobrado ecoando no vasto armazém e o som langoroso de um realejo incessante desciam do alto atordoando a gente",
+        "segundos" : 3.0878731249999998,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 42,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 160,
+          "substituicoes" : 6
+        },
+        "duracao" : 13.72,
+        "hipotese" : "lord granville na camara dos lords na camara dos commons gladstone fizeram em sessão solene o seu panegyrico publico e durante dias toda a imprensa ingleza a imprensa de todo o mundo civilizado",
+        "id" : "12287_12742_000001",
+        "referencia" : "lord granville na câmara dos lords na câmara dos comuns gladstone fizeram em sessão solene o seu panegírico público e durante dias toda a imprensa inglesa a imprensa de todo o mundo civilizado",
+        "segundos" : 2.07965325,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 33,
+          "substituicoes" : 6
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 150,
+          "substituicoes" : 2
+        },
+        "duracao" : 14.35,
+        "hipotese" : "O juiz municipal, sem dar de resposta, olhou-o com grande nojo. Em pé, no meio do terreiro, de chapéu na mão, a cabeça ao sol, o coluno via com os olhos desvairados a justiça sumir-se na estrada.",
+        "id" : "12626_10229_000001",
+        "referencia" : "o juiz municipal sem dar-lhe resposta olhou-o com grande nojo em pé no meio do terreiro de chapéu na mão a cabeça ao sol o colono via com os olhos desvairados a justiça sumir-se na estrada",
+        "segundos" : 2.23543725,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 39,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 200,
+          "substituicoes" : 0
+        },
+        "duracao" : 16.13,
+        "hipotese" : "e seus olhos percorrendo a coberta beijavam também com ternuras de pai os âmbitos do iate podia-se afirmar que estava ali um homem verdadeiramente experimentado herdeiro único de grande fortuna que o pai amoedara na vida comercial em belém",
+        "id" : "12670_13396_000001",
+        "referencia" : "e seus olhos percorrendo a coberta beijavam também com ternuras de pai os âmbitos do iate podia-se afirmar que estava ali um homem verdadeiramente experimentado herdeiro único de grande fortuna que o pai amoedara na vida comercial em belém",
+        "segundos" : 2.310968875,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 40,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 141,
+          "substituicoes" : 1
+        },
+        "duracao" : 14.51,
+        "hipotese" : "A verdadeira doutrina é um catecismo popular de economia social. É por esta ciência que nos há de vir à libertação, desde que o homem reconheça que produz mais do que consome.",
+        "id" : "13063_13511_000001",
+        "referencia" : "a verdadeira doutrina é um catecismo popular de economia social é por esta ciência que nos há de vir a libertação desde que o homem reconheça que produz mais do que consome",
+        "segundos" : 1.959669167,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 32,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 173,
+          "substituicoes" : 0
+        },
+        "duracao" : 19.63,
+        "hipotese" : "ama esta casa pede a deus que a guarde pede a deus que a proteja eternamente porque talvez em lágrimas mais tarde te vejas triste desta casa ausente e já homem já velho e fatigado te lembrarás da casa que perdeste",
+        "id" : "3050_2941_000001",
+        "referencia" : "ama esta casa pede a deus que a guarde pede a deus que a proteja eternamente porque talvez em lágrimas mais tarde te vejas triste desta casa ausente e já homem já velho e fatigado te lembrarás da casa que perdeste",
+        "segundos" : 2.061187875,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 41,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 110,
+          "substituicoes" : 0
+        },
+        "duracao" : 11.57,
+        "hipotese" : "Erros meus, má fortuna, amor ardente, em minha perdição se conjuraram. Os erros e a fortuna sobejaram, que para mim bastava o amor somente.",
+        "id" : "4405_3604_000001",
+        "referencia" : "erros meus má fortuna amor ardente em minha perdição se conjuraram os erros e a fortuna sobejaram que para mim bastava o amor somente",
+        "segundos" : 1.907977375,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 24,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 197,
+          "substituicoes" : 0
+        },
+        "duracao" : 12.87,
+        "hipotese" : "acatado querido descansado tal é o nosso azevedo a quem por cúmulo de ventura coroam os mais belos vinte e seis anos deu-lhe a fortuna um emprego suave não fazer nada possui um diploma de bacharel em direito mas esse diploma nunca lhe serviu",
+        "id" : "5739_4739_000001",
+        "referencia" : "acatado querido descansado tal é o nosso azevedo a quem por cúmulo de ventura coroam os mais belos vinte e seis anos deu-lhe a fortuna um emprego suave não fazer nada possui um diploma de bacharel em direito mas esse diploma nunca lhe serviu",
+        "segundos" : 2.282611292,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 45,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 146,
+          "substituicoes" : 0
+        },
+        "duracao" : 15.14,
+        "hipotese" : "A modéstia é a moldura do merecimento que o guarnece e realça. Não é dado ao saber humano conhecer toda a extensão da sua ignorância. Cessa a prudência quando lhe falta a paciência.",
+        "id" : "7925_6390_000001",
+        "referencia" : "a modéstia é a moldura do merecimento que o guarnece e realça não é dado ao saber humano conhecer toda a extensão da sua ignorância cessa a prudência quando lhe falta a paciência",
+        "segundos" : 2.041625667,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 33,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 126,
+          "substituicoes" : 1
+        },
+        "duracao" : 12.46,
+        "hipotese" : "viviam unidos em uma só comunhão de desanimo e de espanto na casinha feita de madeira tosca com teto de telhas de pau incendiada pelo sol nos dias quentes",
+        "id" : "11247_10229_000002",
+        "referencia" : "viviam unidos em uma só comunhão de desânimo e de espanto na casinha feita de madeira tosca com teto de telhas de pau incendiada pelo sol nos dias quentes",
+        "segundos" : 1.846297541,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 29,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 177,
+          "substituicoes" : 0
+        },
+        "duracao" : 14.53,
+        "hipotese" : "No terreiro já não havia quase ninguém. As crianças tinham debandado. Os grandes haviam partido para as colônias, ou se tinham recolhido ao salão do baile. Subiram ao sobrado, onde na sala da frente se começava a dançar.",
+        "id" : "12114_10229_000002",
+        "referencia" : "no terreiro já não havia quase ninguém as crianças tinham debandado os grandes haviam partido para as colônias ou se tinham recolhido ao salão do baile subiram ao sobrado onde na sala da frente se começava a dançar",
+        "segundos" : 2.469014458,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 38,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 217,
+          "substituicoes" : 6
+        },
+        "duracao" : 19.43,
+        "hipotese" : "mas que os criticos mais benevolos falam como dum volume de duzentas paginas sem uma só linha tolerável e cousa curiosa este homem tão fino tão cético tão experiente nunca perdeu a candura quasi comica de se considerar um grande poeta como virgilio ou como dante",
+        "id" : "12287_12742_000002",
+        "referencia" : "mas  que os críticos mais benévolos falam como dum volume de duzentas páginas sem uma só linha tolerável e cousa curiosa este homem tão fino tão cético tão experiente nunca perdeu a candura quase cômica de se considerar um grande poeta como virgílio ou como dante",
+        "segundos" : 2.3280455,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 46,
+          "substituicoes" : 6
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 4,
+          "referencia" : 180,
+          "substituicoes" : 1
+        },
+        "duracao" : 14.24,
+        "hipotese" : "Dizem que a Alemanha tem planos. Dizem. O colega sabe que em questões desta ordem não convém falar sem toda segurança, comentou profundamente o doutor Itapecuru, e a sua cobardia solene punha uma certa brandura na discussão.",
+        "id" : "12626_10229_000002",
+        "referencia" : "dizem que a alemanha tem planos dizem o colega sabe que em questões desta ordem não convém falar sem toda a segurança comentou profundamente o dr itapecurú e a sua cobardia solene punha uma certa brandura na discussão",
+        "segundos" : 2.192989709,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 38,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 134,
+          "substituicoes" : 0
+        },
+        "duracao" : 12.2,
+        "hipotese" : "sem deter-se ultrapassou o istmo desceu mais ao sul transpondo os alcantis dos andes e remirou as faces emaciadas na fria onda marulhosa do estreito de magalhães",
+        "id" : "12670_13396_000002",
+        "referencia" : "sem deter-se ultrapassou o istmo desceu mais ao sul transpondo os alcantis dos andes e remirou as faces emaciadas na fria onda marulhosa do estreito de magalhães",
+        "segundos" : 1.8983733329999999,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 28,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 166,
+          "substituicoes" : 0
+        },
+        "duracao" : 19.48,
+        "hipotese" : "e o destituía de importância, que um descuido qualquer o expunha aos apupos da vadiagem. Assim explicava comigo aqueles ares afetados de elegância que despertaram a risada, que ressoou só dentro em mim.",
+        "id" : "13063_13511_000002",
+        "referencia" : "e o destituía de importância que um descuido qualquer o expunha aos apupos da vadiagem assim explicava comigo aqueles ares afetados de elegância que despertaram a risada que ressoou só dentro em mim",
+        "segundos" : 2.130816958,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 33,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 1,
+          "referencia" : 138,
+          "substituicoes" : 0
+        },
+        "duracao" : 13.65,
+        "hipotese" : "gente pobre invejando a gente que é mais rica quer como ela gastar e ainda mais pobre fica gasta tudo que tem o que não tem consome e por querer ter mais vem a morrer de fome",
+        "id" : "3050_2941_000002",
+        "referencia" : "gente pobre invejando a gente que é mais rica quer como ela gastar e inda mais pobre fica gasta tudo o que tem o que não tem consome e por querer ter mais vem a morrer de fome",
+        "segundos" : 1.8139450830000001,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 38,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 95,
+          "substituicoes" : 0
+        },
+        "duracao" : 16.706,
+        "hipotese" : "Mas, segundo o que o céu me tem mostrado, já sei que deste meu buscar ventura, achado tenho já que não a tenho. Fim do poema.",
+        "id" : "4405_3604_000002",
+        "referencia" : "mas segundo o que o céu me tem mostrado já sei que deste meu buscar ventura achado tenho já que não a tenho fim do poema",
+        "segundos" : 1.717607917,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 26,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 15,
+          "insercoes" : 0,
+          "referencia" : 155,
+          "substituicoes" : 2
+        },
+        "duracao" : 13.44,
+        "hipotese" : "disse diogo louco de contente pois sim adeus até amanhã tenha sonhos cor-de-rosa e desculpe os meus maus modos até amanhã o velho beijou graciosamente a mão de milha e saiu",
+        "id" : "5739_4739_000002",
+        "referencia" : "disse diogo louco de contente pois sim adeus até amanhã tenha sonhos cor-de-rosa e desculpe os meus maus modos até amanhã o velho beijou graciosamente a mão de emília e saiu capítulo quatro",
+        "segundos" : 1.998029834,
+        "wer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 35,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 22,
+          "insercoes" : 0,
+          "referencia" : 161,
+          "substituicoes" : 5
+        },
+        "duracao" : 13.94,
+        "hipotese" : "transportando-se em 1877 para a cidade mineira de mar de espanha onde fora exercer o cargo de promotor da justiça pública deixando o lugar nesta cidade ficou advogando",
+        "id" : "7925_6390_000002",
+        "referencia" : "transportando-se em mil oitocentos e setenta e sete para a cidade mineira de mar de espanha onde fora exercer o cargo de promotor da justiça pública deixando o lugar nessa cidade ficou advogando",
+        "segundos" : 1.8052542919999999,
+        "wer" : {
+          "delecoes" : 5,
+          "insercoes" : 0,
+          "referencia" : 34,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 13,
+          "insercoes" : 0,
+          "referencia" : 189,
+          "substituicoes" : 1
+        },
+        "duracao" : 20,
+        "hipotese" : "até que uma manhã o agrimensor e os seus ajudantes sentados à porta do barracão viram uma mancha preta passar velejando majestosa serena no céu claro urubu disse felicíssimo ah temos carniça por aqui opinou joca",
+        "id" : "11247_10229_000003",
+        "referencia" : "trabalhadores até que uma manhã o agrimensor e os seus ajudantes sentados á porta do barracão viram uma mancha preta passar velejando majestosa serena no céu claro urubu disse felicíssimo ah temos carniça por aqui opinou joca",
+        "segundos" : 2.097683917,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 37,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 146,
+          "substituicoes" : 0
+        },
+        "duracao" : 11.93,
+        "hipotese" : "De fato, no sobrado, enquanto a sala da frente se achava quase deserta e apenas com algumas pessoas à janela vendo o baile das crianças, a sala do fundo estava num grande burburinho.",
+        "id" : "12114_10229_000003",
+        "referencia" : "de fato no sobrado enquanto a sala da frente se achava quase deserta e apenas com algumas pessoas à janela vendo o baile das crianças a sala do fundo estava num grande burburinho",
+        "segundos" : 1.8125957499999998,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 33,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 177,
+          "substituicoes" : 1
+        },
+        "duracao" : 15.51,
+        "hipotese" : "mas uma criação subjetiva da sua própria vontade e como um enredo de romance talhado pela sua pena senão veja-se tendo nascido judeu tornou-se o chefe de uma aristocracia saxona e normanda a mais orgulhosa da terra",
+        "id" : "12287_12742_000003",
+        "referencia" : "mas uma criação subjetiva da sua própria vontade e como um enredo de romance talhado pela sua pena senão veja-se tendo nascido judeu tornou-se o chefe de uma aristocracia saxônia e normanda a mais orgulhosa da terra",
+        "segundos" : 2.172336042,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 39,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 2,
+          "referencia" : 188,
+          "substituicoes" : 2
+        },
+        "duracao" : 14.64,
+        "hipotese" : "A mulher ficou pensativa sem responder. Naturalmente, tinha algum amigo que substitui o defunto, disse Pantoja para se vingar do interesse do juiz, o que ele, habituado a fazer tudo, considerava como uma invasão dos seus privilégios.",
+        "id" : "12626_10229_000003",
+        "referencia" : "a mulher ficou pensativa sem responder naturalmente tem algum amigo que substitui o defunto disse pantoja para se vingar do interesse do juiz o que ele habituado a fazer tudo considerava como uma invasão dos seus privilégios",
+        "segundos" : 2.22890725,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 37,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 13,
+          "insercoes" : 0,
+          "referencia" : 196,
+          "substituicoes" : 6
+        },
+        "duracao" : 17.5,
+        "hipotese" : "voga ninféia voga meu iate além duma enseadinha da costa soalhada e calma é o sossego infinito que nos aguarda a ti os beijos cadenciados das vagas a mim os ósculos da única mulher verdadeiramente sincera que já encontrei",
+        "id" : "12670_13396_000003",
+        "referencia" : "enlevado voga nymphéa voga meu hiate além duma enseadazinha da costa assoalhada e calma é o sossego infinito que nos aguarda a ti os beijos cadenciados das vagas a mim os ósculos da unica mulher verdadeiramente sincera que já encontrei",
+        "segundos" : 2.259165834,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 40,
+          "substituicoes" : 5
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 117,
+          "substituicoes" : 0
+        },
+        "duracao" : 14.77,
+        "hipotese" : "trazia uma vestimenta velha esfarrapada que produzia uma antítese perfeita com a sua idade mais ao pé vi que tinha um fulgor de vida nos olhos",
+        "id" : "13063_13511_000003",
+        "referencia" : "trazia uma vestimenta velha esfarrapada que produzia uma antítese perfeita com a sua idade mais ao pé vi que tinha um fulgor de vida nos olhos",
+        "segundos" : 1.761897625,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 26,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 66,
+          "substituicoes" : 0
+        },
+        "duracao" : 12.872,
+        "hipotese" : "E ainda não dá frutos como o outono, pois só dá flores como a primavera. Fim do poema.",
+        "id" : "3050_2941_000003",
+        "referencia" : "e ainda não dá frutos como o outono pois só dá flores como a primavera fim do poema",
+        "segundos" : 1.578853583,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 18,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 2,
+          "referencia" : 110,
+          "substituicoes" : 0
+        },
+        "duracao" : 12.06,
+        "hipotese" : "amor fero, cruel, fortuna dura, bem tendes vossa força experimentada, assolai, destruí, não fique nada, vingai-vos desta vida que ainda dura.",
+        "id" : "4405_3604_000003",
+        "referencia" : "amor fero cruel fortuna dura bem tendes vossa força experimentada assolai destruí não fique nada vingai-vos desta vida quinda dura",
+        "segundos" : 1.8073436250000001,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 21,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 3,
+          "referencia" : 210,
+          "substituicoes" : 4
+        },
+        "duracao" : 14.68,
+        "hipotese" : "pois não serei eu quem o descei foi o senhor diogo desejo-lhe muita felicidade aleus e os dous separaram-se diogo seguiu para a casa de emília tito para a casa de azevedo tito acabava de saber que a viúva pensava nele todavia isso não lhe dera o menor abalo por quê",
+        "id" : "5739_4739_000003",
+        "referencia" : "pois não serei eu quem o decifre senhor diogo desejo-lhe muita felicidade adeus e os dois separaram-se diogo seguiu para a casa de emília tito para a casa de azevedo tito acabava de saber que a viúva pensava nele todavia isso não lhe dera o menor abalo por quê",
+        "segundos" : 2.476499292,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 2,
+          "referencia" : 51,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 110,
+          "substituicoes" : 2
+        },
+        "duracao" : 13.05,
+        "hipotese" : "Tudo mal do Brasil é que a política é uma profissão, mas os políticos não são profissionais. O adulador é como a ave, voa porque se agacha.",
+        "id" : "7925_6390_000003",
+        "referencia" : "todo o mal do brasil é que a politica é uma profissão mas os políticos não são profissionais o adulador é como a ave voa porque se agacha",
+        "segundos" : 1.7782460420000001,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 28,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 201,
+          "substituicoes" : 2
+        },
+        "duracao" : 19.39,
+        "hipotese" : "até então não se trabalhara os homens corriam às vizinhanças caçavam vagavam pelos montes e iam aos povoados as mulheres viviam no lar quando caía a sombra o cigano deitava-se sobre a relva à beira do rio e pregava os olhos preguiçosos no poente",
+        "id" : "11247_10229_000004",
+        "referencia" : "até então não se trabalhara os homens corriam as vizinhanças caçavam vagavam pelos montes e iam aos povoados as mulheres viviam no lar quando caía a sombra o cigano deitava-se sobre a relva a beira do rio e pregava os olhos preguiçosos no poente",
+        "segundos" : 2.427060542,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 45,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 202,
+          "substituicoes" : 4
+        },
+        "duracao" : 17.54,
+        "hipotese" : "era um sobrado branco no fundo de um vale e à margem de um endiabrado ribeiro que descia em tropéu infindo do morro para o santa maria à roda dele o terreno estava limpo de plantação e havia um pequeno campo de relvo tenra e fresca que brilhava ao sol",
+        "id" : "12114_10229_000004",
+        "referencia" : "era um sobrado branco no fundo de um vale e à margem de um endiabrado ribeiro que descia em tropel infindo do morro para o santa maria a roda dele o terreno estava limpo de plantação e havia um pequeno campo de relva tenra e fresca que brilhava ao sol",
+        "segundos" : 2.418345458,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 50,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 156,
+          "substituicoes" : 0
+        },
+        "duracao" : 13.06,
+        "hipotese" : "benjamin disraeli tornou-se bem depressa um dos heróis deste salão onde desde logo se mostrara com esse ar de tranquila superioridade de correto desdém que foi um dos segredos da sua força",
+        "id" : "12287_12742_000004",
+        "referencia" : "benjamin disraeli tornou-se bem depressa um dos heróis deste salão onde desde logo se mostrara com esse ar de tranquila superioridade de correto desdém que foi um dos segredos da sua força",
+        "segundos" : 1.9335337080000001,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 33,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 13,
+          "insercoes" : 0,
+          "referencia" : 232,
+          "substituicoes" : 4
+        },
+        "duracao" : 20,
+        "hipotese" : "passando fazendo-as gemir rumorosamente no vão das trevas de espaço a espaço pelas frestas ensia claridade e do jogo de luz se formava dentro da floresta uma coluna levantada do chão para o céu atravessando o teto ondeante e docemente iluminada pelos reflexos das",
+        "id" : "12626_10229_000004",
+        "referencia" : "ia passando fazendo-as gemer rumorosamente no vão das trevas de espaço a espaço pelas frestas descia a claridade e do jorro de luz se formava dentro da floresta uma coluna alevantada do chão para o céu atravessando o teto ondeante e docemente iluminada pelos reflexos das árvores",
+        "segundos" : 2.300606959,
+        "wer" : {
+          "delecoes" : 3,
+          "insercoes" : 0,
+          "referencia" : 48,
+          "substituicoes" : 4
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 213,
+          "substituicoes" : 1
+        },
+        "duracao" : 18.98,
+        "hipotese" : "e toda a vida das matas alevantava se em gorjeios granidos e aromas a bordo do ninféia na diminuta coberta acabara agora mesmo o serviço do café matinal xícaras disseminadas pelos bancos da murada rescendiam ainda do alegre cheiro da infusão escaldante",
+        "id" : "12670_13396_000004",
+        "referencia" : "e toda a vida das matas alevantava-se em gorjeios grasnidos e aromas a bordo do ninfeia na diminuta coberta acabara agora mesmo o serviço do café matinal xícaras disseminadas pelos bancos da amurada rescendiam ainda do alegre cheiro da infusão escaldante",
+        "segundos" : 2.3417825,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 42,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 137,
+          "substituicoes" : 0
+        },
+        "duracao" : 13.34,
+        "hipotese" : "O movimento, a expressão de uma intensa atividade interior. Eu tinha caminhado para ele com um riso mofador, com pretensões a observá-lo, este casquilho em quinta mão.",
+        "id" : "13063_13511_000004",
+        "referencia" : "o movimento a expressão de uma intensa atividade interior eu tinha caminhado para ele com um um riso mofador com pretensões a observá-lo este casquilho em quinta mão",
+        "segundos" : 1.977390959,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 29,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 7,
+          "insercoes" : 1,
+          "referencia" : 152,
+          "substituicoes" : 4
+        },
+        "duracao" : 16.3,
+        "hipotese" : "um dia caiu doente carinhos junto ao colchão vivia constantemente triste abatido lutando e eram muitos doutores vão toda casa aflita era uma casa de dores era uma casa maldita",
+        "id" : "3050_2941_000004",
+        "referencia" : "um dia caiu doente carlinhos junto ao colchão vivia constantemente triste e abatido o plutão vieram muitos doutores em vão toda a casa aflita era uma casa de dores era uma casa maldita",
+        "segundos" : 1.8951013749999999,
+        "wer" : {
+          "delecoes" : 3,
+          "insercoes" : 0,
+          "referencia" : 33,
+          "substituicoes" : 4
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 157,
+          "substituicoes" : 3
+        },
+        "duracao" : 17.5,
+        "hipotese" : "O tempo cobre o chão de verdimanto, que já coberto foi de neve fria, e, enfim, converte em choro o doce canto. E afora este mudar-se cada dia, outra mudança faz de mau espanto, que não se muda já como soía.",
+        "id" : "4405_3604_000004",
+        "referencia" : "o tempo cobre o chão de verde manto que já coberto foi de neve fria e enfim converte em choro o doce canto e afora este mudar-se cada dia outra mudança faz de mor espanto que não se muda já como soía",
+        "segundos" : 2.331449375,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 43,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 179,
+          "substituicoes" : 3
+        },
+        "duracao" : 12.98,
+        "hipotese" : "supuz que pudesse dar-lhe uma felicidade recebendo outra enganei me tem a gloria de retirar-se com todas as honras de guerra eu é que fico vencida paciencia pode zombar de mim não lhe contesto o direito que tem para isso",
+        "id" : "5739_4739_000004",
+        "referencia" : "supus que pudesse dar-lhe uma felicidade recebendo outra enganei-me tem a glória de retirar-se com todas as honras de guerra eu é que fico vencida paciência pode zombar de mim não lhe contesto o direito que tem para isso",
+        "segundos" : 2.107863583,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 42,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 1,
+          "referencia" : 177,
+          "substituicoes" : 1
+        },
+        "duracao" : 16.56,
+        "hipotese" : "a fronte alta e calma os olhos pequenos e negros e a boca séria tinha uma expressão de melancolia que impressionava á primeira vista teria a natureza estampado naquelle rosto o presentimento de futuras desgraças",
+        "id" : "7925_6390_000004",
+        "referencia" : "a fronte alta e calma os olhos pequenos e negros e a boca séria tinha uma expressão de melancolia que impressionava à primeira vista teria a natureza estampado naquele rosto o pressentimento de futuras desgraças",
+        "segundos" : 2.116449,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 35,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 14,
+          "insercoes" : 1,
+          "referencia" : 226,
+          "substituicoes" : 0
+        },
+        "duracao" : 20,
+        "hipotese" : "para os montes levada pela brisa como se fosse o imperceptível véu que envolvesse alguma deusa errante e retardada um raio de sol porém descera a brincar-lhe nos olhos e incendiava lhe a pupila meiguices da natureza um dos jovens maguiares levando uma corda",
+        "id" : "11247_10229_000005",
+        "referencia" : "fugira para os montes levada pela brisa como se fosse o imperceptível véu que envolvesse alguma deusa errante e retardada um raio de sol porém descera a brincar-lhe nos olhos e incendiava-lhe a pupila meiguices da natureza um dos jovens magiares levando uma corda caminhou",
+        "segundos" : 2.476241375,
+        "wer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 47,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 211,
+          "substituicoes" : 0
+        },
+        "duracao" : 19.69,
+        "hipotese" : "por aqui mesmo neste banco ou na janela quando a jovem partiu arrebatada pelo par maria disse a milkau não lhe parece tão boazinha é filha de um colono do luxemburgo há muito tempo não nos víamos e hoje tem sido um regalo oh desde manhã andamos nesta roda viva",
+        "id" : "12114_10229_000005",
+        "referencia" : "por aqui mesmo neste banco ou na janela quando a jovem partiu arrebatada pelo par maria disse a milkau não lhe parece tão boazinha é filha de um colono do luxemburgo há muito tempo não nos víamos e hoje tem sido um regalo oh desde manhã andamos nesta roda viva",
+        "segundos" : 2.4333075,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 50,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 205,
+          "substituicoes" : 1
+        },
+        "duracao" : 18.09,
+        "hipotese" : "de raça oriental teve sempre o amor do fausto das pedrarias dos ricos tecidos da pompa os seus romances transbordam de descrições de palacios de festas perante as quais as mais ricas galas de salomão são como desbotados cenários de teatro de feira",
+        "id" : "12287_12742_000005",
+        "referencia" : "de raça oriental teve sempre o amor do fausto das pedrarias dos ricos tecidos da pompa os seus romances transbordam de descrições de palácios de festas perante as quais as mais ricas galas de salomão são como desbotados cenários de teatro de feira",
+        "segundos" : 2.324146625,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 43,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 3,
+          "insercoes" : 0,
+          "referencia" : 220,
+          "substituicoes" : 1
+        },
+        "duracao" : 20,
+        "hipotese" : "Cada um de nós, a soma de todos nós, exprime a força criadora da utopia. E em nós mesmos, como no indefinido ponto de transição que se fará a passagem dolorosa do sofrimento, purifiquemos nossos corpos, nós que viemos do mal originário, que é a violência. O que seduz na vida.",
+        "id" : "12626_10229_000005",
+        "referencia" : "cada um de nós a soma de todos nós exprime a força criadora da utopia e em nós mesmos como num indefinido ponto de transição que se fará a passagem dolorosa do sofrimento purifiquemos os nossos corpos nós que viemos do mal originário que é a violência o que seduz na vida",
+        "segundos" : 3.085318875,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 52,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 203,
+          "substituicoes" : 0
+        },
+        "duracao" : 17.31,
+        "hipotese" : "e a convicção de que, mais uma vez, andar errada, a balofa ignorância do chauvinismo brasílico trouxe-lhe aos olhos duas lágrimas sinceras e uma nova desilusão ao fundo da alma angustiada. Foi após este derradeiro desgosto que regressou ao Brasil.",
+        "id" : "12670_13396_000005",
+        "referencia" : "e a convicção de que mais uma vez andara errada a balofa ignorância do chauvinismo brasílico trouxe-lhe aos olhos duas lágrimas sinceras e uma nova desilusão ao fundo da alma angustiada foi após este derradeiro desgosto que regressou ao brasil",
+        "segundos" : 2.90483775,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 41,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 178,
+          "substituicoes" : 0
+        },
+        "duracao" : 19.65,
+        "hipotese" : "E tenho ainda não sei que terror de me ver perdido, atropelado entre as massas. Vivo assim desde criança. Como criança fui também poeta. Cantei porque tinha medo, queria distrair-me. Eu chamo-lhe meu amigo porque me escuta.",
+        "id" : "13063_13511_000005",
+        "referencia" : "e tenho ainda não sei que terror de me ver perdido atropelado entre as massas vivo assim desde criança como criança fui também poeta cantei porque tinha medo queria distrair-me eu chamo-lhe meu amigo porque me escuta",
+        "segundos" : 2.4484985,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 39,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 177,
+          "substituicoes" : 2
+        },
+        "duracao" : 18.67,
+        "hipotese" : "reina flor pois quis a sorte que a flor a tudo presida e também enfeite a morte assim como enfeita a vida amai as flores crianças suas irmãs dos esplendores porque há muitas semelhanças entre as crianças e as flores",
+        "id" : "3050_2941_000005",
+        "referencia" : "reina a flor pois quis a sorte que a flor a tudo presida e também enfeite a morte assim como enfeita a vida amai as flores crianças sois irmãs dos esplendores porque há muitas semelhanças entre as crianças e as flores",
+        "segundos" : 2.231099,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 41,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 111,
+          "substituicoes" : 0
+        },
+        "duracao" : 11.44,
+        "hipotese" : "Continuamente vemos novidades, diferentes em tudo da esperança. Do mal ficam as mágoas na lembrança, e do bem, se algum ouve, as saudades.",
+        "id" : "4405_3604_000005",
+        "referencia" : "continuamente vemos novidades diferentes em tudo da esperança do mal ficam as mágoas na lembrança e do bem se algum houve as saudades",
+        "segundos" : 1.857609542,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 23,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 0,
+          "referencia" : 259,
+          "substituicoes" : 4
+        },
+        "duracao" : 16.57,
+        "hipotese" : "no fim de algum tempo azevedo deteve-se e perguntou queres que paremos aqui como quiseres disse adelaide é melhor disse azevedo fechando o livro as coisas boas não se gozam de uma sentada guardemos um pouco para a noite demais era já tempo que eu passasse do idilho escrito para o idilho vivo deixa-me olhar para ti",
+        "id" : "5739_4739_000005",
+        "referencia" : "no fim de algum tempo azevedo deteve-se e perguntou queres que paremos aqui como quiseres disse adelaide é melhor disse azevedo fechando o livro as coisas boas não se gozam de uma assentada guardemos um pouco para a noite demais era já tempo que eu passasse do idílio escrito para o idílio vivo deixa-me olhar para ti",
+        "segundos" : 2.5562985,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 59,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 116,
+          "substituicoes" : 0
+        },
+        "duracao" : 14.99,
+        "hipotese" : "O maior banquete não tem senão quatro pratos, oxigênio, hidrogênio, carbono e azoto. Vemos Deus nos olhos de nossa mãe e dizem que ele não existe.",
+        "id" : "7925_6390_000005",
+        "referencia" : "o maior banquete não tem senão quatro pratos oxigênio hidrogênio carbono e azoto vemos deus nos olhos de nossa mãe e dizem que ele não existe",
+        "segundos" : 1.824048667,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 26,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 3,
+          "insercoes" : 0,
+          "referencia" : 221,
+          "substituicoes" : 1
+        },
+        "duracao" : 20,
+        "hipotese" : "perguntou joca ao agrimensor ora vamos a enterrar o velho deus lhe perdoe a alma nós lhe cuidaremos do corpo disse decisivo o cearense os homens não hesitaram mais agora inspirados pelo impulso de piedade de felicissimo e todos caminharam para dentro do cercado",
+        "id" : "11247_10229_000006",
+        "referencia" : "faz perguntou joca ao agrimensor ora vamos a enterrar o velho deus lhe perdoe a alma nós lhe cuidaremos do corpo disse decisivo o cearense os homens não hesitaram mais agora inspirados pelo impulso de piedade de felicíssimo e todos caminharam para dentro do cercado",
+        "segundos" : 2.277315709,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 45,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 191,
+          "substituicoes" : 0
+        },
+        "duracao" : 16.15,
+        "hipotese" : "e achegava se a alguma mulher quase de rastos suspenso querendo arrebatá la numa volúpia contida mas que se adivinhava febril vertiginosa depois erguia-se num salto de tigre retomava sua doidice como num grande ataque satânico",
+        "id" : "12114_10229_000006",
+        "referencia" : "e achegava-se a alguma mulher quase de rastos suspenso querendo arrebatá-la numa volúpia contida mas que se adivinhava febril vertiginosa depois erguia-se num salto de tigre retomava a sua doidice como num grande ataque satânico",
+        "segundos" : 2.428002042,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 38,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 1,
+          "referencia" : 231,
+          "substituicoes" : 5
+        },
+        "duracao" : 19.63,
+        "hipotese" : "num dia de crise politica em que lord beaconsfield devia fazer um discurso decisivo encontrou momentos antes n'um dos salões da camara occupado a encher d'agua o tubozinho de cristal que por traz da botoeira da casaca conservava frescas as suas rosas todo homem está neste traço",
+        "id" : "12287_12742_000006",
+        "referencia" : "num dia de crise política em que lord beaconsfield devia fazer um discurso decisivo encontrou-o momentos antes num dos salões da câmara ocupado a encher d'água o tubozinho de cristal que por trás da botoeira da casaca conservava frescas as suas rosas todo o homem está neste traço",
+        "segundos" : 2.4460017499999998,
+        "wer" : {
+          "delecoes" : 2,
+          "insercoes" : 1,
+          "referencia" : 50,
+          "substituicoes" : 6
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 10,
+          "referencia" : 231,
+          "substituicoes" : 4
+        },
+        "duracao" : 20,
+        "hipotese" : "E no esmorecimento do colapso, ela vacilou e veio se apoiar nos braços de Milcal, que a foi arrastando vagarosamente. Enlaçados, caminhavam pela cidade calada e adormecida. E amorosos. Os passos dela eram vacilantes e os pés, por tanto tempo entorpecidos, tropeçavam nas pedras soltas da praia.",
+        "id" : "12626_10229_000006",
+        "referencia" : "e num esmorecido colapso ela vacilou e veio se apoiar nos braços de milkau que a foi arrastando vagarosamente enlaçados caminhavam pela cidade calada e adormecida iam morosos os passos dela eram vacilantes e os pés por tanto tempo entorpecidos tropeçavam nas pedras soltas da",
+        "segundos" : 2.904884542,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 2,
+          "referencia" : 45,
+          "substituicoes" : 5
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 1,
+          "referencia" : 104,
+          "substituicoes" : 2
+        },
+        "duracao" : 10.12,
+        "hipotese" : "manhã clara uma beleza diáfana e prazenteira o rio tinha as entilações prateadas fluindo numa suavidade infinita aqui e ali",
+        "id" : "12670_13396_000006",
+        "referencia" : "manhã clara duma beleza diáfana e prazenteira o rio tinha cintilações prateadas fluindo numa suavidade infinita aqui e ali",
+        "segundos" : 1.691363291,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 19,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 156,
+          "substituicoes" : 1
+        },
+        "duracao" : 15.89,
+        "hipotese" : "era quanto bastava para lhe ficar reconhecido a maior parte das pessoas que me ouvem riem se de mim falo sobre a génese das religiões a origem dos governos as relações da arte com a sociedade",
+        "id" : "13063_13511_000006",
+        "referencia" : "era quanto bastava para lhe ficar reconhecido a maior parte das pessoas que me ouvem riem-se de mim falo sobre a gênese das religiões a origem dos governos as relações da arte com a sociedade",
+        "segundos" : 1.937844416,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 36,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 164,
+          "substituicoes" : 2
+        },
+        "duracao" : 17.39,
+        "hipotese" : "é a idade da força e da beleza olha o futuro e ainda não tem passado e encarando de frente a natureza não tem receio do trabalho ousado ama a vigília aborrecendo o sono tem projetos de glória ama o que mera",
+        "id" : "3050_2941_000006",
+        "referencia" : "é a idade da força e da beleza olha o futuro e indo não tem passado e encarando de frente a natureza não tem receio do trabalho ousado ama a vigília aborrecendo o sono tem projetos de glória ama o quimera",
+        "segundos" : 2.034111917,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 41,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 4,
+          "referencia" : 111,
+          "substituicoes" : 2
+        },
+        "duracao" : 11.5,
+        "hipotese" : "Se cuido nas passadas que já dei, custa-me esta lembrança só tão cara, que a dor de ver as mágoas que passaram, tem o pô-la a maior mágoa que passei.",
+        "id" : "4405_3604_000006",
+        "referencia" : "se cuido nas passadas que já dei custa me esta lembrança só tão cara que a dor de ver as mágoas que passara tenho pola mor mágoa que passei",
+        "segundos" : 2.01279825,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 3,
+          "referencia" : 29,
+          "substituicoes" : 4
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 189,
+          "substituicoes" : 8
+        },
+        "duracao" : 12.73,
+        "hipotese" : "trouxe de lá alguns leques e mantilhas passou a itália e levantou o espirito á altura das recordações da arte classica viu a sombra de dante nas ruas de florence viu as almas dos doges pairando saudosas sobre as aguas e uvas do mar",
+        "id" : "5739_4739_000006",
+        "referencia" : "trouxe de lá alguns leques e mantilhas passou a itália e levantou o espírito à altura das recordações da arte clássica viu a sombra de dante nas ruas de florença viu as almas dos doges pairando saudosas sobre as águas viúvas do mar",
+        "segundos" : 2.298604833,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 43,
+          "substituicoes" : 6
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 2,
+          "referencia" : 196,
+          "substituicoes" : 2
+        },
+        "duracao" : 18.38,
+        "hipotese" : "Em que pensará o pobre Tapuia? No encanto misterioso da mãe d'água, cuja sedutora voz lhe parece estar ouvindo no murmúrio da corrente? No corrupira que vagabundeia nas matas, fatal e esquivo, com olhar ardente e cheio de promessas e de ameaças?",
+        "id" : "7925_6390_000006",
+        "referencia" : "em que pensará o pobre tapuya no encanto misterioso da mãe d'água cuja sedutora voz lhe parece estar ouvindo no murmúrio da corrente no curupira que vagabundeia nas matas fatal e esquivo com o olhar ardente cheio de promessas e de ameaças",
+        "segundos" : 2.586767,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 1,
+          "referencia" : 43,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 185,
+          "substituicoes" : 3
+        },
+        "duracao" : 17.53,
+        "hipotese" : "varada pelo vento invadida pela chuva nos dias de tormenta ahi cumpriam o ritual dos costumes patrios sob a pressão covarde do isolamento apegavam se como a um refugio ás intactas tradições transportadas de sangue a sangue",
+        "id" : "11247_10229_000007",
+        "referencia" : "varada pelo vento invadida pela chuva nos dias de tormenta aí cumpriam o ritual dos costumes pátrios sob a pressão covarde do isolamento apegavam-se como a um refugio as intactas tradições transportadas de sangue a sangue",
+        "segundos" : 2.344516458,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 37,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 231,
+          "substituicoes" : 1
+        },
+        "duracao" : 18.8,
+        "hipotese" : "os músicos instalaram se num dos ângulos do pátio largo liso lavado que recebia em seu lagedo para irradiá la a força do sol num momento ficou coalhado da gente simples e fácil de contentar desses que são amados da alegria e em quem ela não encontra tropelo para reinar livremente",
+        "id" : "12114_10229_000007",
+        "referencia" : "os músicos instalaram-se num dos ângulos do pátio largo liso lavado que recebia em seu lajedo para irradiá-la a força do sol num momento ficou coalhado da gente simples e fácil de contentar desses que são amados da alegria e em quem ela não encontra atropelo para reinar livremente",
+        "segundos" : 2.601663834,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 51,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 122,
+          "substituicoes" : 2
+        },
+        "duracao" : 12.26,
+        "hipotese" : "onde esperava o homem que sessenta anos antes era um pobre escrevente de cartório pode-se dizer que nesta carreira tão feliz a morte mesma foi feliz",
+        "id" : "12287_12742_000007",
+        "referencia" : "onde expirava o homem que sessenta anos antes era um pobre escrevente de cartório pode-se dizer que nesta carreira tão feliz a morte mesma foi feliz",
+        "segundos" : 2.127325708,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 27,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 239,
+          "substituicoes" : 2
+        },
+        "duracao" : 18.87,
+        "hipotese" : "Paulo Maciel ficou sem saber o que dizer diante de tais atitudes. O seu sentimento era suspender, prender esse escrevão insolente e seu subordinado legal. Era dispensar o inventário, era ainda por cima dar dinheiro do seu bolso à desgraçada e mandá-la embora, envolvendo-a num clarão de bondade.",
+        "id" : "12626_10229_000007",
+        "referencia" : "paulo maciel ficou sem saber o que dizer diante de tais atitudes o seu sentimento era suspender prender esse escrivão insolente seu subordinado legal era dispensar o inventário era ainda por cima dar dinheiro do seu bolso a desgraçada e mandá-la embora envolvendo-a num clarão de bondade",
+        "segundos" : 3.202557,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 49,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 3,
+          "insercoes" : 2,
+          "referencia" : 196,
+          "substituicoes" : 3
+        },
+        "duracao" : 16.47,
+        "hipotese" : "a sua maior dita viajar no pequeno yacht veleiro e gracioso nem a certeza dos bens pecuniários herdados anos antes nem a sedução das valsas em que o rodopiara outrora pelos salões à moda enlaçando frágeis bustos de morenitas capitosas",
+        "id" : "12670_13396_000007",
+        "referencia" : "eis a sua maior dita viajar no pequeno iate veleiro e gracioso nem a certeza dos bens pecuniários herdados anos antes nem a sedução das valsas em que rodopiara outrora pelos salões à moda enlaçando frágeis bustos de morenitas capitosas",
+        "segundos" : 2.459176125,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 1,
+          "referencia" : 40,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 182,
+          "substituicoes" : 0
+        },
+        "duracao" : 18.06,
+        "hipotese" : "um dia saí para respirar o ar livre de uma bela manhã de verão uma veia sarcástica provocadora não deixava harmonizar me com a serenidade da natureza vinha pelo mesmo passeio um sujeito magro fumando uma ponta de cigarro",
+        "id" : "13063_13511_000007",
+        "referencia" : "um dia saí para respirar o ar livre de uma bela manhã de verão uma veia sarcástica provocadora não deixava harmonizar-me com a serenidade da natureza vinha pelo mesmo passeio um sujeito magro fumando uma ponta de cigarro",
+        "segundos" : 2.34737725,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 39,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 121,
+          "substituicoes" : 1
+        },
+        "duracao" : 13.8,
+        "hipotese" : "mamãe como sou ingrata com tantos mimos me trata tão boa tão delicada dá-me vestidas e fitas dá-me bonecas bonitas e eu mamãe não lhe dou nada tolinha",
+        "id" : "3050_2941_000007",
+        "referencia" : "mamãe como sou ingrata com tantos mimos me trata tão boa tão delicada dá-me vestidos e fitas dá-me bonecas bonitas e eu mamãe não lhe dou nada tolinha",
+        "segundos" : 2.026259209,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 30,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 109,
+          "substituicoes" : 0
+        },
+        "duracao" : 11.09,
+        "hipotese" : "Grão tempo há já que soube da aventura A vida que me tinha destinada Que a longa experiência da passada Me dava claro indício da futura",
+        "id" : "4405_3604_000007",
+        "referencia" : "grão tempo há já que soube da ventura a vida que me tinha destinada que a longa experiência da passada me dava claro indício da futura",
+        "segundos" : 1.788979375,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 26,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 2,
+          "referencia" : 193,
+          "substituicoes" : 5
+        },
+        "duracao" : 13.21,
+        "hipotese" : "a carta de emilia respondeu tito nos seguintes termos minha senhora leio relia sua carta e não lhe ocultarei o sentimento de pesar que ella me inspirou realmente minha senhora é esse o estado do seu coração estás então perdido por mim",
+        "id" : "5739_4739_000007",
+        "referencia" : "à carta de emília respondeu tito nos seguintes termos minha senhora li e reli a sua carta e não lhe ocultarei o sentimento de pesar que ela me inspirou realmente minha senhora é esse o estado do seu coração está assim tão perdido por mim",
+        "segundos" : 2.125033459,
+        "wer" : {
+          "delecoes" : 3,
+          "insercoes" : 0,
+          "referencia" : 45,
+          "substituicoes" : 7
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 1,
+          "referencia" : 115,
+          "substituicoes" : 1
+        },
+        "duracao" : 10.44,
+        "hipotese" : "A vez de ter encontrado, beirando o rio, em viagem pelos sítios, o dono da casa sentado no terreiro, a olhar fixamente para as águas da correnteza.",
+        "id" : "7925_6390_000007",
+        "referencia" : "a vez de ter encontrado beirando o rio em viagem pelo sítios o dono da casa sentado no terreiro a olhar fixamente para as aguas da correnteza",
+        "segundos" : 1.876005917,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 27,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 198,
+          "substituicoes" : 0
+        },
+        "duracao" : 19.29,
+        "hipotese" : "e percebia num grande desalento que o conjunto tropical do país do sol o deixava estático errante e incompreensível e que a sua alma emigrava dali incapaz de uma comunhão perfeita de uma infiltração definitiva com a terra que sou eu então",
+        "id" : "11247_10229_000008",
+        "referencia" : "e percebia num grande desalento que o conjunto tropical do país do sol o deixava estático errante e incompreensível e que a sua alma emigrava dali incapaz de uma comunhão perfeita de uma infiltração definitiva com a terra o que sou eu então",
+        "segundos" : 2.144429875,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 43,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 118,
+          "substituicoes" : 0
+        },
+        "duracao" : 10.25,
+        "hipotese" : "Durante algum tempo, ninguém se moveu, e a música prosseguia solitária nos seus largos e chorosos compassos. Mas de repente, como um fauno antigo,",
+        "id" : "12114_10229_000008",
+        "referencia" : "durante algum tempo ninguém se moveu e a música prosseguia solitária nos seus largos e chorosos compassos mas de repente como um fauno antigo",
+        "segundos" : 1.812232416,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 24,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 200,
+          "substituicoes" : 3
+        },
+        "duracao" : 16.67,
+        "hipotese" : "e quando as modas românticas o permitiam vestia-se de cetim e veludo recobria se dum luxo de medalhões e joias as suas próprias calças tinham bordados d'ouro agora era mais sobre de toilette usava apenas esses casacos compridos como tunicas",
+        "id" : "12287_12742_000008",
+        "referencia" : "e quando as modas românticas o permitiam vestia-se de cetim e veludo recobria-se dum luxo de medalhões e joias as suas próprias calças tinham bordados d'ouro agora era mais sóbrio de toilette usava apenas esses casacos compridos como túnicas",
+        "segundos" : 2.21918425,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 42,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 229,
+          "substituicoes" : 1
+        },
+        "duracao" : 20,
+        "hipotese" : "com ela serena e forte ao lado da sentinela, conduzindo-a para a noite e para a liberdade. Fora, o ar sutil e frio que lhe penetrava nas carnes sonolentas e tépidas, o céu cristalino, a cintilação das estrelas, a largueza, a imensidade do espaço davam a fugitiva uma deliciosa vertigem,",
+        "id" : "12626_10229_000008",
+        "referencia" : "com ela sereno e forte ao lado da sentinela conduzindo-a para a noite e para a liberdade fora o ar subtil e frio que lhe penetrava nas carnes sonolentas e tépidas o céu cristalino a cintilação das estrelas a largueza a imensidade do espaço davam a fugitiva uma deliciosa vertigem",
+        "segundos" : 3.017822542,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 51,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 1,
+          "referencia" : 131,
+          "substituicoes" : 2
+        },
+        "duracao" : 11.73,
+        "hipotese" : "sequioso de novidade partida da terra paraense com a pasta pejada de cartas de ordem sobre bancos de alem-mar e a alma transbordante da ânsia de tudo ver e fruir",
+        "id" : "12670_13396_000008",
+        "referencia" : "sequioso de novidade partida da terra paraense com a pasta pejada de cartas d'ordens sobre bancos de além mar e a alma transbordante da ânsia de tudo ver e fruir",
+        "segundos" : 1.836640292,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 31,
+          "substituicoes" : 3
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 176,
+          "substituicoes" : 0
+        },
+        "duracao" : 18.04,
+        "hipotese" : "Outras vezes descrevo a formação da Terra, procuro explicar as evoluções da antropogenia com a cosmogonia, o aperfeiçoamento dos seres e a sua decadência pelo grau do calor que a matéria conserva e vai irradiando.",
+        "id" : "13063_13511_000008",
+        "referencia" : "outras vezes descrevo a formação da terra procuro explicar as evoluções da antropogenia com a cosmogonia o aperfeiçoamento dos seres e a sua decadência pelo grau do calor que a matéria conserva e vai irradiando",
+        "segundos" : 2.143074959,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 35,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 3,
+          "insercoes" : 1,
+          "referencia" : 111,
+          "substituicoes" : 3
+        },
+        "duracao" : 11.65,
+        "hipotese" : "dentro da casa em que nasceste és tudo como tudo é feliz no fim do dia quando volta da exausa do estudo volta quando tu voltas à alegria",
+        "id" : "3050_2941_000008",
+        "referencia" : "dentro da casa em que nasceste és tudo como tudo é feliz no fim do dia quando voltas das aulas e do estudo volta quando tu voltas a alegria",
+        "segundos" : 1.7133154579999998,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 29,
+          "substituicoes" : 4
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 106,
+          "substituicoes" : 0
+        },
+        "duracao" : 11.93,
+        "hipotese" : "A vida, sim, que uma áspera mudança não deixa viver tanto um coração. E eu na morte tenho a salvação? Sim, mas quem a deseja não a alcança.",
+        "id" : "4405_3604_000008",
+        "referencia" : "a vida sim que uma áspera mudança não deixa viver tanto um coração e eu na morte tenho a salvação sim mas quem a deseja não a alcança",
+        "segundos" : 2.016355209,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 28,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 2,
+          "insercoes" : 3,
+          "referencia" : 222,
+          "substituicoes" : 6
+        },
+        "duracao" : 15.06,
+        "hipotese" : "houve um tempo proseguiu emilia em que estivemos separadas mas isso não trouxe mudança a alguma ás nossas relações foi no tempo do meu primeiro casamento ah foi casada duas vezes em dois annos e por quem viu o vôo da primeira porque meu marido morreu disse emilia rindo-se",
+        "id" : "5739_4739_000008",
+        "referencia" : "houve um tempo prosseguiu emília em que estivemos separadas mas isso não trouxe mudança alguma às nossas relações foi no tempo do meu primeiro casamento ah foi casada duas vezes em dois anos e por que enviuvou da primeira porque meu marido morreu disse emília rindo-se",
+        "segundos" : 2.460290125,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 3,
+          "referencia" : 47,
+          "substituicoes" : 7
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 131,
+          "substituicoes" : 2
+        },
+        "duracao" : 13.52,
+        "hipotese" : "Dessa melancolia, contínua, Dão mostra principalmente as mulheres, por causa da vida que levam. Os homens sempre andam. Vêm uma ou outra vez gente e coisas novas.",
+        "id" : "7925_6390_000008",
+        "referencia" : "dessa melancolia contínua dão mostra principalmente as mulheres por causa da vida que levam os homens sempre andam veem uma ou outra vez gente e cousas novas",
+        "segundos" : 1.952123791,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 27,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 200,
+          "substituicoes" : 1
+        },
+        "duracao" : 20,
+        "hipotese" : "o rio sem horizonte sem limite como uma grande pasta cinzenta ligava-se ao céu baixo e denso o desenho apagara-se a bruma mascarava os perfis das coisas e o colorido surgia com a sombra numa sublime desforra por toda a parte manchas esplêndidas",
+        "id" : "11247_10229_000009",
+        "referencia" : "o rio sem horizonte sem limite como uma grande pasta cinzenta ligava-se ao céu baixo e denso o desenho apagara-se a bruma mascarava os perfis das coisas e o colorido surgia com a sombra numa sublime desforra por toda a parte manchas esplendidas",
+        "segundos" : 2.35513875,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 45,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 182,
+          "substituicoes" : 2
+        },
+        "duracao" : 15.77,
+        "hipotese" : "onde cada um parece possuído do espírito do demônio solto sobre a face do mundo devastando a nos seus impulsos de loucura e estribuchando para morrer num espasmo de maldade aqui ao menos é a serenidade é a calma é a alegria",
+        "id" : "12114_10229_000009",
+        "referencia" : "onde cada um parece possuído do espirito do demônio solto sobre a face do mundo devastando-a nos seus impulsos de loucura e estrebuchando para morrer num espasmo de maldade aqui ao menos é a serenidade é a calma é a alegria",
+        "segundos" : 2.247640791,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 42,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 159,
+          "substituicoes" : 4
+        },
+        "duracao" : 15.89,
+        "hipotese" : "tinham ainda outros distintivos usavam o cabelo a nazarena mostravam a coragem enorme nesse tempo de admirar o odiado byron e procuravam elevar e aperfeiçoar a arte da cozinha em ingalterre",
+        "id" : "12287_12742_000009",
+        "referencia" : "tinham ainda outros distintivos usavam o cabelo à nazarena mostravam a coragem enorme nesse tempo de admirar o odiado byron e procuravam elevar e aperfeiçoar a arte da cozinha em inglaterra",
+        "segundos" : 2.030829125,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 31,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 215,
+          "substituicoes" : 0
+        },
+        "duracao" : 20,
+        "hipotese" : "sentimento da perpetuidade nós nos prolongaremos desdobraremos infinitamente a nossa personalidade iremos viver longe muito longe na alma dos descendentes façamos dela o vaso sagrado da nossa ternura onde depositaremos tudo que é puro e santo e divino",
+        "id" : "12626_10229_000009",
+        "referencia" : "sentimento da perpetuidade nós nos prolongaremos desdobraremos infinitamente a nossa personalidade iremos viver longe muito longe na alma dos descendentes façamos dela o vaso sagrado da nossa ternura onde depositaremos tudo o que é puro e santo e divino",
+        "segundos" : 2.183487083,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 39,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 247,
+          "substituicoes" : 0
+        },
+        "duracao" : 19.95,
+        "hipotese" : "fossem lá dizer-lhe que as seduções da tapuia paraense mimosa e ingênua duas vezes adorável pela graça e pela ignorância tímida seriam capazes de o transportar aos requintes da ventura absorvendo o de corpo e alma perenemente e purificando o dos primitivos contatos como numa piscina miraculosa",
+        "id" : "12670_13396_000009",
+        "referencia" : "fossem lá dizer-lhe que as seduções da tapuia paraense mimosa e ingênua duas vezes adorável pela graça e pela ignorância tímida seriam capazes de o transportar aos requintes da ventura absorvendo-o de corpo e alma perenemente e purificando-o dos primitivos contatos como numa piscina miraculosa",
+        "segundos" : 2.733568917,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 48,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 193,
+          "substituicoes" : 1
+        },
+        "duracao" : 19.16,
+        "hipotese" : "O homem, ao destacar-se do último elo da cadeia dos seres, sentiu-se forte e senhor da terra. A natureza oferecia-lhe por toda a parte seus peitos uberantes, e este regozijo de harmonia ligava a sua existência à vida panteística do universo.",
+        "id" : "13063_13511_000009",
+        "referencia" : "o homem ao destacar-se do último elo da cadeia dos seres sentiu-se forte e senhor da terra a natureza oferecia-lhe por toda a parte seus peitos uberantes e este regozijo de harmonia ligava a sua existência a vida panteística do universo",
+        "segundos" : 2.444405459,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 44,
+          "substituicoes" : 1
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 3,
+          "insercoes" : 0,
+          "referencia" : 129,
+          "substituicoes" : 1
+        },
+        "duracao" : 14.4,
+        "hipotese" : "sobrem hinos de amor ao céu profundo homem jesus nasceu natal natal sob esta palha está quem salva o mundo quem ama os fracos quem perdoa o mal natal natal",
+        "id" : "3050_2941_000009",
+        "referencia" : "sobrem hinos de amor ao céu profundo homens jesus nasceu natal natal sobre esta palha está quem salva o mundo quem ama os fracos quem perdoa o mal natal natal",
+        "segundos" : 2.035521209,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 30,
+          "substituicoes" : 2
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 172,
+          "substituicoes" : 0
+        },
+        "duracao" : 17.06,
+        "hipotese" : "e se de qualquer áspera mudança toda vontade isenta amor castiga como eu vi bem no mal que me condena e se em vós não se entende haver vingança será forçado pois amor me obriga que eu só de vossa culpa pague a pena",
+        "id" : "4405_3604_000009",
+        "referencia" : "e se de qualquer áspera mudança toda a vontade isenta amor castiga como eu vi bem no mal que me condena e se em vós não se entende haver vingança será forçado pois amor me obriga que eu só de vossa culpa pague a pena",
+        "segundos" : 2.2665545,
+        "wer" : {
+          "delecoes" : 1,
+          "insercoes" : 0,
+          "referencia" : 45,
+          "substituicoes" : 0
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 3,
+          "referencia" : 225,
+          "substituicoes" : 7
+        },
+        "duracao" : 14.2,
+        "hipotese" : "no primeiro dia da residência de pito em petrópolis a chuva como disse acima impediu que os diversos personagens desta historia se encontrassem cada qual ficou na sua casa mas o dia immediato foi mais viníquido tito aproveitou o bom tempo para ir ver a risonha cidade da serra",
+        "id" : "5739_4739_000009",
+        "referencia" : "no primeiro dia da residência de tito em petrópolis a chuva como disse acima impediu que os diversos personagens desta história se encontrassem cada qual ficou na sua casa mas o dia imediato foi mais benigno tito aproveitou o bom tempo para ir ver a risonha cidade da serra",
+        "segundos" : 2.427582542,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 49,
+          "substituicoes" : 4
+        }
+      },
+      {
+        "cer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 130,
+          "substituicoes" : 0
+        },
+        "duracao" : 17.23,
+        "hipotese" : "A virtude é comunicável, o vício é contagioso. Os governos fracos fazem fortes os ambiciosos e insurgentes. A atividade sem juízo é mais ruinosa que a preguiça.",
+        "id" : "7925_6390_000009",
+        "referencia" : "a virtude é comunicável o vício é contagioso os governos fracos fazem fortes os ambiciosos e insurgentes a atividade sem juízo é mais ruinosa que a preguiça",
+        "segundos" : 2.110482792,
+        "wer" : {
+          "delecoes" : 0,
+          "insercoes" : 0,
+          "referencia" : 27,
+          "substituicoes" : 0
+        }
+      }
+    ],
+    "segundosDeCargaDoModelo" : 0.901473958,
+    "segundosDeProcessamento" : 220.76522280000003,
+    "vezesTempoReal" : 7.130325963641769,
+    "wer" : {
+      "delecoes" : 42,
+      "insercoes" : 20,
+      "referencia" : 3728,
+      "substituicoes" : 169
+    }
+  }
+}

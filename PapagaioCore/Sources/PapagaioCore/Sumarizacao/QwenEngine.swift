@@ -59,6 +59,17 @@ public struct QwenEngine: SummarizationEngine {
         _ trechos: [Trecho],
         idiomaDeSaida: IdiomaDeProcessamento? = nil
     ) async throws -> Resumo {
+        try await summarizeComCitacoesSugeridas(trechos, idiomaDeSaida: idiomaDeSaida).resumo
+    }
+
+    /// O resumo e as citações **como o modelo sugeriu**, antes da validação.
+    ///
+    /// Só a avaliação usa: é o que mede quanto o modelo parafraseia, e por
+    /// que a validação contra a transcrição existe.
+    public func summarizeComCitacoesSugeridas(
+        _ trechos: [Trecho],
+        idiomaDeSaida: IdiomaDeProcessamento? = nil
+    ) async throws -> (resumo: Resumo, citacoesSugeridas: [Citacao]) {
         guard !trechos.isEmpty else {
             throw ErroDeResumo.transcricaoVazia
         }
@@ -74,13 +85,14 @@ public struct QwenEngine: SummarizationEngine {
         // chega à tela é a lembrança que o Qwen tem da conversa — texto
         // parafraseado e `start` estimado, que leva o player para o lugar
         // errado. Ver `ValidacaoDeCitacoes`.
-        return Resumo(
+        let resumo = Resumo(
             titulo: bruto.titulo,
             visaoGeral: bruto.visaoGeral,
             temas: bruto.temas,
             citacoes: ValidacaoDeCitacoes.validar(bruto.citacoes, contra: trechos),
             proximosPassos: bruto.proximosPassos
         )
+        return (resumo, bruto.citacoes)
     }
 
     /// Traduz os textos dos trechos mantendo a linha do tempo e o canal de
